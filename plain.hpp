@@ -89,6 +89,8 @@ private:
 #undef DEFINE_GATE_IMPL
 };
 
+using PlainNetwork = PlainNetworkBuilder::NetworkType;
+
 class PlainWorker : public Worker<uint8_t /* dummy */> {
 private:
     uint8_t getWorkerInfo()

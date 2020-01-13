@@ -189,23 +189,18 @@ protected:
 };
 
 template <class TaskType, class TaskTypeMem, class WorkerInfo>
-class NetworkBuilder {
+class NetworkBuilder;
+
+template <class TaskType, class TaskTypeMem, class WorkerInfo>
+class TaskNetwork {
 public:
     using QueueType = std::queue<std::shared_ptr<DepNode<WorkerInfo>>>;
 
-public:
-    struct InputNode {
-        std::shared_ptr<TaskTypeMem> task;
-        std::shared_ptr<DepNode<WorkerInfo>> depnode;
-    };
-    struct OutputNode {
-        std::shared_ptr<TaskTypeMem> task;
-        std::shared_ptr<DepNode<WorkerInfo>> depnode;
-    };
     struct MemNode {
         std::shared_ptr<TaskTypeMem> task;
         std::shared_ptr<DepNode<WorkerInfo>> depnode;
     };
+
     struct Node {
         std::shared_ptr<TaskType> task;
         std::shared_ptr<DepNode<WorkerInfo>> depnode;
@@ -213,44 +208,84 @@ public:
 
 private:
     std::unordered_map<int, Node> id2node_;
-
-    std::map<std::pair<std::string, int>, InputNode> inputs_;
-    std::map<std::pair<std::string, int>, OutputNode> outputs_;
     std::map<std::tuple<std::string, std::string, int>, MemNode> namedMems_;
 
+private:
+    MemNode &mem(const std::string &kind, const std::string &portName,
+                 int portBit)
+    {
+        auto it = namedMems_.find(std::make_tuple(kind, portName, portBit));
+        assert(it != namedMems_.end());
+        return it->second;
+    }
+
 public:
-    NetworkBuilder()
+    TaskNetwork(NetworkBuilder<TaskType, TaskTypeMem, WorkerInfo> &&builder);
+
+    size_t numNodes() const
     {
+        return id2node_.size();
     }
 
-    std::unordered_map<int, Node> nodes() const
+    QueueType getReadyQueue() const
     {
-        return id2node_;
+        QueueType queue;
+        for (auto &&[id, node] : id2node_)
+            if (node.task->areInputsReady())
+                queue.push(node.depnode);
+        return queue;
     }
 
-    std::map<std::pair<std::string, int>, InputNode> inputs() const
+    Node &node(int id)
     {
-        return inputs_;
+        return id2node_[id];
     }
 
-    std::map<std::pair<std::string, int>, OutputNode> outputs() const
+    MemNode &input(const std::string &portName, int portBit)
     {
-        return outputs_;
+        return mem("input", portName, portBit);
     }
+
+    MemNode &output(const std::string &portName, int portBit)
+    {
+        return mem("output", portName, portBit);
+    }
+
+    void tick()
+    {
+        for (auto &&[key, node] : id2node_)
+            node.task->tick();
+    }
+};
+
+template <class TaskType, class TaskTypeMem, class WorkerInfo>
+class NetworkBuilder {
+    friend TaskNetwork<TaskType, TaskTypeMem, WorkerInfo>;
+
+public:
+    using NetworkType = TaskNetwork<TaskType, TaskTypeMem, WorkerInfo>;
 
 private:
-    MemNode addMem(int id)
+    std::unordered_map<int, typename NetworkType::Node> id2node_;
+
+    std::map<std::tuple<std::string, std::string, int>,
+             typename NetworkType::MemNode>
+        namedMems_;
+
+private:
+    typename NetworkType::MemNode addMem(int id)
     {
         auto task = std::make_shared<TaskTypeMem>();
         auto depnode = std::make_shared<DepNode<WorkerInfo>>(task);
-        id2node_.emplace(id, Node{task, depnode});
-        return MemNode{task, depnode};
+        id2node_.emplace(id, typename NetworkType::Node{task, depnode});
+        return typename NetworkType::MemNode{task, depnode};
     }
 
-    void addNamedMem(int id,
-                     const std::tuple<std::string, std::string, int> &key)
+    void addNamedMem(int id, const std::string &kind,
+                     const std::string &portName, int portBit)
     {
-        namedMems_.emplace(key, addMem(id));
+        namedMems_.emplace(std::make_tuple(kind, portName, portBit),
+                           addMem(id));
     }
 
 public:
@@ -261,30 +296,22 @@ public:
 
     void ROM(int id, const std::string &portName, int portBit)
     {
-        addNamedMem(id, std::make_tuple("rom", portName, portBit));
+        addNamedMem(id, "rom", portName, portBit);
     }
 
     void RAM(int id, const std::string &portName, int portBit)
     {
-        addNamedMem(id, std::make_tuple("ram", portName, portBit));
+        addNamedMem(id, "ram", portName, portBit);
     }
 
     void INPUT(int id, const std::string &portName, int portBit)
     {
-        auto task = std::make_shared<TaskTypeMem>();
-        auto depnode = std::make_shared<DepNode<WorkerInfo>>(task);
-        id2node_.emplace(id, Node{task, depnode});
-
-        inputs_[std::make_pair(portName, portBit)] = InputNode{task, depnode};
+        addNamedMem(id, "input", portName, portBit);
     }
 
     void OUTPUT(int id, const std::string &portName, int portBit)
     {
-        auto task = std::make_shared<TaskTypeMem>();
-        auto depnode = std::make_shared<DepNode<WorkerInfo>>(task);
-        id2node_.emplace(id, Node{task, depnode});
-
-        outputs_[std::make_pair(portName, portBit)] = OutputNode{task, depnode};
+        addNamedMem(id, "output", portName, portBit);
     }
 
     void connect(int from, int to)
@@ -298,16 +325,16 @@ public:
         fromIt->second.depnode->addDependent(toIt->second.depnode);
     }
 
-#define DEFINE_GATE(name)                                           \
-protected:                                                          \
-    virtual std::shared_ptr<TaskType> name##Impl() = 0;             \
-                                                                    \
-public:                                                             \
-    void name(int id)                                               \
-    {                                                               \
-        auto task = name##Impl();                                   \
-        auto depnode = std::make_shared<DepNode<WorkerInfo>>(task); \
-        id2node_.emplace(id, Node{task, depnode});                  \
+#define DEFINE_GATE(name)                                                \
+protected:                                                               \
+    virtual std::shared_ptr<TaskType> name##Impl() = 0;                  \
+                                                                         \
+public:                                                                  \
+    void name(int id)                                                    \
+    {                                                                    \
+        auto task = name##Impl();                                        \
+        auto depnode = std::make_shared<DepNode<WorkerInfo>>(task);      \
+        id2node_.emplace(id, typename NetworkType::Node{task, depnode}); \
     }
     DEFINE_GATE(AND);
     DEFINE_GATE(NAND);
@@ -322,16 +349,20 @@ public:                                                             \
 #undef DEFINE_GATE
 };
 
+template <class TaskType, class TaskTypeMem, class WorkerInfo>
+TaskNetwork<TaskType, TaskTypeMem, WorkerInfo>::TaskNetwork(
+    NetworkBuilder<TaskType, TaskTypeMem, WorkerInfo> &&builder)
+    : id2node_(std::move(builder.id2node_)),
+      namedMems_(std::move(builder.namedMems_))
+{
+}
+
 #include <picojson.h>
 
 // Read JSON from the stream, build a network, and return a tuple of inputs,
 // outputs, and nodes.
 template <class NetworkBuilder>
-std::tuple<
-    std::invoke_result_t<decltype(&NetworkBuilder::inputs), NetworkBuilder>,
-    std::invoke_result_t<decltype(&NetworkBuilder::outputs), NetworkBuilder>,
-    std::invoke_result_t<decltype(&NetworkBuilder::nodes), NetworkBuilder>>
-readNetworkFromJSON(std::istream &is)
+typename NetworkBuilder::NetworkType readNetworkFromJSON(std::istream &is)
 {
     // Read the stream as picojson::value.
     picojson::value v;
@@ -340,14 +371,14 @@ readNetworkFromJSON(std::istream &is)
         throw std::runtime_error(err);
     }
 
-    NetworkBuilder net;
-    readNetworkFromJSONImpl(net, v);
+    NetworkBuilder builder;
+    readNetworkFromJSONImpl(builder, v);
 
-    return std::make_tuple(net.inputs(), net.outputs(), net.nodes());
+    return typename NetworkBuilder::NetworkType{std::move(builder)};
 }
 
 template <class NetworkBuilder>
-void readNetworkFromJSONImpl(NetworkBuilder &net, picojson::value &v)
+void readNetworkFromJSONImpl(NetworkBuilder &builder, picojson::value &v)
 {
     // FIXME: Make use of attribute `priority`
     picojson::object &obj = v.get<picojson::object>();
@@ -361,10 +392,10 @@ void readNetworkFromJSONImpl(NetworkBuilder &net, picojson::value &v)
         int portBit = static_cast<int>(port.at("portBit").get<double>());
         int priority = static_cast<int>(port.at("priority").get<double>());
         if (type == "input") {
-            net.INPUT(id, portName, portBit);
+            builder.INPUT(id, portName, portBit);
         }
         else if (type == "output") {
-            net.OUTPUT(id, portName, portBit);
+            builder.OUTPUT(id, portName, portBit);
         }
     }
     for (const auto &e : cells) {  // vectorをrange-based-forでまわしている。
@@ -373,49 +404,49 @@ void readNetworkFromJSONImpl(NetworkBuilder &net, picojson::value &v)
         int id = static_cast<int>(cell.at("id").get<double>());
         int priority = static_cast<int>(cell.at("priority").get<double>());
         if (type == "AND") {
-            net.AND(id);
+            builder.AND(id);
         }
         else if (type == "NAND") {
-            net.NAND(id);
+            builder.NAND(id);
         }
         else if (type == "ANDNOT") {
-            net.ANDNOT(id);
+            builder.ANDNOT(id);
         }
         else if (type == "XOR") {
-            net.XOR(id);
+            builder.XOR(id);
         }
         else if (type == "XNOR") {
-            net.XNOR(id);
+            builder.XNOR(id);
         }
         else if (type == "DFFP") {
-            net.DFF(id);
+            builder.DFF(id);
         }
         else if (type == "NOT") {
-            net.NOT(id);
+            builder.NOT(id);
         }
         else if (type == "NOR") {
-            net.NOR(id);
+            builder.NOR(id);
         }
         else if (type == "OR") {
-            net.OR(id);
+            builder.OR(id);
         }
         else if (type == "ORNOT") {
-            net.ORNOT(id);
+            builder.ORNOT(id);
         }
         else if (type == "MUX") {
-            net.MUX(id);
+            builder.MUX(id);
         }
         else if (type == "ROM") {
             int romAddress =
                 static_cast<int>(cell.at("romAddress").get<double>());
             int romBit = static_cast<int>(cell.at("romBit").get<double>());
-            net.ROM(id, std::to_string(romAddress), romBit);
+            builder.ROM(id, std::to_string(romAddress), romBit);
         }
         else if (type == "RAM") {
             int ramAddress =
                 static_cast<int>(cell.at("ramAddress").get<double>());
             int ramBit = static_cast<int>(cell.at("ramBit").get<double>());
-            net.RAM(id, std::to_string(ramAddress), ramBit);
+            builder.RAM(id, std::to_string(ramAddress), ramBit);
         }
         else {
             throw std::runtime_error("Not implemented:" + type);
@@ -430,13 +461,13 @@ void readNetworkFromJSONImpl(NetworkBuilder &net, picojson::value &v)
         if (type == "input") {
             for (const auto &b : bits) {
                 int logic = static_cast<int>(b.get<double>());
-                net.connect(id, logic);
+                builder.connect(id, logic);
             }
         }
         else if (type == "output") {
             for (const auto &b : bits) {
                 int logic = static_cast<int>(b.get<double>());
-                net.connect(logic, id);
+                builder.connect(logic, id);
             }
         }
     }
@@ -452,29 +483,29 @@ void readNetworkFromJSONImpl(NetworkBuilder &net, picojson::value &v)
             int A = static_cast<int>(input.at("A").get<double>());
             int B = static_cast<int>(input.at("B").get<double>());
             picojson::array &Y = output.at("Y").get<picojson::array>();
-            net.connect(A, id);
-            net.connect(B, id);
+            builder.connect(A, id);
+            builder.connect(B, id);
             for (const auto &y : Y) {
                 int bitY = static_cast<int>(y.get<double>());
-                net.connect(id, bitY);
+                builder.connect(id, bitY);
             }
         }
         else if (type == "DFFP") {
             int D = static_cast<int>(input.at("D").get<double>());
             picojson::array &Q = output.at("Q").get<picojson::array>();
-            net.connect(D, id);
+            builder.connect(D, id);
             for (const auto &q : Q) {
                 int bitQ = static_cast<int>(q.get<double>());
-                net.connect(id, bitQ);
+                builder.connect(id, bitQ);
             }
         }
         else if (type == "NOT") {
             int A = static_cast<int>(input.at("A").get<double>());
             picojson::array &Y = output.at("Y").get<picojson::array>();
-            net.connect(A, id);
+            builder.connect(A, id);
             for (const auto &y : Y) {
                 int bitY = static_cast<int>(y.get<double>());
-                net.connect(id, bitY);
+                builder.connect(id, bitY);
             }
         }
         else if (type == "MUX") {
@@ -482,28 +513,28 @@ void readNetworkFromJSONImpl(NetworkBuilder &net, picojson::value &v)
             int B = static_cast<int>(input.at("B").get<double>());
             int S = static_cast<int>(input.at("S").get<double>());
             picojson::array &Y = output.at("Y").get<picojson::array>();
-            net.connect(A, id);
-            net.connect(B, id);
-            net.connect(S, id);
+            builder.connect(A, id);
+            builder.connect(B, id);
+            builder.connect(S, id);
             for (const auto &y : Y) {
                 int bitY = static_cast<int>(y.get<double>());
-                net.connect(id, bitY);
+                builder.connect(id, bitY);
             }
         }
         else if (type == "ROM") {
             picojson::array &Q = output.at("Q").get<picojson::array>();
             for (const auto &q : Q) {
                 int bitQ = static_cast<int>(q.get<double>());
-                net.connect(id, bitQ);
+                builder.connect(id, bitQ);
             }
         }
         else if (type == "RAM") {
             int D = static_cast<int>(input.at("D").get<double>());
             picojson::array &Q = output.at("Q").get<picojson::array>();
-            net.connect(D, id);
+            builder.connect(D, id);
             for (const auto &q : Q) {
                 int bitQ = static_cast<int>(q.get<double>());
-                net.connect(id, bitQ);
+                builder.connect(id, bitQ);
             }
         }
         else {
