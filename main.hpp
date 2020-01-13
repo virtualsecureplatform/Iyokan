@@ -188,19 +188,22 @@ protected:
     virtual WorkerInfo getWorkerInfo() = 0;
 };
 
-template <class TaskType, class TaskTypeINPUT, class TaskTypeOUTPUT,
-          class WorkerInfo>
+template <class TaskType, class TaskTypeMem, class WorkerInfo>
 class NetworkBuilder {
 public:
     using QueueType = std::queue<std::shared_ptr<DepNode<WorkerInfo>>>;
 
 public:
     struct InputNode {
-        std::shared_ptr<TaskTypeINPUT> task;
+        std::shared_ptr<TaskTypeMem> task;
         std::shared_ptr<DepNode<WorkerInfo>> depnode;
     };
     struct OutputNode {
-        std::shared_ptr<TaskTypeOUTPUT> task;
+        std::shared_ptr<TaskTypeMem> task;
+        std::shared_ptr<DepNode<WorkerInfo>> depnode;
+    };
+    struct MemNode {
+        std::shared_ptr<TaskTypeMem> task;
         std::shared_ptr<DepNode<WorkerInfo>> depnode;
     };
     struct Node {
@@ -213,6 +216,7 @@ private:
 
     std::map<std::pair<std::string, int>, InputNode> inputs_;
     std::map<std::pair<std::string, int>, OutputNode> outputs_;
+    std::map<std::tuple<std::string, std::string, int>, MemNode> namedMems_;
 
 public:
     NetworkBuilder()
@@ -234,37 +238,40 @@ public:
         return outputs_;
     }
 
-    /*
-    std::unordered_map<std::string, std::vector<InputNode>> inputs() const
+private:
+    MemNode addMem(int id)
     {
-        // Convert map[(string, int)]InputNode to map[string]([]InputNode)
-        std::unordered_map<std::string, std::vector<InputNode>> ret;
-        for (auto &&[key, node] : inputs_) {
-            std::vector<InputNode> &v = ret[key.first];
-            if (v.size() < key.second + 1)
-                v.resize(key.second + 1, InputNode{nullptr, nullptr});
-            v.at(key.second) = node;
-        }
-        return ret;
+        auto task = std::make_shared<TaskTypeMem>();
+        auto depnode = std::make_shared<DepNode<WorkerInfo>>(task);
+        id2node_.emplace(id, Node{task, depnode});
+        return MemNode{task, depnode};
     }
 
-    std::unordered_map<std::string, std::vector<OutputNode>> outputs() const
+    void addNamedMem(int id,
+                     const std::tuple<std::string, std::string, int> &key)
     {
-        // Convert map[(string, int)]OutputNode to map[string]([]OutputNode)
-        std::unordered_map<std::string, std::vector<OutputNode>> ret;
-        for (auto [key, node] : outputs_) {
-            std::vector<OutputNode> &v = ret[key.first];
-            if (v.size() < key.second + 1)
-                v.resize(key.second + 1, OutputNode{nullptr, nullptr});
-            v.at(key.second) = node;
-        }
-        return ret;
+        namedMems_.emplace(key, addMem(id));
     }
-    */
+
+public:
+    void DFF(int id)
+    {
+        addMem(id);
+    }
+
+    void ROM(int id, const std::string &portName, int portBit)
+    {
+        addNamedMem(id, std::make_tuple("rom", portName, portBit));
+    }
+
+    void RAM(int id, const std::string &portName, int portBit)
+    {
+        addNamedMem(id, std::make_tuple("ram", portName, portBit));
+    }
 
     void INPUT(int id, const std::string &portName, int portBit)
     {
-        auto task = std::make_shared<TaskTypeINPUT>();
+        auto task = std::make_shared<TaskTypeMem>();
         auto depnode = std::make_shared<DepNode<WorkerInfo>>(task);
         id2node_.emplace(id, Node{task, depnode});
 
@@ -273,7 +280,7 @@ public:
 
     void OUTPUT(int id, const std::string &portName, int portBit)
     {
-        auto task = std::make_shared<TaskTypeOUTPUT>();
+        auto task = std::make_shared<TaskTypeMem>();
         auto depnode = std::make_shared<DepNode<WorkerInfo>>(task);
         id2node_.emplace(id, Node{task, depnode});
 

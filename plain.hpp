@@ -68,7 +68,7 @@ DEFINE_TASK_PLAIN_GATE(NOT, ~input(0));
 #undef DEFINE_TASK_PLAIN_GATE
 
 class PlainNetworkBuilder
-    : public NetworkBuilder<TaskPlainGate, TaskPlainGateMem, TaskPlainGateMem,
+    : public NetworkBuilder<TaskPlainGate, TaskPlainGateMem,
                             uint8_t /* dummy */> {
 private:
 #define DEFINE_GATE_IMPL(name)                           \
