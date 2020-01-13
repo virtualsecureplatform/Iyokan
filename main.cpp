@@ -1,5 +1,8 @@
 #include "main.hpp"
 
+//
+#include "plain.hpp"
+
 template <class Inputs, class AllNodes>
 void processAllGates(Inputs& inputs, AllNodes& allNodes, int numWorkers)
 {
