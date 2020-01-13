@@ -184,6 +184,28 @@ void testPlainFromJSONtest_and_4bit()
     assert(net.output("io_out", 3).task->get() == 1);
 }
 
+void testPlainFromJSONtest_and_4_2bit()
+{
+    const std::string fileName = "test/test-and-4_2bit.json";
+    std::ifstream ifs{fileName};
+    assert(ifs);
+
+    auto net = readNetworkFromJSON<PlainNetworkBuilder>(ifs);
+    net.input("io_inA", 0).task->set(1);
+    net.input("io_inA", 1).task->set(0);
+    net.input("io_inA", 2).task->set(1);
+    net.input("io_inA", 3).task->set(1);
+    net.input("io_inB", 0).task->set(1);
+    net.input("io_inB", 1).task->set(1);
+    net.input("io_inB", 2).task->set(1);
+    net.input("io_inB", 3).task->set(1);
+
+    processAllGates(net, 3);
+
+    assert(net.output("io_out", 0).task->get() == 1);
+    assert(net.output("io_out", 1).task->get() == 0);
+}
+
 int main()
 {
     testPlainBinopGates();
@@ -191,4 +213,5 @@ int main()
     testPlainNOT();
     testPlainFromJSONtest_pass_4bit();
     testPlainFromJSONtest_and_4bit();
+    testPlainFromJSONtest_and_4_2bit();
 }
