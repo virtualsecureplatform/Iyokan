@@ -59,6 +59,7 @@ DEFINE_TASK_PLAIN_GATE(AND, (input(0) & input(1)));
 DEFINE_TASK_PLAIN_GATE(NAND, ~(input(0) & input(1)));
 DEFINE_TASK_PLAIN_GATE(ANDNOT, (input(0) & ~input(1)));
 DEFINE_TASK_PLAIN_GATE(OR, (input(0) | input(1)));
+DEFINE_TASK_PLAIN_GATE(NOR, ~(input(0) | input(1)));
 DEFINE_TASK_PLAIN_GATE(ORNOT, (input(0) | ~input(1)));
 DEFINE_TASK_PLAIN_GATE(XOR, (input(0) ^ input(1)));
 DEFINE_TASK_PLAIN_GATE(XNOR, ~(input(0) ^ input(1)));
@@ -79,6 +80,7 @@ private:
     DEFINE_GATE_IMPL(NAND);
     DEFINE_GATE_IMPL(ANDNOT);
     DEFINE_GATE_IMPL(OR);
+    DEFINE_GATE_IMPL(NOR);
     DEFINE_GATE_IMPL(ORNOT);
     DEFINE_GATE_IMPL(XOR);
     DEFINE_GATE_IMPL(XNOR);

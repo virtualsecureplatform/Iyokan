@@ -306,6 +306,7 @@ public:                                                             \
     DEFINE_GATE(NAND);
     DEFINE_GATE(ANDNOT);
     DEFINE_GATE(OR);
+    DEFINE_GATE(NOR);
     DEFINE_GATE(ORNOT);
     DEFINE_GATE(XOR);
     DEFINE_GATE(XNOR);
