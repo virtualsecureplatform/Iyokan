@@ -322,4 +322,194 @@ public:                                                             \
 #undef DEFINE_GATE
 };
 
+#include <picojson.h>
+
+// Read JSON from the stream, build a network, and return a tuple of inputs,
+// outputs, and nodes.
+template <class NetworkBuilder>
+std::tuple<
+    std::invoke_result_t<decltype(&NetworkBuilder::inputs), NetworkBuilder>,
+    std::invoke_result_t<decltype(&NetworkBuilder::outputs), NetworkBuilder>,
+    std::invoke_result_t<decltype(&NetworkBuilder::nodes), NetworkBuilder>>
+readNetworkFromJSON(std::istream &is)
+{
+    // Read the stream as picojson::value.
+    picojson::value v;
+    const std::string err = picojson::parse(v, is);
+    if (!err.empty()) {
+        throw std::runtime_error(err);
+    }
+
+    NetworkBuilder net;
+    readNetworkFromJSONImpl(net, v);
+
+    return std::make_tuple(net.inputs(), net.outputs(), net.nodes());
+}
+
+template <class NetworkBuilder>
+void readNetworkFromJSONImpl(NetworkBuilder &net, picojson::value &v)
+{
+    // FIXME: Make use of attribute `priority`
+    picojson::object &obj = v.get<picojson::object>();
+    picojson::array &cells = obj["cells"].get<picojson::array>();
+    picojson::array &ports = obj["ports"].get<picojson::array>();
+    for (const auto &e : ports) {  // vectorをrange-based-forでまわしている。
+        picojson::object port = e.get<picojson::object>();
+        std::string type = port.at("type").get<std::string>();
+        int id = static_cast<int>(port.at("id").get<double>());
+        std::string portName = port.at("portName").get<std::string>();
+        int portBit = static_cast<int>(port.at("portBit").get<double>());
+        int priority = static_cast<int>(port.at("priority").get<double>());
+        if (type == "input") {
+            net.INPUT(id, portName, portBit);
+        }
+        else if (type == "output") {
+            net.OUTPUT(id, portName, portBit);
+        }
+    }
+    for (const auto &e : cells) {  // vectorをrange-based-forでまわしている。
+        picojson::object cell = e.get<picojson::object>();
+        std::string type = cell.at("type").get<std::string>();
+        int id = static_cast<int>(cell.at("id").get<double>());
+        int priority = static_cast<int>(cell.at("priority").get<double>());
+        if (type == "AND") {
+            net.AND(id);
+        }
+        else if (type == "NAND") {
+            net.NAND(id);
+        }
+        else if (type == "ANDNOT") {
+            net.ANDNOT(id);
+        }
+        else if (type == "XOR") {
+            net.XOR(id);
+        }
+        else if (type == "XNOR") {
+            net.XNOR(id);
+        }
+        else if (type == "DFFP") {
+            net.DFF(id);
+        }
+        else if (type == "NOT") {
+            net.NOT(id);
+        }
+        else if (type == "NOR") {
+            net.NOR(id);
+        }
+        else if (type == "OR") {
+            net.OR(id);
+        }
+        else if (type == "ORNOT") {
+            net.ORNOT(id);
+        }
+        else if (type == "MUX") {
+            net.MUX(id);
+        }
+        else if (type == "ROM") {
+            int romAddress =
+                static_cast<int>(cell.at("romAddress").get<double>());
+            int romBit = static_cast<int>(cell.at("romBit").get<double>());
+            net.ROM(id, std::to_string(romAddress), romBit);
+        }
+        else if (type == "RAM") {
+            int ramAddress =
+                static_cast<int>(cell.at("ramAddress").get<double>());
+            int ramBit = static_cast<int>(cell.at("ramBit").get<double>());
+            net.RAM(id, std::to_string(ramAddress), ramBit);
+        }
+        else {
+            throw std::runtime_error("Not implemented:" + type);
+        }
+    }
+    for (const auto &e : ports) {  // vectorをrange-based-forでまわしている。
+        picojson::object port = e.get<picojson::object>();
+        std::string type = port.at("type").get<std::string>();
+        std::string name = port.at("name").get<std::string>();
+        int id = static_cast<int>(port.at("id").get<double>());
+        picojson::array &bits = port.at("bits").get<picojson::array>();
+        if (type == "input") {
+            for (const auto &b : bits) {
+                int logic = static_cast<int>(b.get<double>());
+                net.connect(id, logic);
+            }
+        }
+        else if (type == "output") {
+            for (const auto &b : bits) {
+                int logic = static_cast<int>(b.get<double>());
+                net.connect(logic, id);
+            }
+        }
+    }
+    for (const auto &e : cells) {  // vectorをrange-based-forでまわしている。
+        picojson::object cell = e.get<picojson::object>();
+        std::string type = cell.at("type").get<std::string>();
+        int id = static_cast<int>(cell.at("id").get<double>());
+        picojson::object input = cell.at("input").get<picojson::object>();
+        picojson::object output = cell.at("output").get<picojson::object>();
+        if (type == "AND" || type == "NAND" || type == "XOR" ||
+            type == "XNOR" || type == "NOR" || type == "ANDNOT" ||
+            type == "OR" || type == "ORNOT") {
+            int A = static_cast<int>(input.at("A").get<double>());
+            int B = static_cast<int>(input.at("B").get<double>());
+            picojson::array &Y = output.at("Y").get<picojson::array>();
+            net.connect(A, id);
+            net.connect(B, id);
+            for (const auto &y : Y) {
+                int bitY = static_cast<int>(y.get<double>());
+                net.connect(id, bitY);
+            }
+        }
+        else if (type == "DFFP") {
+            int D = static_cast<int>(input.at("D").get<double>());
+            picojson::array &Q = output.at("Q").get<picojson::array>();
+            net.connect(D, id);
+            for (const auto &q : Q) {
+                int bitQ = static_cast<int>(q.get<double>());
+                net.connect(id, bitQ);
+            }
+        }
+        else if (type == "NOT") {
+            int A = static_cast<int>(input.at("A").get<double>());
+            picojson::array &Y = output.at("Y").get<picojson::array>();
+            net.connect(A, id);
+            for (const auto &y : Y) {
+                int bitY = static_cast<int>(y.get<double>());
+                net.connect(id, bitY);
+            }
+        }
+        else if (type == "MUX") {
+            int A = static_cast<int>(input.at("A").get<double>());
+            int B = static_cast<int>(input.at("B").get<double>());
+            int S = static_cast<int>(input.at("S").get<double>());
+            picojson::array &Y = output.at("Y").get<picojson::array>();
+            net.connect(A, id);
+            net.connect(B, id);
+            net.connect(S, id);
+            for (const auto &y : Y) {
+                int bitY = static_cast<int>(y.get<double>());
+                net.connect(id, bitY);
+            }
+        }
+        else if (type == "ROM") {
+            picojson::array &Q = output.at("Q").get<picojson::array>();
+            for (const auto &q : Q) {
+                int bitQ = static_cast<int>(q.get<double>());
+                net.connect(id, bitQ);
+            }
+        }
+        else if (type == "RAM") {
+            int D = static_cast<int>(input.at("D").get<double>());
+            picojson::array &Q = output.at("Q").get<picojson::array>();
+            net.connect(D, id);
+            for (const auto &q : Q) {
+                int bitQ = static_cast<int>(q.get<double>());
+                net.connect(id, bitQ);
+            }
+        }
+        else {
+            throw std::runtime_error("Not executed");
+        }
+    }
+}
+
 #endif

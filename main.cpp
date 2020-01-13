@@ -3,6 +3,9 @@
 //
 #include "plain.hpp"
 
+//
+#include <fstream>
+
 template <class Inputs, class AllNodes>
 void processAllGates(Inputs& inputs, AllNodes& allNodes, int numWorkers)
 {
@@ -158,9 +161,31 @@ void testPlainBinopGates()
     }
 }
 
+void testPlainFromJSONtest_pass_4bit()
+{
+    const std::string fileName = "test/test-pass-4bit.json";
+    std::ifstream ifs{fileName};
+    assert(ifs);
+
+    auto [inputs, outputs, allNodes] =
+        readNetworkFromJSON<PlainNetworkBuilder>(ifs);
+    inputs[std::make_pair("io_in", 0)].task->set(0);
+    inputs[std::make_pair("io_in", 1)].task->set(1);
+    inputs[std::make_pair("io_in", 2)].task->set(1);
+    inputs[std::make_pair("io_in", 3)].task->set(0);
+
+    processAllGates(inputs, allNodes, 2);
+
+    assert(outputs[std::make_pair("io_out", 0)].task->get() == 0);
+    assert(outputs[std::make_pair("io_out", 1)].task->get() == 1);
+    assert(outputs[std::make_pair("io_out", 2)].task->get() == 1);
+    assert(outputs[std::make_pair("io_out", 3)].task->get() == 0);
+}
+
 int main()
 {
     testPlainBinopGates();
     testPlainMUX();
     testPlainNOT();
+    testPlainFromJSONtest_pass_4bit();
 }

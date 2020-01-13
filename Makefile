@@ -4,7 +4,7 @@ CXXFLAGS_SANITIZE=$(CXXFLAGS) -O0 -g3 \
 				  -fsanitize=address,undefined -fno-omit-frame-pointer \
 				  -fno-optimize-sibling-calls
 CXXFLAGS_RELEASE=$(CXXFLAGS) -O3 -march=native -g3
-INC=
+INC=-I picojson/
 LIB=
 
 main: main.cpp main.hpp
