@@ -1,6 +1,20 @@
 #ifndef VIRTUALSECUREPLATFORM_IYOKAN_L2_2_MAIN_HPP
 #define VIRTUALSECUREPLATFORM_IYOKAN_L2_2_MAIN_HPP
 
+/*
+     Node --has---> DepNode --has-> dependent DepNode s
+      |              |
+     has            has
+      |              |
+      v              v
+     Task --is a--> TaskBase
+      |
+     references
+      |
+      v
+    input Task s
+*/
+
 #include <cassert>
 #include <iostream>
 #include <map>
@@ -24,7 +38,8 @@ class Task : public TaskBase<WorkerInfo> {
 private:
     size_t numReadyInputs_;
     std::shared_ptr<OutType> output_;
-    std::vector<std::shared_ptr<const InType>> inputs_;
+    // Use weak_ptr here in order to avoid circular references.
+    std::vector<std::weak_ptr<const InType>> inputs_;
 
 protected:
     size_t inputSize() const
@@ -34,7 +49,9 @@ protected:
 
     const InType &input(size_t index) const
     {
-        return *inputs_.at(index);
+        std::shared_ptr<const InType> in = inputs_.at(index).lock();
+        assert(in);
+        return *in;
     }
 
     OutType &output()
@@ -51,9 +68,9 @@ public:
     {
     }
 
-    void addInputPtr(std::shared_ptr<const InType> input)
+    void addInputPtr(const std::shared_ptr<const InType> &input)
     {
-        inputs_.push_back(std::move(input));
+        inputs_.emplace_back(input);
     }
 
     std::shared_ptr<const OutType> getOutputPtr() const
