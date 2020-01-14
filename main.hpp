@@ -2,7 +2,7 @@
 #define VIRTUALSECUREPLATFORM_IYOKAN_L2_2_MAIN_HPP
 
 /*
-     Node --has---> DepNode --has-> dependent DepNode s
+     Node --has---> DepNode --references--> dependent DepNode s
       |              |
      has            has
       |              |
@@ -132,7 +132,9 @@ template <class WorkerInfo>
 class DepNode {
 private:
     std::shared_ptr<TaskBase<WorkerInfo>> task_;
-    std::vector<std::shared_ptr<DepNode>> dependents_;
+
+    // Use weak_ptr here in order to avoid circular references.
+    std::vector<std::weak_ptr<DepNode>> dependents_;
 
 public:
     DepNode(std::shared_ptr<TaskBase<WorkerInfo>> task) : task_(task)
@@ -166,10 +168,10 @@ public:
         assert(task_->hasFinished());
 
         for (auto &&dep : dependents_) {
-            auto &&task = dep->task_;
+            auto task = dep.lock()->task_;
             task->notifyOneInputReady();
             if (!task->hasStarted() && task->areInputsReady())
-                readyQueue.push(dep);
+                readyQueue.push(dep.lock());
         }
     }
 };
