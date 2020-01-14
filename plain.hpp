@@ -36,6 +36,17 @@ public:
     {
     }
 
+    bool areInputsReady() const override
+    {
+        if (clockNeeded_) {  // DFF / RAM
+            // Since areInputsReady() is called after calling of tick(), the
+            // input should already be in val_.
+            return true;
+        }
+
+        return TaskPlainGate::areInputsReady();
+    }
+
     void tick() override
     {
         TaskPlainGate::tick();
@@ -46,7 +57,6 @@ public:
             output() = val_;
         }
     }
-
 
     bool hasFinished() const override
     {
