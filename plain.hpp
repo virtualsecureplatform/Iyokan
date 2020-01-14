@@ -13,7 +13,8 @@ private:
     uint8_t val_;
 
 public:
-    TaskPlainGateMem(bool clockNeeded) : clockNeeded_(clockNeeded), val_(100)
+    TaskPlainGateMem(bool inputNeeded, bool clockNeeded)
+        : TaskPlainGate(inputNeeded ? 1 : 0), clockNeeded_(clockNeeded)
     {
     }
 
@@ -61,28 +62,31 @@ public:
     }
 };
 
-#define DEFINE_TASK_PLAIN_GATE(name, expr)             \
-    class TaskPlainGate##name : public TaskPlainGate { \
-    public:                                            \
-        void startAsync(uint8_t) override              \
-        {                                              \
-            output() = (expr)&1;                       \
-        }                                              \
-        bool hasFinished() const override              \
-        {                                              \
-            return true;                               \
-        }                                              \
+#define DEFINE_TASK_PLAIN_GATE(name, numInputs, expr)    \
+    class TaskPlainGate##name : public TaskPlainGate {   \
+    public:                                              \
+        TaskPlainGate##name() : TaskPlainGate(numInputs) \
+        {                                                \
+        }                                                \
+        void startAsync(uint8_t) override                \
+        {                                                \
+            output() = (expr)&1;                         \
+        }                                                \
+        bool hasFinished() const override                \
+        {                                                \
+            return true;                                 \
+        }                                                \
     };
-DEFINE_TASK_PLAIN_GATE(AND, (input(0) & input(1)));
-DEFINE_TASK_PLAIN_GATE(NAND, ~(input(0) & input(1)));
-DEFINE_TASK_PLAIN_GATE(ANDNOT, (input(0) & ~input(1)));
-DEFINE_TASK_PLAIN_GATE(OR, (input(0) | input(1)));
-DEFINE_TASK_PLAIN_GATE(NOR, ~(input(0) | input(1)));
-DEFINE_TASK_PLAIN_GATE(ORNOT, (input(0) | ~input(1)));
-DEFINE_TASK_PLAIN_GATE(XOR, (input(0) ^ input(1)));
-DEFINE_TASK_PLAIN_GATE(XNOR, ~(input(0) ^ input(1)));
-DEFINE_TASK_PLAIN_GATE(MUX, input(2) == 0 ? input(0) : input(1));
-DEFINE_TASK_PLAIN_GATE(NOT, ~input(0));
+DEFINE_TASK_PLAIN_GATE(AND, 2, (input(0) & input(1)));
+DEFINE_TASK_PLAIN_GATE(NAND, 2, ~(input(0) & input(1)));
+DEFINE_TASK_PLAIN_GATE(ANDNOT, 2, (input(0) & ~input(1)));
+DEFINE_TASK_PLAIN_GATE(OR, 2, (input(0) | input(1)));
+DEFINE_TASK_PLAIN_GATE(NOR, 2, ~(input(0) | input(1)));
+DEFINE_TASK_PLAIN_GATE(ORNOT, 2, (input(0) | ~input(1)));
+DEFINE_TASK_PLAIN_GATE(XOR, 2, (input(0) ^ input(1)));
+DEFINE_TASK_PLAIN_GATE(XNOR, 2, ~(input(0) ^ input(1)));
+DEFINE_TASK_PLAIN_GATE(MUX, 3, input(2) == 0 ? input(0) : input(1));
+DEFINE_TASK_PLAIN_GATE(NOT, 1, ~input(0));
 #undef DEFINE_TASK_PLAIN_GATE
 
 class PlainNetworkBuilder

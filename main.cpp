@@ -147,6 +147,8 @@ void testPlainFromJSONtest_pass_4bit()
     assert(ifs);
 
     auto net = readNetworkFromJSON<PlainNetworkBuilder>(ifs);
+    assert(net.isValid());
+
     net.input("io_in", 0).task->set(0);
     net.input("io_in", 1).task->set(1);
     net.input("io_in", 2).task->set(1);
@@ -167,6 +169,8 @@ void testPlainFromJSONtest_and_4bit()
     assert(ifs);
 
     auto net = readNetworkFromJSON<PlainNetworkBuilder>(ifs);
+    assert(net.isValid());
+
     net.input("io_inA", 0).task->set(0);
     net.input("io_inA", 1).task->set(0);
     net.input("io_inA", 2).task->set(1);
@@ -191,6 +195,8 @@ void testPlainFromJSONtest_and_4_2bit()
     assert(ifs);
 
     auto net = readNetworkFromJSON<PlainNetworkBuilder>(ifs);
+    assert(net.isValid());
+
     net.input("io_inA", 0).task->set(1);
     net.input("io_inA", 1).task->set(0);
     net.input("io_inA", 2).task->set(1);
@@ -213,6 +219,8 @@ void testPlainFromJSONtest_mux_4bit()
     assert(ifs);
 
     auto net = readNetworkFromJSON<PlainNetworkBuilder>(ifs);
+    assert(net.isValid());
+
     net.input("io_inA", 0).task->set(0);
     net.input("io_inA", 1).task->set(0);
     net.input("io_inA", 2).task->set(1);
@@ -245,6 +253,8 @@ void testPlainFromJSONtest_addr_4bit()
     assert(ifs);
 
     auto net = readNetworkFromJSON<PlainNetworkBuilder>(ifs);
+    assert(net.isValid());
+
     net.input("io_inA", 0).task->set(0);
     net.input("io_inA", 1).task->set(0);
     net.input("io_inA", 2).task->set(1);

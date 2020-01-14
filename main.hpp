@@ -15,6 +15,7 @@
     input Task s
 */
 
+#include <algorithm>
 #include <cassert>
 #include <iostream>
 #include <map>
@@ -26,6 +27,7 @@
 template <class WorkerInfo>
 class TaskBase {
 public:
+    virtual bool isValid() = 0;
     virtual void notifyOneInputReady() = 0;
     virtual bool areInputsReady() const = 0;
     virtual void startAsync(WorkerInfo) = 0;
@@ -38,6 +40,7 @@ class Task : public TaskBase<WorkerInfo> {
 private:
     size_t numReadyInputs_;
     std::shared_ptr<OutType> output_;
+
     // Use weak_ptr here in order to avoid circular references.
     std::vector<std::weak_ptr<const InType>> inputs_;
 
@@ -60,7 +63,10 @@ protected:
     }
 
 public:
-    Task() : numReadyInputs_(0), output_(std::make_shared<OutType>())
+    Task(size_t expectedNumInputs)
+        : numReadyInputs_(0),
+          output_(std::make_shared<OutType>()),
+          inputs_(expectedNumInputs)
     {
     }
 
@@ -70,12 +76,21 @@ public:
 
     void addInputPtr(const std::shared_ptr<const InType> &input)
     {
-        inputs_.emplace_back(input);
+        auto it = std::find_if(inputs_.begin(), inputs_.end(),
+                               [](auto &&in) { return in.use_count() == 0; });
+        assert(it != inputs_.end());
+        *it = input;
     }
 
     std::shared_ptr<const OutType> getOutputPtr() const
     {
         return output_;
+    }
+
+    virtual bool isValid() override
+    {
+        return std::all_of(inputs_.begin(), inputs_.end(),
+                           [](auto &&in) { return in.use_count() != 0; });
     }
 
     virtual void tick() override
@@ -86,8 +101,7 @@ public:
     virtual void notifyOneInputReady() override
     {
         numReadyInputs_++;
-        if (numReadyInputs_ > inputs_.size())
-            throw 0;
+        assert(numReadyInputs_ <= inputs_.size());
     }
 
     virtual bool areInputsReady() const override
@@ -256,6 +270,14 @@ public:
         for (auto &&[key, node] : id2node_)
             node.task->tick();
     }
+
+    bool isValid()
+    {
+        for (auto &&[key, node] : id2node_)
+            if (!node.task->isValid())
+                return false;
+        return true;
+    }
 };
 
 template <class TaskType, class TaskTypeMem, class WorkerInfo>
@@ -273,45 +295,47 @@ private:
         namedMems_;
 
 private:
-    typename NetworkType::MemNode addMem(bool clockNeeded, int id)
+    typename NetworkType::MemNode addMem(bool inputNeeded, bool clockNeeded,
+                                         int id)
     {
-        auto task = std::make_shared<TaskTypeMem>(clockNeeded);
+        auto task = std::make_shared<TaskTypeMem>(inputNeeded, clockNeeded);
         auto depnode = std::make_shared<DepNode<WorkerInfo>>(task);
         id2node_.emplace(id, typename NetworkType::Node{task, depnode});
         return typename NetworkType::MemNode{task, depnode};
     }
 
-    void addNamedMem(bool clockNeeded, int id, const std::string &kind,
-                     const std::string &portName, int portBit)
+    void addNamedMem(bool inputNeeded, bool clockNeeded, int id,
+                     const std::string &kind, const std::string &portName,
+                     int portBit)
     {
         namedMems_.emplace(std::make_tuple(kind, portName, portBit),
-                           addMem(clockNeeded, id));
+                           addMem(inputNeeded, clockNeeded, id));
     }
 
 public:
     void DFF(int id)
     {
-        addMem(true, id);
+        addMem(true, true, id);
     }
 
     void ROM(int id, const std::string &portName, int portBit)
     {
-        addNamedMem(false, id, "rom", portName, portBit);
+        addNamedMem(false, false, id, "rom", portName, portBit);
     }
 
     void RAM(int id, const std::string &portName, int portBit)
     {
-        addNamedMem(true, id, "ram", portName, portBit);
+        addNamedMem(true, true, id, "ram", portName, portBit);
     }
 
     void INPUT(int id, const std::string &portName, int portBit)
     {
-        addNamedMem(false, id, "input", portName, portBit);
+        addNamedMem(false, false, id, "input", portName, portBit);
     }
 
     void OUTPUT(int id, const std::string &portName, int portBit)
     {
-        addNamedMem(false, id, "output", portName, portBit);
+        addNamedMem(true, false, id, "output", portName, portBit);
     }
 
     void connect(int from, int to)
