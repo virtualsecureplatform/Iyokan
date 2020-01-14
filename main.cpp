@@ -400,6 +400,46 @@ void testPlainSequentialCircuit()
     assert(out->get() == 0);
 }
 
+void testPlainFromJSONtest_counter_4bit()
+{
+    const std::string fileName = "test/test-counter-4bit.json";
+    std::ifstream ifs{fileName};
+    assert(ifs);
+
+    auto net = readNetworkFromJSON<PlainNetworkBuilder>(ifs);
+    assert(net.isValid());
+
+    std::vector<std::array<int, 4>> outvals{{{0, 0, 0, 0},
+                                             {1, 0, 0, 0},
+                                             {0, 1, 0, 0},
+                                             {1, 1, 0, 0},
+                                             {0, 0, 1, 0},
+                                             {1, 0, 1, 0},
+                                             {0, 1, 1, 0},
+                                             {1, 1, 1, 0},
+                                             {0, 0, 0, 1},
+                                             {1, 0, 0, 1},
+                                             {0, 1, 0, 1},
+                                             {1, 1, 0, 1},
+                                             {0, 0, 1, 1},
+                                             {1, 0, 1, 1},
+                                             {0, 1, 1, 1},
+                                             {1, 1, 1, 1}}};
+
+    net.input("reset", 0).task->set(1);
+    processAllGates(net, 3);
+
+    net.input("reset", 0).task->set(0);
+    for (size_t i = 0; i < outvals.size(); i++) {
+        net.tick();
+        processAllGates(net, 3);
+        assert(net.output("io_out", 0).task->get() == outvals[i][0]);
+        assert(net.output("io_out", 1).task->get() == outvals[i][1]);
+        assert(net.output("io_out", 2).task->get() == outvals[i][2]);
+        assert(net.output("io_out", 3).task->get() == outvals[i][3]);
+    }
+}
+
 int main()
 {
     testPlainBinopGates();
@@ -412,4 +452,5 @@ int main()
     testPlainFromJSONtest_addr_4bit();
     testPlainFromJSONtest_register_4bit();
     testPlainSequentialCircuit();
+    testPlainFromJSONtest_counter_4bit();
 }

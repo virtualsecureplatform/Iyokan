@@ -1,0 +1,347 @@
+{
+  "cells": [
+    {
+      "input": {
+        "A": 0,
+        "B": 16
+      },
+      "output": {
+        "Y": [
+          16
+        ]
+      },
+      "id": 5,
+      "type": "NOR",
+      "priority": 0
+    },
+    {
+      "input": {
+        "A": 17,
+        "B": 16
+      },
+      "output": {
+        "Y": [
+          9,
+          10,
+          11
+        ]
+      },
+      "id": 6,
+      "type": "AND",
+      "priority": 3
+    },
+    {
+      "input": {
+        "A": 17,
+        "B": 16
+      },
+      "output": {
+        "Y": [
+          8
+        ]
+      },
+      "id": 7,
+      "type": "NOR",
+      "priority": 2
+    },
+    {
+      "input": {
+        "A": 0,
+        "B": 7
+      },
+      "output": {
+        "Y": [
+          9
+        ]
+      },
+      "id": 8,
+      "type": "NOR",
+      "priority": 1
+    },
+    {
+      "input": {
+        "A": 8,
+        "B": 6
+      },
+      "output": {
+        "Y": [
+          17
+        ]
+      },
+      "id": 9,
+      "type": "ANDNOT",
+      "priority": 0
+    },
+    {
+      "input": {
+        "A": 18,
+        "B": 6
+      },
+      "output": {
+        "Y": [
+          13,
+          14
+        ]
+      },
+      "id": 10,
+      "type": "NAND",
+      "priority": 2
+    },
+    {
+      "input": {
+        "A": 18,
+        "B": 6
+      },
+      "output": {
+        "Y": [
+          12
+        ]
+      },
+      "id": 11,
+      "type": "NOR",
+      "priority": 2
+    },
+    {
+      "input": {
+        "A": 0,
+        "B": 11
+      },
+      "output": {
+        "Y": [
+          13
+        ]
+      },
+      "id": 12,
+      "type": "NOR",
+      "priority": 1
+    },
+    {
+      "input": {
+        "A": 10,
+        "B": 12
+      },
+      "output": {
+        "Y": [
+          18
+        ]
+      },
+      "id": 13,
+      "type": "AND",
+      "priority": 0
+    },
+    {
+      "input": {
+        "A": 19,
+        "B": 10
+      },
+      "output": {
+        "Y": [
+          15
+        ]
+      },
+      "id": 14,
+      "type": "XOR",
+      "priority": 1
+    },
+    {
+      "input": {
+        "A": 0,
+        "B": 14
+      },
+      "output": {
+        "Y": [
+          19
+        ]
+      },
+      "id": 15,
+      "type": "NOR",
+      "priority": 0
+    },
+    {
+      "input": {
+        "D": 5
+      },
+      "output": {
+        "Q": [
+          1,
+          5,
+          6,
+          7
+        ]
+      },
+      "id": 16,
+      "type": "DFFP",
+      "priority": 4
+    },
+    {
+      "input": {
+        "D": 9
+      },
+      "output": {
+        "Q": [
+          2,
+          6,
+          7
+        ]
+      },
+      "id": 17,
+      "type": "DFFP",
+      "priority": 4
+    },
+    {
+      "input": {
+        "D": 13
+      },
+      "output": {
+        "Q": [
+          3,
+          10,
+          11
+        ]
+      },
+      "id": 18,
+      "type": "DFFP",
+      "priority": 3
+    },
+    {
+      "input": {
+        "D": 15
+      },
+      "output": {
+        "Q": [
+          4,
+          14
+        ]
+      },
+      "id": 19,
+      "type": "DFFP",
+      "priority": 2
+    }
+  ],
+  "ports": [
+    {
+      "bits": [
+        5,
+        8,
+        12,
+        15
+      ],
+      "name": "reset",
+      "portName": "reset",
+      "portBit": 0,
+      "id": 0,
+      "type": "input",
+      "priority": 2
+    },
+    {
+      "bits": [
+        16
+      ],
+      "name": "io_out[0]",
+      "portName": "io_out",
+      "portBit": 0,
+      "id": 1,
+      "type": "output",
+      "priority": 0
+    },
+    {
+      "bits": [
+        17
+      ],
+      "name": "io_out[1]",
+      "portName": "io_out",
+      "portBit": 1,
+      "id": 2,
+      "type": "output",
+      "priority": 0
+    },
+    {
+      "bits": [
+        18
+      ],
+      "name": "io_out[2]",
+      "portName": "io_out",
+      "portBit": 2,
+      "id": 3,
+      "type": "output",
+      "priority": 0
+    },
+    {
+      "bits": [
+        19
+      ],
+      "name": "io_out[3]",
+      "portName": "io_out",
+      "portBit": 3,
+      "id": 4,
+      "type": "output",
+      "priority": 0
+    }
+  ],
+  "inputs": {
+    "reset": {
+      "0": {
+        "bits": [
+          5,
+          8,
+          12,
+          15
+        ],
+        "name": "reset",
+        "portName": "reset",
+        "portBit": 0,
+        "id": 0,
+        "type": "input",
+        "priority": 2
+      }
+    }
+  },
+  "outputs": {
+    "io_out": {
+      "0": {
+        "bits": [
+          16
+        ],
+        "name": "io_out[0]",
+        "portName": "io_out",
+        "portBit": 0,
+        "id": 1,
+        "type": "output",
+        "priority": 0
+      },
+      "1": {
+        "bits": [
+          17
+        ],
+        "name": "io_out[1]",
+        "portName": "io_out",
+        "portBit": 1,
+        "id": 2,
+        "type": "output",
+        "priority": 0
+      },
+      "2": {
+        "bits": [
+          18
+        ],
+        "name": "io_out[2]",
+        "portName": "io_out",
+        "portBit": 2,
+        "id": 3,
+        "type": "output",
+        "priority": 0
+      },
+      "3": {
+        "bits": [
+          19
+        ],
+        "name": "io_out[3]",
+        "portName": "io_out",
+        "portBit": 3,
+        "id": 4,
+        "type": "output",
+        "priority": 0
+      }
+    }
+  }
+}
