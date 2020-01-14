@@ -483,10 +483,7 @@ void readNetworkFromJSONImpl(NetworkBuilder &builder, picojson::value &v)
         int id = static_cast<int>(port.at("id").get<double>());
         picojson::array &bits = port.at("bits").get<picojson::array>();
         if (type == "input") {
-            for (const auto &b : bits) {
-                int logic = static_cast<int>(b.get<double>());
-                builder.connect(id, logic);
-            }
+            // nothing to do!
         }
         else if (type == "output") {
             for (const auto &b : bits) {
@@ -506,60 +503,37 @@ void readNetworkFromJSONImpl(NetworkBuilder &builder, picojson::value &v)
             type == "OR" || type == "ORNOT") {
             int A = static_cast<int>(input.at("A").get<double>());
             int B = static_cast<int>(input.at("B").get<double>());
-            picojson::array &Y = output.at("Y").get<picojson::array>();
+            // picojson::array &Y = output.at("Y").get<picojson::array>();
             builder.connect(A, id);
             builder.connect(B, id);
-            for (const auto &y : Y) {
-                int bitY = static_cast<int>(y.get<double>());
-                builder.connect(id, bitY);
-            }
         }
         else if (type == "DFFP") {
             int D = static_cast<int>(input.at("D").get<double>());
-            picojson::array &Q = output.at("Q").get<picojson::array>();
+            // picojson::array &Q = output.at("Q").get<picojson::array>();
             builder.connect(D, id);
-            for (const auto &q : Q) {
-                int bitQ = static_cast<int>(q.get<double>());
-                builder.connect(id, bitQ);
-            }
         }
         else if (type == "NOT") {
             int A = static_cast<int>(input.at("A").get<double>());
-            picojson::array &Y = output.at("Y").get<picojson::array>();
+            // picojson::array &Y = output.at("Y").get<picojson::array>();
             builder.connect(A, id);
-            for (const auto &y : Y) {
-                int bitY = static_cast<int>(y.get<double>());
-                builder.connect(id, bitY);
-            }
         }
         else if (type == "MUX") {
             int A = static_cast<int>(input.at("A").get<double>());
             int B = static_cast<int>(input.at("B").get<double>());
             int S = static_cast<int>(input.at("S").get<double>());
-            picojson::array &Y = output.at("Y").get<picojson::array>();
+            // picojson::array &Y = output.at("Y").get<picojson::array>();
             builder.connect(A, id);
             builder.connect(B, id);
             builder.connect(S, id);
-            for (const auto &y : Y) {
-                int bitY = static_cast<int>(y.get<double>());
-                builder.connect(id, bitY);
-            }
         }
         else if (type == "ROM") {
-            picojson::array &Q = output.at("Q").get<picojson::array>();
-            for (const auto &q : Q) {
-                int bitQ = static_cast<int>(q.get<double>());
-                builder.connect(id, bitQ);
-            }
+            // picojson::array &Q = output.at("Q").get<picojson::array>();
+            // Nothing to do!
         }
         else if (type == "RAM") {
             int D = static_cast<int>(input.at("D").get<double>());
-            picojson::array &Q = output.at("Q").get<picojson::array>();
+            // picojson::array &Q = output.at("Q").get<picojson::array>();
             builder.connect(D, id);
-            for (const auto &q : Q) {
-                int bitQ = static_cast<int>(q.get<double>());
-                builder.connect(id, bitQ);
-            }
         }
         else {
             throw std::runtime_error("Not executed");
