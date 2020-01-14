@@ -8,20 +8,69 @@
 
 using TaskPlainGate = Task<uint8_t, uint8_t, uint8_t /*dummy*/>;
 
-// TaskPlainGateMem can be used as INPUT/OUTPUT/ROM/RAM/DFF depending on how to
-// connect it to other gates.
 class TaskPlainGateMem : public TaskPlainGate {
-private:
-    bool clockNeeded_;
+protected:
     uint8_t val_;
+
+public:
+    TaskPlainGateMem(int numInputs) : TaskPlainGate(numInputs)
+    {
+    }
+
+    void set(uint8_t val)
+    {
+        val_ = val & 1;
+    }
+
+    uint8_t get() const
+    {
+        return val_;
+    }
+};
+
+// DFF/RAM
+class TaskPlainGateDFF : public TaskPlainGateMem {
+private:
+    void startAsyncImpl(uint8_t) override
+    {
+    }
+
+public:
+    TaskPlainGateDFF() : TaskPlainGateMem(1)
+    {
+    }
+
+    bool areInputsReady() const override
+    {
+        // Since areInputsReady() is called after calling of tick(), the
+        // input should already be in val_.
+        return true;
+    }
+
+    void tick() override
+    {
+        TaskPlainGate::tick();
+
+        val_ = input(0);
+        output() = val_;
+    }
+
+    bool hasFinished() const override
+    {
+        // Since hasFinished() is called after calling of tick(), the
+        // input should already be in val_.
+        return true;
+    }
+};
+
+// INPUT/OUTPUT/ROM
+class TaskPlainGateWIRE : public TaskPlainGateMem {
+private:
     AsyncThread thr_;
 
 private:
     void startAsyncImpl(uint8_t) override
     {
-        if (clockNeeded_)
-            return;
-
         if (inputSize() == 0) {  // INPUT / ROM
             thr_ = [&]() { output() = val_; };
         }
@@ -37,47 +86,13 @@ private:
     }
 
 public:
-    TaskPlainGateMem(bool inputNeeded, bool clockNeeded)
-        : TaskPlainGate(inputNeeded ? 1 : 0), clockNeeded_(clockNeeded)
+    TaskPlainGateWIRE(bool inputNeeded) : TaskPlainGateMem(inputNeeded ? 1 : 0)
     {
-    }
-
-    bool areInputsReady() const override
-    {
-        if (clockNeeded_) {  // DFF / RAM
-            // Since areInputsReady() is called after calling of tick(), the
-            // input should already be in val_.
-            return true;
-        }
-
-        return TaskPlainGate::areInputsReady();
-    }
-
-    void tick() override
-    {
-        TaskPlainGate::tick();
-
-        if (clockNeeded_) {  // DFF / RAM
-            assert(inputSize() == 1);
-            val_ = input(0);
-            output() = val_;
-        }
     }
 
     bool hasFinished() const override
     {
-        return clockNeeded_ ||      // DFF / RAM
-               thr_.hasFinished();  // INPUT / OUTPUT / ROM
-    }
-
-    void set(uint8_t val)
-    {
-        val_ = val & 1;
-    }
-
-    uint8_t get() const
-    {
-        return val_;
+        return thr_.hasFinished();
     }
 };
 
@@ -115,8 +130,8 @@ DEFINE_TASK_PLAIN_GATE(NOT, 1, ~input(0));
 #undef DEFINE_TASK_PLAIN_GATE
 
 class PlainNetworkBuilder
-    : public NetworkBuilder<TaskPlainGate, TaskPlainGateMem,
-                            uint8_t /* dummy */> {
+    : public NetworkBuilder<TaskPlainGate, TaskPlainGateMem, TaskPlainGateDFF,
+                            TaskPlainGateWIRE, uint8_t /* dummy */> {
 private:
 #define DEFINE_GATE_IMPL(name)                           \
     std::shared_ptr<TaskPlainGate> name##Impl() override \
