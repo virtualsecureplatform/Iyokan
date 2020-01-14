@@ -3,6 +3,9 @@
 
 #include "main.hpp"
 
+//
+#include <thread>
+
 using TaskPlainGate = Task<uint8_t, uint8_t, uint8_t /*dummy*/>;
 
 // TaskPlainGateMem can be used as INPUT/OUTPUT/ROM/RAM/DFF depending on how to
@@ -11,6 +14,7 @@ class TaskPlainGateMem : public TaskPlainGate {
 private:
     bool clockNeeded_;
     uint8_t val_;
+    AsyncThread thr_;
 
 private:
     void startAsyncImpl(uint8_t) override
@@ -19,11 +23,13 @@ private:
             return;
 
         if (inputSize() == 0) {  // INPUT / ROM
-            output() = val_;
+            thr_ = [&]() { output() = val_; };
         }
         else if (inputSize() == 1) {  // OUTPUT
-            val_ = input(0);
-            output() = val_;
+            thr_ = [&]() {
+                val_ = input(0);
+                output() = val_;
+            };
         }
         else {
             assert(false);
@@ -60,7 +66,8 @@ public:
 
     bool hasFinished() const override
     {
-        return true;
+        return clockNeeded_ ||      // DFF / RAM
+               thr_.hasFinished();  // INPUT / OUTPUT / ROM
     }
 
     void set(uint8_t val)
@@ -77,18 +84,22 @@ public:
 #define DEFINE_TASK_PLAIN_GATE(name, numInputs, expr)    \
     class TaskPlainGate##name : public TaskPlainGate {   \
     private:                                             \
+        AsyncThread thr_;                                \
+                                                         \
+    private:                                             \
         void startAsyncImpl(uint8_t) override            \
         {                                                \
-            output() = (expr)&1;                         \
+            thr_ = [&]() { output() = (expr)&1; };       \
         }                                                \
                                                          \
     public:                                              \
         TaskPlainGate##name() : TaskPlainGate(numInputs) \
         {                                                \
         }                                                \
+                                                         \
         bool hasFinished() const override                \
         {                                                \
-            return true;                                 \
+            return thr_.hasFinished();                   \
         }                                                \
     };
 DEFINE_TASK_PLAIN_GATE(AND, 2, (input(0) & input(1)));

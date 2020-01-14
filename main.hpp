@@ -603,4 +603,29 @@ void readNetworkFromJSONImpl(NetworkBuilder &builder, picojson::value &v)
     }
 }
 
+#include <future>
+
+class AsyncThread {
+private:
+    std::future<void> ftr_;
+
+public:
+    AsyncThread()
+    {
+    }
+
+    template <class Func>
+    AsyncThread &operator=(Func &&func)
+    {
+        ftr_ = std::async(std::launch::async, std::forward<Func>(func));
+        return *this;
+    }
+
+    bool hasFinished() const
+    {
+        using namespace std::chrono_literals;
+        return ftr_.wait_for(0ms) == std::future_status::ready;
+    }
+};
+
 #endif
