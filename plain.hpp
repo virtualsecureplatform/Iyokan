@@ -12,6 +12,24 @@ private:
     bool clockNeeded_;
     uint8_t val_;
 
+private:
+    void startAsyncImpl(uint8_t) override
+    {
+        if (clockNeeded_)
+            return;
+
+        if (inputSize() == 0) {  // INPUT / ROM
+            output() = val_;
+        }
+        else if (inputSize() == 1) {  // OUTPUT
+            val_ = input(0);
+            output() = val_;
+        }
+        else {
+            assert(false);
+        }
+    }
+
 public:
     TaskPlainGateMem(bool inputNeeded, bool clockNeeded)
         : TaskPlainGate(inputNeeded ? 1 : 0), clockNeeded_(clockNeeded)
@@ -29,22 +47,6 @@ public:
         }
     }
 
-    void startAsync(uint8_t) override
-    {
-        if (clockNeeded_)
-            return;
-
-        if (inputSize() == 0) {  // INPUT / ROM
-            output() = val_;
-        }
-        else if (inputSize() == 1) {  // OUTPUT
-            val_ = input(0);
-            output() = val_;
-        }
-        else {
-            assert(false);
-        }
-    }
 
     bool hasFinished() const override
     {
@@ -64,13 +66,15 @@ public:
 
 #define DEFINE_TASK_PLAIN_GATE(name, numInputs, expr)    \
     class TaskPlainGate##name : public TaskPlainGate {   \
+    private:                                             \
+        void startAsyncImpl(uint8_t) override            \
+        {                                                \
+            output() = (expr)&1;                         \
+        }                                                \
+                                                         \
     public:                                              \
         TaskPlainGate##name() : TaskPlainGate(numInputs) \
         {                                                \
-        }                                                \
-        void startAsync(uint8_t) override                \
-        {                                                \
-            output() = (expr)&1;                         \
         }                                                \
         bool hasFinished() const override                \
         {                                                \

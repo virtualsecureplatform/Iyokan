@@ -31,6 +31,7 @@ public:
     virtual void notifyOneInputReady() = 0;
     virtual bool areInputsReady() const = 0;
     virtual void startAsync(WorkerInfo) = 0;
+    virtual bool hasStarted() const = 0;
     virtual bool hasFinished() const = 0;
     virtual void tick() = 0;  // Reset for next process.
 };
@@ -38,6 +39,7 @@ public:
 template <class InType, class OutType, class WorkerInfo>
 class Task : public TaskBase<WorkerInfo> {
 private:
+    bool hasStarted_;
     size_t numReadyInputs_;
     std::shared_ptr<OutType> output_;
 
@@ -62,9 +64,12 @@ protected:
         return *output_;
     }
 
+    virtual void startAsyncImpl(WorkerInfo wi) = 0;
+
 public:
     Task(size_t expectedNumInputs)
-        : numReadyInputs_(0),
+        : hasStarted_(false),
+          numReadyInputs_(0),
           output_(std::make_shared<OutType>()),
           inputs_(expectedNumInputs)
     {
@@ -95,7 +100,9 @@ public:
 
     virtual void tick() override
     {
+        hasStarted_ = false;
         numReadyInputs_ = 0;
+        // FIXME: Should inputs_ be reset?
     }
 
     virtual void notifyOneInputReady() override
@@ -107,6 +114,17 @@ public:
     virtual bool areInputsReady() const override
     {
         return numReadyInputs_ == inputs_.size();
+    }
+
+    bool hasStarted() const override
+    {
+        return hasStarted_;
+    }
+
+    void startAsync(WorkerInfo wi) override
+    {
+        startAsyncImpl(std::move(wi));
+        hasStarted_ = true;
     }
 };
 
@@ -148,10 +166,10 @@ public:
         assert(task_->hasFinished());
 
         for (auto &&dep : dependents_) {
-            dep->task_->notifyOneInputReady();
-            if (!dep->task_->areInputsReady())
-                continue;
-            readyQueue.push(dep);
+            auto &&task = dep->task_;
+            task->notifyOneInputReady();
+            if (!task->hasStarted() && task->areInputsReady())
+                readyQueue.push(dep);
         }
     }
 };
