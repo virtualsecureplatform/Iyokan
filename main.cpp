@@ -272,6 +272,72 @@ void testPlainFromJSONtest_addr_4bit()
     assert(net.output("io_out", 3).task->get() == 0);
 }
 
+void testPlainFromJSONtest_register_4bit()
+{
+    const std::string fileName = "test/test-register-4bit.json";
+    std::ifstream ifs{fileName};
+    assert(ifs);
+
+    auto net = readNetworkFromJSON<PlainNetworkBuilder>(ifs);
+    assert(net.isValid());
+
+    net.input("io_in", 0).task->set(0);
+    net.input("io_in", 1).task->set(0);
+    net.input("io_in", 2).task->set(1);
+    net.input("io_in", 3).task->set(1);
+
+    // 1: Reset all DFFs.
+    net.input("reset", 0).task->set(1);
+    processAllGates(net, 3);
+    net.tick();
+
+    assert(
+        std::dynamic_pointer_cast<TaskPlainGateMem>(net.node(13).task)->get() ==
+        0);
+    assert(
+        std::dynamic_pointer_cast<TaskPlainGateMem>(net.node(14).task)->get() ==
+        0);
+    assert(
+        std::dynamic_pointer_cast<TaskPlainGateMem>(net.node(15).task)->get() ==
+        0);
+    assert(
+        std::dynamic_pointer_cast<TaskPlainGateMem>(net.node(16).task)->get() ==
+        0);
+
+    // 2: Store values into DFFs.
+    net.input("reset", 0).task->set(0);
+    processAllGates(net, 3);
+    net.tick();
+
+    assert(
+        std::dynamic_pointer_cast<TaskPlainGateMem>(net.node(13).task)->get() ==
+        0);
+    assert(
+        std::dynamic_pointer_cast<TaskPlainGateMem>(net.node(14).task)->get() ==
+        0);
+    assert(
+        std::dynamic_pointer_cast<TaskPlainGateMem>(net.node(15).task)->get() ==
+        1);
+    assert(
+        std::dynamic_pointer_cast<TaskPlainGateMem>(net.node(16).task)->get() ==
+        1);
+
+    assert(net.output("io_out", 0).task->get() == 0);
+    assert(net.output("io_out", 1).task->get() == 0);
+    assert(net.output("io_out", 2).task->get() == 0);
+    assert(net.output("io_out", 3).task->get() == 0);
+
+    // 3: Get outputs.
+    net.input("reset", 0).task->set(0);
+    processAllGates(net, 3);
+    net.tick();
+
+    assert(net.output("io_out", 0).task->get() == 0);
+    assert(net.output("io_out", 1).task->get() == 0);
+    assert(net.output("io_out", 2).task->get() == 1);
+    assert(net.output("io_out", 3).task->get() == 1);
+}
+
 int main()
 {
     testPlainBinopGates();
@@ -282,4 +348,5 @@ int main()
     testPlainFromJSONtest_and_4_2bit();
     testPlainFromJSONtest_mux_4bit();
     testPlainFromJSONtest_addr_4bit();
+    testPlainFromJSONtest_register_4bit();
 }
