@@ -346,6 +346,60 @@ void testPlainFromJSONtest_register_4bit()
     assert(net.output("io_out", 3).task->get() == 1);
 }
 
+void testPlainSequentialCircuit()
+{
+    /*
+                    B               D
+       reset(0) >---> ANDNOT(4) >---> DFF(2)
+                        ^ A            v Q
+                        |              |
+                        *--< NOT(3) <--*-----> OUTPUT(1)
+                                    A
+    */
+
+    PlainNetworkBuilder builder;
+    builder.INPUT(0, "reset", 0);
+    builder.OUTPUT(1, "out", 0);
+    builder.DFF(2);
+    builder.NOT(3);
+    builder.ANDNOT(4);
+    builder.connect(2, 1);
+    builder.connect(4, 2);
+    builder.connect(2, 3);
+    builder.connect(3, 4);
+    builder.connect(0, 4);
+
+    PlainNetwork net = std::move(builder);
+    assert(net.isValid());
+
+    std::shared_ptr<TaskPlainGateMem> dff =
+        std::dynamic_pointer_cast<TaskPlainGateMem>(net.node(2).task);
+    std::shared_ptr<TaskPlainGateMem> out = net.output("out", 0).task;
+
+    // 1:
+    net.input("reset", 0).task->set(1);
+    processAllGates(net, 3);
+
+    // 2:
+    net.tick();
+    assert(dff->get() == 0);
+    net.input("reset", 0).task->set(0);
+    processAllGates(net, 3);
+    assert(out->get() == 0);
+
+    // 3:
+    net.tick();
+    assert(dff->get() == 1);
+    processAllGates(net, 3);
+    assert(out->get() == 1);
+
+    // 4:
+    net.tick();
+    assert(dff->get() == 0);
+    processAllGates(net, 3);
+    assert(out->get() == 0);
+}
+
 int main()
 {
     testPlainBinopGates();
@@ -357,4 +411,5 @@ int main()
     testPlainFromJSONtest_mux_4bit();
     testPlainFromJSONtest_addr_4bit();
     testPlainFromJSONtest_register_4bit();
+    testPlainSequentialCircuit();
 }
