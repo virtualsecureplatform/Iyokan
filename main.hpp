@@ -131,13 +131,11 @@ public:
 template <class WorkerInfo>
 class DepNode {
 private:
-    bool alreadyStarted_;
     std::shared_ptr<TaskBase<WorkerInfo>> task_;
     std::vector<std::shared_ptr<DepNode>> dependents_;
 
 public:
-    DepNode(std::shared_ptr<TaskBase<WorkerInfo>> task)
-        : alreadyStarted_(false), task_(task)
+    DepNode(std::shared_ptr<TaskBase<WorkerInfo>> task) : task_(task)
     {
     }
 
@@ -146,15 +144,17 @@ public:
         dependents_.push_back(dep);
     }
 
+    void start(WorkerInfo wi)
+    {
+        task_->startAsync(std::move(wi));
+    }
+
     enum class STATUS {
         CONT,
         FINISHED,
     };
-    STATUS update(WorkerInfo wi)
+    STATUS update()
     {
-        if (!alreadyStarted_)
-            task_->startAsync(std::move(wi));
-
         if (!task_->hasFinished())
             return STATUS::CONT;
 
@@ -203,10 +203,11 @@ public:
             target_ = readyQueue_.front();
             readyQueue_.pop();
             assert(target_ != nullptr);
+            target_->start(getWorkerInfo());
         }
 
         if (target_ != nullptr) {
-            auto status = target_->update(getWorkerInfo());
+            auto status = target_->update();
             if (status == DepNode<WorkerInfo>::STATUS::FINISHED) {
                 // The task has finished.
                 target_->propagate(readyQueue_);
