@@ -440,6 +440,80 @@ void testPlainFromJSONtest_counter_4bit()
     }
 }
 
+void testPlainFromJSONdiamond_core()
+{
+    const std::string fileName = "test/diamond-core.json";
+    std::ifstream ifs{fileName};
+    assert(ifs);
+
+    auto net = readNetworkFromJSON<PlainNetworkBuilder>(ifs);
+    assert(net.isValid());
+
+    // 0: 74 80     lsi ra, 24
+    // 2: 00 00     nop
+    net.mem("rom", "0", 0x00).task->set(0);
+    net.mem("rom", "0", 0x01).task->set(0);
+    net.mem("rom", "0", 0x02).task->set(1);
+    net.mem("rom", "0", 0x03).task->set(0);
+    net.mem("rom", "0", 0x04).task->set(1);
+    net.mem("rom", "0", 0x05).task->set(1);
+    net.mem("rom", "0", 0x06).task->set(1);
+    net.mem("rom", "0", 0x07).task->set(0);
+
+    net.mem("rom", "0", 0x08).task->set(0);
+    net.mem("rom", "0", 0x09).task->set(0);
+    net.mem("rom", "0", 0x0a).task->set(0);
+    net.mem("rom", "0", 0x0b).task->set(0);
+    net.mem("rom", "0", 0x0c).task->set(0);
+    net.mem("rom", "0", 0x0d).task->set(0);
+    net.mem("rom", "0", 0x0e).task->set(0);
+    net.mem("rom", "0", 0x0f).task->set(1);
+
+    net.mem("rom", "0", 0x10).task->set(0);
+    net.mem("rom", "0", 0x11).task->set(0);
+    net.mem("rom", "0", 0x12).task->set(0);
+    net.mem("rom", "0", 0x13).task->set(0);
+    net.mem("rom", "0", 0x14).task->set(0);
+    net.mem("rom", "0", 0x15).task->set(0);
+    net.mem("rom", "0", 0x16).task->set(0);
+    net.mem("rom", "0", 0x17).task->set(0);
+
+    net.mem("rom", "0", 0x18).task->set(0);
+    net.mem("rom", "0", 0x19).task->set(0);
+    net.mem("rom", "0", 0x1a).task->set(0);
+    net.mem("rom", "0", 0x1b).task->set(0);
+    net.mem("rom", "0", 0x1c).task->set(0);
+    net.mem("rom", "0", 0x1d).task->set(0);
+    net.mem("rom", "0", 0x1e).task->set(0);
+    net.mem("rom", "0", 0x1f).task->set(0);
+
+    net.input("reset", 0).task->set(1);
+    processAllGates(net, 7);
+
+    net.input("reset", 0).task->set(0);
+    for (int i = 0; i < 5; i++) {
+        net.tick();
+        processAllGates(net, 7);
+    }
+
+    assert(net.output("io_regOut_x0", 0x00).task->get() == 0);
+    assert(net.output("io_regOut_x0", 0x01).task->get() == 0);
+    assert(net.output("io_regOut_x0", 0x02).task->get() == 0);
+    assert(net.output("io_regOut_x0", 0x03).task->get() == 1);
+    assert(net.output("io_regOut_x0", 0x04).task->get() == 1);
+    assert(net.output("io_regOut_x0", 0x05).task->get() == 0);
+    assert(net.output("io_regOut_x0", 0x06).task->get() == 0);
+    assert(net.output("io_regOut_x0", 0x07).task->get() == 0);
+    assert(net.output("io_regOut_x0", 0x08).task->get() == 0);
+    assert(net.output("io_regOut_x0", 0x09).task->get() == 0);
+    assert(net.output("io_regOut_x0", 0x0a).task->get() == 0);
+    assert(net.output("io_regOut_x0", 0x0b).task->get() == 0);
+    assert(net.output("io_regOut_x0", 0x0c).task->get() == 0);
+    assert(net.output("io_regOut_x0", 0x0d).task->get() == 0);
+    assert(net.output("io_regOut_x0", 0x0e).task->get() == 0);
+    assert(net.output("io_regOut_x0", 0x0f).task->get() == 0);
+}
+
 int main()
 {
     testPlainBinopGates();
@@ -453,4 +527,5 @@ int main()
     testPlainFromJSONtest_register_4bit();
     testPlainSequentialCircuit();
     testPlainFromJSONtest_counter_4bit();
+    testPlainFromJSONdiamond_core();
 }
