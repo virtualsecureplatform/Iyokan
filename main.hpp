@@ -268,7 +268,7 @@ template <class TaskType, class TaskTypeMem, class TaskTypeDFF,
           class TaskTypeWIRE, class WorkerInfo>
 class NetworkBuilder;
 
-template <class TaskType, class TaskTypeMem, class WorkerInfo>
+template <class TaskTypeMem, class WorkerInfo>
 class TaskNetwork {
 public:
     struct MemNode {
@@ -277,7 +277,7 @@ public:
     };
 
     struct Node {
-        std::shared_ptr<TaskType> task;
+        std::shared_ptr<TaskBase<WorkerInfo>> task;
         std::shared_ptr<DepNode<WorkerInfo>> depnode;
     };
 
@@ -295,7 +295,7 @@ private:
     }
 
 public:
-    template <class TaskTypeDFF, class TaskTypeWIRE>
+    template <class TaskType, class TaskTypeDFF, class TaskTypeWIRE>
     TaskNetwork(NetworkBuilder<TaskType, TaskTypeMem, TaskTypeDFF, TaskTypeWIRE,
                                WorkerInfo> &&builder);
 
@@ -346,10 +346,10 @@ public:
 template <class TaskType, class TaskTypeMem, class TaskTypeDFF,
           class TaskTypeWIRE, class WorkerInfo>
 class NetworkBuilder {
-    friend TaskNetwork<TaskType, TaskTypeMem, WorkerInfo>;
+    friend TaskNetwork<TaskTypeMem, WorkerInfo>;
 
 public:
-    using NetworkType = TaskNetwork<TaskType, TaskTypeMem, WorkerInfo>;
+    using NetworkType = TaskNetwork<TaskTypeMem, WorkerInfo>;
 
 private:
     std::unordered_map<int, typename NetworkType::Node> id2node_;
@@ -419,7 +419,13 @@ public:
         auto toIt = id2node_.find(to);
         assert(toIt != id2node_.end());
 
-        toIt->second.task->addInputPtr(fromIt->second.task->getOutputPtr());
+        auto toTask = std::dynamic_pointer_cast<TaskType>(toIt->second.task);
+        assert(toTask);
+        auto fromTask =
+            std::dynamic_pointer_cast<TaskType>(fromIt->second.task);
+        assert(fromTask);
+
+        toTask->addInputPtr(fromTask->getOutputPtr());
         fromIt->second.depnode->addDependent(toIt->second.depnode);
     }
 
@@ -447,9 +453,9 @@ public:                                                                       \
 #undef DEFINE_GATE
 };
 
-template <class TaskType, class TaskTypeMem, class WorkerInfo>
-template <class TaskTypeDFF, class TaskTypeWIRE>
-TaskNetwork<TaskType, TaskTypeMem, WorkerInfo>::TaskNetwork(
+template <class TaskTypeMem, class WorkerInfo>
+template <class TaskType, class TaskTypeDFF, class TaskTypeWIRE>
+TaskNetwork<TaskTypeMem, WorkerInfo>::TaskNetwork(
     NetworkBuilder<TaskType, TaskTypeMem, TaskTypeDFF, TaskTypeWIRE, WorkerInfo>
         &&builder)
     : id2node_(std::move(builder.id2node_)),
