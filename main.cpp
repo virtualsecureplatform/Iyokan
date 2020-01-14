@@ -18,9 +18,17 @@ void processAllGates(TaskNetwork& net, int numWorkers)
         workers.emplace_back(readyQueue, numFinishedTargets);
 
     // Process all targets.
-    while (numFinishedTargets < net.numNodes())
+    while (numFinishedTargets < net.numNodes()) {
+        // Detect infinite loops.
+        assert(std::any_of(workers.begin(), workers.end(),
+                           [](auto&& w) { return w.isWorking(); }) ||
+               !readyQueue.empty());
+
         for (auto&& w : workers)
             w.update();
+    }
+
+    assert(readyQueue.empty());
 }
 
 void testPlainNOT()

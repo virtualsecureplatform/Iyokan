@@ -216,6 +216,11 @@ public:
         }
     }
 
+    bool isWorking() const
+    {
+        return target_ != nullptr;
+    }
+
 protected:
     virtual WorkerInfo getWorkerInfo() = 0;
 };
