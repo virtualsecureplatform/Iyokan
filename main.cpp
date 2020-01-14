@@ -9,7 +9,7 @@
 template <class TaskNetwork>
 void processAllGates(TaskNetwork& net, int numWorkers)
 {
-    typename TaskNetwork::QueueType readyQueue = net.getReadyQueue();
+    auto readyQueue = net.getReadyQueue();
 
     // Create workers.
     size_t numFinishedTargets = 0;

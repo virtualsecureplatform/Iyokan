@@ -135,8 +135,7 @@ private:
     }
 
 public:
-    PlainWorker(Worker<uint8_t>::QueueType &readyQueue,
-                size_t &numFinishedTargets)
+    PlainWorker(ReadyQueue<uint8_t> &readyQueue, size_t &numFinishedTargets)
         : Worker(readyQueue, numFinishedTargets)
     {
     }

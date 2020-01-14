@@ -129,16 +129,26 @@ public:
 };
 
 template <class WorkerInfo>
+class ReadyQueue;
+
+template <class WorkerInfo>
 class DepNode {
 private:
+    int priority_;
     std::shared_ptr<TaskBase<WorkerInfo>> task_;
 
     // Use weak_ptr here in order to avoid circular references.
     std::vector<std::weak_ptr<DepNode>> dependents_;
 
 public:
-    DepNode(std::shared_ptr<TaskBase<WorkerInfo>> task) : task_(task)
+    DepNode(int priority, std::shared_ptr<TaskBase<WorkerInfo>> task)
+        : priority_(priority), task_(task)
     {
+    }
+
+    int priority() const
+    {
+        return priority_;
     }
 
     void addDependent(const std::shared_ptr<DepNode> &dep)
@@ -163,31 +173,58 @@ public:
         return STATUS::FINISHED;
     }
 
-    void propagate(std::queue<std::shared_ptr<DepNode>> &readyQueue)
-    {
-        assert(task_->hasFinished());
+    void propagate(ReadyQueue<WorkerInfo> &readyQueue);
+};
 
-        for (auto &&dep : dependents_) {
-            auto task = dep.lock()->task_;
-            task->notifyOneInputReady();
-            if (!task->hasStarted() && task->areInputsReady())
-                readyQueue.push(dep.lock());
-        }
+template <class WorkerInfo>
+class ReadyQueue {
+private:
+    std::priority_queue<std::pair<int, std::shared_ptr<DepNode<WorkerInfo>>>>
+        queue_;
+
+public:
+    bool empty() const
+    {
+        return queue_.empty();
+    }
+
+    std::shared_ptr<DepNode<WorkerInfo>> pop()
+    {
+        auto [priority, depnode] = std::move(queue_.top());
+        queue_.pop();
+        return depnode;
+    }
+
+    void push(const std::shared_ptr<DepNode<WorkerInfo>> &depnode)
+    {
+        queue_.emplace(depnode->priority(), depnode);
     }
 };
 
 template <class WorkerInfo>
-class Worker {
-protected:
-    using QueueType = std::queue<std::shared_ptr<DepNode<WorkerInfo>>>;
+void DepNode<WorkerInfo>::propagate(ReadyQueue<WorkerInfo> &readyQueue)
+{
+    assert(task_->hasFinished());
 
+    for (auto &&dep_weak : dependents_) {
+        auto dep = dep_weak.lock();
+        auto &&task = dep->task_;
+
+        task->notifyOneInputReady();
+        if (!task->hasStarted() && task->areInputsReady())
+            readyQueue.push(dep);
+    }
+}
+
+template <class WorkerInfo>
+class Worker {
 private:
-    QueueType &readyQueue_;
+    ReadyQueue<WorkerInfo> &readyQueue_;
     size_t &numFinishedTargets_;
     std::shared_ptr<DepNode<WorkerInfo>> target_;
 
 public:
-    Worker(QueueType &readyQueue, size_t &numFinishedTargets)
+    Worker(ReadyQueue<WorkerInfo> &readyQueue, size_t &numFinishedTargets)
         : readyQueue_(readyQueue),
           numFinishedTargets_(numFinishedTargets),
           target_(nullptr)
@@ -202,8 +239,7 @@ public:
     {
         if (target_ == nullptr && !readyQueue_.empty()) {
             // Found a task to tackle.
-            target_ = readyQueue_.front();
-            readyQueue_.pop();
+            target_ = readyQueue_.pop();
             assert(target_ != nullptr);
             target_->start(getWorkerInfo());
         }
@@ -234,8 +270,6 @@ class NetworkBuilder;
 template <class TaskType, class TaskTypeMem, class WorkerInfo>
 class TaskNetwork {
 public:
-    using QueueType = std::queue<std::shared_ptr<DepNode<WorkerInfo>>>;
-
     struct MemNode {
         std::shared_ptr<TaskTypeMem> task;
         std::shared_ptr<DepNode<WorkerInfo>> depnode;
@@ -267,9 +301,9 @@ public:
         return id2node_.size();
     }
 
-    QueueType getReadyQueue() const
+    ReadyQueue<WorkerInfo> getReadyQueue() const
     {
-        QueueType queue;
+        ReadyQueue<WorkerInfo> queue;
         for (auto &&[id, node] : id2node_)
             if (node.task->areInputsReady())
                 queue.push(node.depnode);
@@ -322,46 +356,48 @@ private:
 
 private:
     typename NetworkType::MemNode addMem(bool inputNeeded, bool clockNeeded,
-                                         int id)
+                                         int id, int priority)
     {
         auto task = std::make_shared<TaskTypeMem>(inputNeeded, clockNeeded);
-        auto depnode = std::make_shared<DepNode<WorkerInfo>>(task);
+        auto depnode = std::make_shared<DepNode<WorkerInfo>>(priority, task);
         id2node_.emplace(id, typename NetworkType::Node{task, depnode});
         return typename NetworkType::MemNode{task, depnode};
     }
 
     void addNamedMem(bool inputNeeded, bool clockNeeded, int id,
                      const std::string &kind, const std::string &portName,
-                     int portBit)
+                     int portBit, int priority)
     {
         namedMems_.emplace(std::make_tuple(kind, portName, portBit),
-                           addMem(inputNeeded, clockNeeded, id));
+                           addMem(inputNeeded, clockNeeded, id, priority));
     }
 
 public:
-    void DFF(int id)
+    void DFF(int id, int priority = 0)
     {
-        addMem(true, true, id);
+        addMem(true, true, id, priority);
     }
 
-    void ROM(int id, const std::string &portName, int portBit)
+    void ROM(int id, const std::string &portName, int portBit, int priority = 0)
     {
-        addNamedMem(false, false, id, "rom", portName, portBit);
+        addNamedMem(false, false, id, "rom", portName, portBit, priority);
     }
 
-    void RAM(int id, const std::string &portName, int portBit)
+    void RAM(int id, const std::string &portName, int portBit, int priority = 0)
     {
-        addNamedMem(true, true, id, "ram", portName, portBit);
+        addNamedMem(true, true, id, "ram", portName, portBit, priority);
     }
 
-    void INPUT(int id, const std::string &portName, int portBit)
+    void INPUT(int id, const std::string &portName, int portBit,
+               int priority = 0)
     {
-        addNamedMem(false, false, id, "input", portName, portBit);
+        addNamedMem(false, false, id, "input", portName, portBit, priority);
     }
 
-    void OUTPUT(int id, const std::string &portName, int portBit)
+    void OUTPUT(int id, const std::string &portName, int portBit,
+                int priority = 0)
     {
-        addNamedMem(true, false, id, "output", portName, portBit);
+        addNamedMem(true, false, id, "output", portName, portBit, priority);
     }
 
     void connect(int from, int to)
@@ -375,16 +411,16 @@ public:
         fromIt->second.depnode->addDependent(toIt->second.depnode);
     }
 
-#define DEFINE_GATE(name)                                                \
-protected:                                                               \
-    virtual std::shared_ptr<TaskType> name##Impl() = 0;                  \
-                                                                         \
-public:                                                                  \
-    void name(int id)                                                    \
-    {                                                                    \
-        auto task = name##Impl();                                        \
-        auto depnode = std::make_shared<DepNode<WorkerInfo>>(task);      \
-        id2node_.emplace(id, typename NetworkType::Node{task, depnode}); \
+#define DEFINE_GATE(name)                                                     \
+protected:                                                                    \
+    virtual std::shared_ptr<TaskType> name##Impl() = 0;                       \
+                                                                              \
+public:                                                                       \
+    void name(int id, int priority = 0)                                       \
+    {                                                                         \
+        auto task = name##Impl();                                             \
+        auto depnode = std::make_shared<DepNode<WorkerInfo>>(priority, task); \
+        id2node_.emplace(id, typename NetworkType::Node{task, depnode});      \
     }
     DEFINE_GATE(AND);
     DEFINE_GATE(NAND);
@@ -442,10 +478,10 @@ void readNetworkFromJSONImpl(NetworkBuilder &builder, picojson::value &v)
         int portBit = static_cast<int>(port.at("portBit").get<double>());
         int priority = static_cast<int>(port.at("priority").get<double>());
         if (type == "input") {
-            builder.INPUT(id, portName, portBit);
+            builder.INPUT(id, portName, portBit, priority);
         }
         else if (type == "output") {
-            builder.OUTPUT(id, portName, portBit);
+            builder.OUTPUT(id, portName, portBit, priority);
         }
     }
     for (const auto &e : cells) {  // vectorをrange-based-forでまわしている。
@@ -454,49 +490,49 @@ void readNetworkFromJSONImpl(NetworkBuilder &builder, picojson::value &v)
         int id = static_cast<int>(cell.at("id").get<double>());
         int priority = static_cast<int>(cell.at("priority").get<double>());
         if (type == "AND") {
-            builder.AND(id);
+            builder.AND(id, priority);
         }
         else if (type == "NAND") {
-            builder.NAND(id);
+            builder.NAND(id, priority);
         }
         else if (type == "ANDNOT") {
-            builder.ANDNOT(id);
+            builder.ANDNOT(id, priority);
         }
         else if (type == "XOR") {
-            builder.XOR(id);
+            builder.XOR(id, priority);
         }
         else if (type == "XNOR") {
-            builder.XNOR(id);
+            builder.XNOR(id, priority);
         }
         else if (type == "DFFP") {
-            builder.DFF(id);
+            builder.DFF(id, priority);
         }
         else if (type == "NOT") {
-            builder.NOT(id);
+            builder.NOT(id, priority);
         }
         else if (type == "NOR") {
-            builder.NOR(id);
+            builder.NOR(id, priority);
         }
         else if (type == "OR") {
-            builder.OR(id);
+            builder.OR(id, priority);
         }
         else if (type == "ORNOT") {
-            builder.ORNOT(id);
+            builder.ORNOT(id, priority);
         }
         else if (type == "MUX") {
-            builder.MUX(id);
+            builder.MUX(id, priority);
         }
         else if (type == "ROM") {
             int romAddress =
                 static_cast<int>(cell.at("romAddress").get<double>());
             int romBit = static_cast<int>(cell.at("romBit").get<double>());
-            builder.ROM(id, std::to_string(romAddress), romBit);
+            builder.ROM(id, std::to_string(romAddress), romBit, priority);
         }
         else if (type == "RAM") {
             int ramAddress =
                 static_cast<int>(cell.at("ramAddress").get<double>());
             int ramBit = static_cast<int>(cell.at("ramBit").get<double>());
-            builder.RAM(id, std::to_string(ramAddress), ramBit);
+            builder.RAM(id, std::to_string(ramAddress), ramBit, priority);
         }
         else {
             throw std::runtime_error("Not implemented:" + type);
