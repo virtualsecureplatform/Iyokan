@@ -273,45 +273,45 @@ private:
         namedMems_;
 
 private:
-    typename NetworkType::MemNode addMem(int id)
+    typename NetworkType::MemNode addMem(bool clockNeeded, int id)
     {
-        auto task = std::make_shared<TaskTypeMem>();
+        auto task = std::make_shared<TaskTypeMem>(clockNeeded);
         auto depnode = std::make_shared<DepNode<WorkerInfo>>(task);
         id2node_.emplace(id, typename NetworkType::Node{task, depnode});
         return typename NetworkType::MemNode{task, depnode};
     }
 
-    void addNamedMem(int id, const std::string &kind,
+    void addNamedMem(bool clockNeeded, int id, const std::string &kind,
                      const std::string &portName, int portBit)
     {
         namedMems_.emplace(std::make_tuple(kind, portName, portBit),
-                           addMem(id));
+                           addMem(clockNeeded, id));
     }
 
 public:
     void DFF(int id)
     {
-        addMem(id);
+        addMem(true, id);
     }
 
     void ROM(int id, const std::string &portName, int portBit)
     {
-        addNamedMem(id, "rom", portName, portBit);
+        addNamedMem(false, id, "rom", portName, portBit);
     }
 
     void RAM(int id, const std::string &portName, int portBit)
     {
-        addNamedMem(id, "ram", portName, portBit);
+        addNamedMem(true, id, "ram", portName, portBit);
     }
 
     void INPUT(int id, const std::string &portName, int portBit)
     {
-        addNamedMem(id, "input", portName, portBit);
+        addNamedMem(false, id, "input", portName, portBit);
     }
 
     void OUTPUT(int id, const std::string &portName, int portBit)
     {
-        addNamedMem(id, "output", portName, portBit);
+        addNamedMem(false, id, "output", portName, portBit);
     }
 
     void connect(int from, int to)

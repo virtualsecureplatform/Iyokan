@@ -9,21 +9,39 @@ using TaskPlainGate = Task<uint8_t, uint8_t, uint8_t /*dummy*/>;
 // connect it to other gates.
 class TaskPlainGateMem : public TaskPlainGate {
 private:
+    bool clockNeeded_;
     uint8_t val_;
 
 public:
-    TaskPlainGateMem()
+    TaskPlainGateMem(bool clockNeeded) : clockNeeded_(clockNeeded), val_(100)
     {
+    }
+
+    void tick() override
+    {
+        TaskPlainGate::tick();
+
+        if (clockNeeded_) {  // DFF / RAM
+            assert(inputSize() == 1);
+            val_ = input(0);
+            output() = val_;
+        }
     }
 
     void startAsync(uint8_t) override
     {
+        if (clockNeeded_)
+            return;
+
         if (inputSize() == 0) {  // INPUT / ROM
             output() = val_;
         }
-        else {  // OUTPUT / RAM / DFF
+        else if (inputSize() == 1) {  // OUTPUT
             val_ = input(0);
             output() = val_;
+        }
+        else {
+            assert(false);
         }
     }
 
