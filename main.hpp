@@ -285,15 +285,6 @@ private:
     std::unordered_map<int, Node> id2node_;
     std::map<std::tuple<std::string, std::string, int>, MemNode> namedMems_;
 
-private:
-    MemNode &mem(const std::string &kind, const std::string &portName,
-                 int portBit)
-    {
-        auto it = namedMems_.find(std::make_tuple(kind, portName, portBit));
-        assert(it != namedMems_.end());
-        return it->second;
-    }
-
 public:
     template <class TaskType, class TaskTypeDFF, class TaskTypeWIRE>
     TaskNetwork(NetworkBuilder<TaskType, TaskTypeMem, TaskTypeDFF, TaskTypeWIRE,
@@ -316,6 +307,14 @@ public:
     Node &node(int id)
     {
         return id2node_[id];
+    }
+
+    MemNode &mem(const std::string &kind, const std::string &portName,
+                 int portBit)
+    {
+        auto it = namedMems_.find(std::make_tuple(kind, portName, portBit));
+        assert(it != namedMems_.end());
+        return it->second;
     }
 
     MemNode &input(const std::string &portName, int portBit)
