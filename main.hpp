@@ -75,6 +75,11 @@ protected:
         return *output_;
     }
 
+    const OutType &output() const
+    {
+        return *output_;
+    }
+
     virtual void startAsyncImpl(WorkerInfo wi) = 0;
 
 public:
@@ -764,28 +769,19 @@ public:
 
 template <class InType, class OutType, class WorkerInfo>
 class TaskMem : public Task<InType, OutType, WorkerInfo> {
-private:
-    OutType val_;
-
-protected:
-    OutType &val()
-    {
-        return val_;
-    }
-
 public:
     TaskMem(int numInputs) : Task<InType, OutType, WorkerInfo>(numInputs)
     {
     }
 
-    void set(OutType val)
+    void set(const OutType &newval)
     {
-        val_ = std::move(val);
+        this->output() = newval;
     }
 
     const OutType &get() const
     {
-        return val_;
+        return this->output();
     }
 };
 
@@ -814,8 +810,7 @@ public:
 
         // We HAVE TO prefix 'this->' here. Thanks to:
         // https://stackoverflow.com/questions/4643074/why-do-i-have-to-access-template-base-class-members-through-the-this-pointer
-        this->val() = this->input(0);
-        this->output() = this->val();
+        this->output() = this->input(0);
     }
 
     bool hasFinished() const override
@@ -837,13 +832,10 @@ private:
         // We HAVE TO prefix 'this->' here. Thanks to:
         // https://stackoverflow.com/questions/4643074/why-do-i-have-to-access-template-base-class-members-through-the-this-pointer
         if (this->inputSize() == 0) {
-            thr_ = [&]() { this->output() = this->val(); };
+            // Nothing to do!
         }
         else if (this->inputSize() == 1) {
-            thr_ = [&]() {
-                this->val() = this->input(0);
-                this->output() = this->val();
-            };
+            thr_ = [&]() { this->output() = this->input(0); };
         }
         else {
             assert(false);
@@ -858,7 +850,7 @@ public:
 
     bool hasFinished() const override
     {
-        return thr_.hasFinished();
+        return this->inputSize() == 0 || thr_.hasFinished();
     }
 };
 #endif
