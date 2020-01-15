@@ -21,8 +21,19 @@
 #include <map>
 #include <memory>
 #include <queue>
+#include <sstream>
 #include <unordered_map>
 #include <vector>
+
+namespace detail {
+template <class... Args>
+std::string fok(Args... args)
+{
+    std::stringstream ss;
+    (ss << ... << args);
+    return ss.str();
+}
+}  // namespace detail
 
 template <class WorkerInfo>
 class TaskBase {
@@ -131,8 +142,16 @@ public:
 template <class WorkerInfo>
 class ReadyQueue;
 
+class ProgressGraphMaker;
+
+struct NodeLabel {
+    int id;
+    std::string kind, desc;
+};
+
 template <class WorkerInfo>
 class DepNode {
+public:
 private:
     int priority_;
     std::shared_ptr<TaskBase<WorkerInfo>> task_;
@@ -140,9 +159,12 @@ private:
     // Use weak_ptr here in order to avoid circular references.
     std::vector<std::weak_ptr<DepNode>> dependents_;
 
+    const NodeLabel label_;
+
 public:
-    DepNode(int priority, std::shared_ptr<TaskBase<WorkerInfo>> task)
-        : priority_(priority), task_(task)
+    DepNode(int priority, std::shared_ptr<TaskBase<WorkerInfo>> task,
+            NodeLabel label)
+        : priority_(priority), task_(task), label_(std::move(label))
     {
     }
 
@@ -166,6 +188,8 @@ public:
         task_->startAsync(std::move(wi));
     }
 
+    void start(WorkerInfo wi, ProgressGraphMaker &graph);
+
     enum class STATUS {
         CONT,
         FINISHED,
@@ -179,6 +203,8 @@ public:
     }
 
     void propagate(ReadyQueue<WorkerInfo> &readyQueue);
+    void propagate(ReadyQueue<WorkerInfo> &readyQueue,
+                   ProgressGraphMaker &graph);
 };
 
 template <class WorkerInfo>
@@ -206,6 +232,70 @@ public:
     }
 };
 
+class ProgressGraphMaker {
+private:
+    struct Node {
+        NodeLabel label;
+        int index;
+    };
+
+    struct Edge {
+        int from, to;
+        int index;
+    };
+
+    std::unordered_map<int, Node> nodes_;
+    std::vector<Edge> edges_;
+
+    int numStartedNodes_, numNotifiedEdges_;
+
+private:
+    Node &node(const NodeLabel &label)
+    {
+        auto [it, emplaced] = nodes_.try_emplace(label.id, Node{label, -1});
+        return it->second;
+    }
+
+public:
+    ProgressGraphMaker() : numStartedNodes_(0), numNotifiedEdges_(0)
+    {
+    }
+
+    void startNode(const NodeLabel &label)
+    {
+        node(label).index = numStartedNodes_++;
+    }
+
+    void notify(const NodeLabel &from, const NodeLabel &to)
+    {
+        edges_.push_back(Edge{from.id, to.id, numNotifiedEdges_++});
+    }
+
+    void dumpDOT(std::ostream &os) const
+    {
+        os << "digraph progress_graph_maker {" << std::endl;
+        os << "node [ shape = record ];" << std::endl;
+        for (auto &&[id, node] : nodes_) {
+            os << "n" << id << " [label = \"{" << node.label.kind << "|"
+               << node.label.desc << "}\"];" << std::endl;
+        }
+        os << std::endl;
+        for (auto &&edge : edges_) {
+            os << "n" << edge.from << " -> "
+               << "n" << edge.to << " [label = \"" << edge.index << "\"];"
+               << std::endl;
+        }
+        os << "}" << std::endl;
+    }
+};
+
+template <class WorkerInfo>
+void DepNode<WorkerInfo>::start(WorkerInfo wi, ProgressGraphMaker &graph)
+{
+    task_->startAsync(std::move(wi));
+    graph.startNode(label_);
+}
+
 template <class WorkerInfo>
 void DepNode<WorkerInfo>::propagate(ReadyQueue<WorkerInfo> &readyQueue)
 {
@@ -222,17 +312,32 @@ void DepNode<WorkerInfo>::propagate(ReadyQueue<WorkerInfo> &readyQueue)
 }
 
 template <class WorkerInfo>
+void DepNode<WorkerInfo>::propagate(ReadyQueue<WorkerInfo> &readyQueue,
+                                    ProgressGraphMaker &graph)
+{
+    propagate(readyQueue);
+
+    for (auto &&dep_weak : dependents_) {
+        auto dep = dep_weak.lock();
+        graph.notify(label_, dep->label_);
+    }
+}
+
+template <class WorkerInfo>
 class Worker {
 private:
     ReadyQueue<WorkerInfo> &readyQueue_;
     size_t &numFinishedTargets_;
     std::shared_ptr<DepNode<WorkerInfo>> target_;
+    std::shared_ptr<ProgressGraphMaker> graph_;
 
 public:
-    Worker(ReadyQueue<WorkerInfo> &readyQueue, size_t &numFinishedTargets)
+    Worker(ReadyQueue<WorkerInfo> &readyQueue, size_t &numFinishedTargets,
+           std::shared_ptr<ProgressGraphMaker> graph)
         : readyQueue_(readyQueue),
           numFinishedTargets_(numFinishedTargets),
-          target_(nullptr)
+          target_(nullptr),
+          graph_(std::move(graph))
     {
     }
 
@@ -246,14 +351,20 @@ public:
             // Found a task to tackle.
             target_ = readyQueue_.pop();
             assert(target_ != nullptr);
-            target_->start(getWorkerInfo());
+            if (graph_)
+                target_->start(getWorkerInfo(), *graph_);
+            else
+                target_->start(getWorkerInfo());
         }
 
         if (target_ != nullptr) {
             auto status = target_->update();
             if (status == DepNode<WorkerInfo>::STATUS::FINISHED) {
                 // The task has finished.
-                target_->propagate(readyQueue_);
+                if (graph_)
+                    target_->propagate(readyQueue_, *graph_);
+                else
+                    target_->propagate(readyQueue_);
                 target_ = nullptr;
                 numFinishedTargets_++;
             }
@@ -361,7 +472,8 @@ private:
     typename NetworkType::MemNode addDFF(int id, int priority = 0)
     {
         auto task = std::make_shared<TaskTypeDFF>();
-        auto depnode = std::make_shared<DepNode<WorkerInfo>>(priority, task);
+        auto depnode = std::make_shared<DepNode<WorkerInfo>>(
+            priority, task, NodeLabel{id, "DFF", ""});
         id2node_.emplace(id, depnode);
         return typename NetworkType::MemNode{task, depnode};
     }
@@ -377,7 +489,9 @@ private:
                       const std::string &portName, int portBit, int priority)
     {
         auto task = std::make_shared<TaskTypeWIRE>(inputNeeded);
-        auto depnode = std::make_shared<DepNode<WorkerInfo>>(priority, task);
+        auto depnode = std::make_shared<DepNode<WorkerInfo>>(
+            priority, task,
+            NodeLabel{id, "WIRE", detail::fok(portName, " ", portBit)});
         id2node_.emplace(id, depnode);
         namedMems_.emplace(std::make_tuple(kind, portName, portBit),
                            typename NetworkType::MemNode{task, depnode});
@@ -428,16 +542,17 @@ public:
         fromIt->second->addDependent(toIt->second);
     }
 
-#define DEFINE_GATE(name)                                                     \
-protected:                                                                    \
-    virtual std::shared_ptr<TaskType> name##Impl() = 0;                       \
-                                                                              \
-public:                                                                       \
-    void name(int id, int priority = 0)                                       \
-    {                                                                         \
-        auto task = name##Impl();                                             \
-        auto depnode = std::make_shared<DepNode<WorkerInfo>>(priority, task); \
-        id2node_.emplace(id, depnode);                                        \
+#define DEFINE_GATE(name)                                     \
+protected:                                                    \
+    virtual std::shared_ptr<TaskType> name##Impl() = 0;       \
+                                                              \
+public:                                                       \
+    void name(int id, int priority = 0)                       \
+    {                                                         \
+        auto task = name##Impl();                             \
+        auto depnode = std::make_shared<DepNode<WorkerInfo>>( \
+            priority, task, NodeLabel{id, #name, ""});        \
+        id2node_.emplace(id, depnode);                        \
     }
     DEFINE_GATE(AND);
     DEFINE_GATE(NAND);

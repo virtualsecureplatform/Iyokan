@@ -161,8 +161,9 @@ private:
     }
 
 public:
-    PlainWorker(ReadyQueue<uint8_t> &readyQueue, size_t &numFinishedTargets)
-        : Worker(readyQueue, numFinishedTargets)
+    PlainWorker(ReadyQueue<uint8_t> &readyQueue, size_t &numFinishedTargets,
+                std::shared_ptr<ProgressGraphMaker> graph)
+        : Worker(readyQueue, numFinishedTargets, graph)
     {
     }
 };

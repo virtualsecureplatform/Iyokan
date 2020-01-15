@@ -7,7 +7,8 @@
 #include <fstream>
 
 template <class TaskNetwork>
-void processAllGates(TaskNetwork& net, int numWorkers)
+void processAllGates(TaskNetwork& net, int numWorkers,
+                     std::shared_ptr<ProgressGraphMaker> graph = nullptr)
 {
     auto readyQueue = net.getReadyQueue();
 
@@ -15,7 +16,7 @@ void processAllGates(TaskNetwork& net, int numWorkers)
     size_t numFinishedTargets = 0;
     std::vector<PlainWorker> workers;
     for (int i = 0; i < numWorkers; i++)
-        workers.emplace_back(readyQueue, numFinishedTargets);
+        workers.emplace_back(readyQueue, numFinishedTargets, graph);
 
     // Process all targets.
     while (numFinishedTargets < net.numNodes()) {
@@ -506,6 +507,51 @@ void testPlainFromJSONdiamond_core()
     assert(net.output("io_regOut_x0", 0x0f).task->get() == 0);
 }
 
+void testProgressGraphMaker()
+{
+    /*
+                    B               D
+       reset(0) >---> ANDNOT(4) >---> DFF(2)
+                        ^ A            v Q
+                        |              |
+                        *--< NOT(3) <--*-----> OUTPUT(1)
+                                    A
+    */
+
+    PlainNetworkBuilder builder;
+    builder.INPUT(0, "reset", 0);
+    builder.OUTPUT(1, "out", 0);
+    builder.DFF(2);
+    builder.NOT(3);
+    builder.ANDNOT(4);
+    builder.connect(2, 1);
+    builder.connect(4, 2);
+    builder.connect(2, 3);
+    builder.connect(3, 4);
+    builder.connect(0, 4);
+
+    PlainNetwork net = std::move(builder);
+    assert(net.isValid());
+
+    auto graph = std::make_shared<ProgressGraphMaker>();
+
+    processAllGates(net, 1, graph);
+
+    std::stringstream ss;
+    graph->dumpDOT(ss);
+    std::string dot = ss.str();
+    assert(dot.find("n0 [label = \"{WIRE|reset 0}\"]") != std::string::npos);
+    assert(dot.find("n1 [label = \"{WIRE|out 0}\"]") != std::string::npos);
+    assert(dot.find("n2 [label = \"{DFF|}\"]") != std::string::npos);
+    assert(dot.find("n3 [label = \"{NOT|}\"]") != std::string::npos);
+    assert(dot.find("n4 [label = \"{ANDNOT|}\"]") != std::string::npos);
+    assert(dot.find("n2 -> n1") != std::string::npos);
+    assert(dot.find("n4 -> n2") != std::string::npos);
+    assert(dot.find("n2 -> n3") != std::string::npos);
+    assert(dot.find("n0 -> n4") != std::string::npos);
+    assert(dot.find("n3 -> n4") != std::string::npos);
+}
+
 int main()
 {
     testPlainBinopGates();
@@ -520,4 +566,5 @@ int main()
     testPlainSequentialCircuit();
     testPlainFromJSONtest_counter_4bit();
     testPlainFromJSONdiamond_core();
+    testProgressGraphMaker();
 }
