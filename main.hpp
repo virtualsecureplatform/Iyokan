@@ -2,11 +2,11 @@
 #define VIRTUALSECUREPLATFORM_IYOKAN_L2_2_MAIN_HPP
 
 /*
-     Node --has---> DepNode --references--> dependent DepNode s
-      |              |
-     has            has
-      |              |
-      v              v
+                  DepNode --references--> dependent DepNode s
+                     |
+                    has
+                     |
+                     v
      Task --is a--> TaskBase
       |
      references
@@ -151,6 +151,11 @@ public:
         return priority_;
     }
 
+    std::shared_ptr<TaskBase<WorkerInfo>> task()
+    {
+        return task_;
+    }
+
     void addDependent(const std::shared_ptr<DepNode> &dep)
     {
         dependents_.push_back(dep);
@@ -276,13 +281,8 @@ public:
         std::shared_ptr<DepNode<WorkerInfo>> depnode;
     };
 
-    struct Node {
-        std::shared_ptr<TaskBase<WorkerInfo>> task;
-        std::shared_ptr<DepNode<WorkerInfo>> depnode;
-    };
-
 private:
-    std::unordered_map<int, Node> id2node_;
+    std::unordered_map<int, std::shared_ptr<DepNode<WorkerInfo>>> id2node_;
     std::map<std::tuple<std::string, std::string, int>, MemNode> namedMems_;
 
 public:
@@ -299,12 +299,12 @@ public:
     {
         ReadyQueue<WorkerInfo> queue;
         for (auto &&[id, node] : id2node_)
-            if (node.task->areInputsReady())
-                queue.push(node.depnode);
+            if (node->task()->areInputsReady())
+                queue.push(node);
         return queue;
     }
 
-    Node &node(int id)
+    std::shared_ptr<DepNode<WorkerInfo>> &node(int id)
     {
         return id2node_[id];
     }
@@ -330,13 +330,13 @@ public:
     void tick()
     {
         for (auto &&[key, node] : id2node_)
-            node.task->tick();
+            node->task()->tick();
     }
 
     bool isValid()
     {
         for (auto &&[key, node] : id2node_)
-            if (!node.task->isValid())
+            if (!node->task()->isValid())
                 return false;
         return true;
     }
@@ -351,7 +351,7 @@ public:
     using NetworkType = TaskNetwork<TaskTypeMem, WorkerInfo>;
 
 private:
-    std::unordered_map<int, typename NetworkType::Node> id2node_;
+    std::unordered_map<int, std::shared_ptr<DepNode<WorkerInfo>>> id2node_;
 
     std::map<std::tuple<std::string, std::string, int>,
              typename NetworkType::MemNode>
@@ -362,7 +362,7 @@ private:
     {
         auto task = std::make_shared<TaskTypeDFF>();
         auto depnode = std::make_shared<DepNode<WorkerInfo>>(priority, task);
-        id2node_.emplace(id, typename NetworkType::Node{task, depnode});
+        id2node_.emplace(id, depnode);
         return typename NetworkType::MemNode{task, depnode};
     }
 
@@ -378,7 +378,7 @@ private:
     {
         auto task = std::make_shared<TaskTypeWIRE>(inputNeeded);
         auto depnode = std::make_shared<DepNode<WorkerInfo>>(priority, task);
-        id2node_.emplace(id, typename NetworkType::Node{task, depnode});
+        id2node_.emplace(id, depnode);
         namedMems_.emplace(std::make_tuple(kind, portName, portBit),
                            typename NetworkType::MemNode{task, depnode});
     }
@@ -418,14 +418,14 @@ public:
         auto toIt = id2node_.find(to);
         assert(toIt != id2node_.end());
 
-        auto toTask = std::dynamic_pointer_cast<TaskType>(toIt->second.task);
+        auto toTask = std::dynamic_pointer_cast<TaskType>(toIt->second->task());
         assert(toTask);
         auto fromTask =
-            std::dynamic_pointer_cast<TaskType>(fromIt->second.task);
+            std::dynamic_pointer_cast<TaskType>(fromIt->second->task());
         assert(fromTask);
 
         toTask->addInputPtr(fromTask->getOutputPtr());
-        fromIt->second.depnode->addDependent(toIt->second.depnode);
+        fromIt->second->addDependent(toIt->second);
     }
 
 #define DEFINE_GATE(name)                                                     \
@@ -437,7 +437,7 @@ public:                                                                       \
     {                                                                         \
         auto task = name##Impl();                                             \
         auto depnode = std::make_shared<DepNode<WorkerInfo>>(priority, task); \
-        id2node_.emplace(id, typename NetworkType::Node{task, depnode});      \
+        id2node_.emplace(id, depnode);                                        \
     }
     DEFINE_GATE(AND);
     DEFINE_GATE(NAND);

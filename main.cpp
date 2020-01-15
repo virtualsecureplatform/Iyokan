@@ -299,36 +299,28 @@ void testPlainFromJSONtest_register_4bit()
     processAllGates(net, 3);
     net.tick();
 
-    assert(
-        std::dynamic_pointer_cast<TaskPlainGateMem>(net.node(13).task)->get() ==
-        0);
-    assert(
-        std::dynamic_pointer_cast<TaskPlainGateMem>(net.node(14).task)->get() ==
-        0);
-    assert(
-        std::dynamic_pointer_cast<TaskPlainGateMem>(net.node(15).task)->get() ==
-        0);
-    assert(
-        std::dynamic_pointer_cast<TaskPlainGateMem>(net.node(16).task)->get() ==
-        0);
+    assert(std::dynamic_pointer_cast<TaskPlainGateMem>(net.node(13)->task())
+               ->get() == 0);
+    assert(std::dynamic_pointer_cast<TaskPlainGateMem>(net.node(14)->task())
+               ->get() == 0);
+    assert(std::dynamic_pointer_cast<TaskPlainGateMem>(net.node(15)->task())
+               ->get() == 0);
+    assert(std::dynamic_pointer_cast<TaskPlainGateMem>(net.node(16)->task())
+               ->get() == 0);
 
     // 2: Store values into DFFs.
     net.input("reset", 0).task->set(0);
     processAllGates(net, 3);
     net.tick();
 
-    assert(
-        std::dynamic_pointer_cast<TaskPlainGateMem>(net.node(13).task)->get() ==
-        0);
-    assert(
-        std::dynamic_pointer_cast<TaskPlainGateMem>(net.node(14).task)->get() ==
-        0);
-    assert(
-        std::dynamic_pointer_cast<TaskPlainGateMem>(net.node(15).task)->get() ==
-        1);
-    assert(
-        std::dynamic_pointer_cast<TaskPlainGateMem>(net.node(16).task)->get() ==
-        1);
+    assert(std::dynamic_pointer_cast<TaskPlainGateMem>(net.node(13)->task())
+               ->get() == 0);
+    assert(std::dynamic_pointer_cast<TaskPlainGateMem>(net.node(14)->task())
+               ->get() == 0);
+    assert(std::dynamic_pointer_cast<TaskPlainGateMem>(net.node(15)->task())
+               ->get() == 1);
+    assert(std::dynamic_pointer_cast<TaskPlainGateMem>(net.node(16)->task())
+               ->get() == 1);
 
     assert(net.output("io_out", 0).task->get() == 0);
     assert(net.output("io_out", 1).task->get() == 0);
@@ -373,7 +365,7 @@ void testPlainSequentialCircuit()
     assert(net.isValid());
 
     std::shared_ptr<TaskPlainGateMem> dff =
-        std::dynamic_pointer_cast<TaskPlainGateMem>(net.node(2).task);
+        std::dynamic_pointer_cast<TaskPlainGateMem>(net.node(2)->task());
     std::shared_ptr<TaskPlainGateMem> out = net.output("out", 0).task;
 
     // 1:
