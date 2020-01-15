@@ -762,4 +762,103 @@ public:
     }
 };
 
+template <class InType, class OutType, class WorkerInfo>
+class TaskMem : public Task<InType, OutType, WorkerInfo> {
+private:
+    OutType val_;
+
+protected:
+    OutType &val()
+    {
+        return val_;
+    }
+
+public:
+    TaskMem(int numInputs) : Task<InType, OutType, WorkerInfo>(numInputs)
+    {
+    }
+
+    void set(OutType val)
+    {
+        val_ = std::move(val);
+    }
+
+    const OutType &get() const
+    {
+        return val_;
+    }
+};
+
+template <class InType, class OutType, class WorkerInfo>
+class TaskDFF : public TaskMem<InType, OutType, WorkerInfo> {
+protected:
+    void startAsyncImpl(WorkerInfo) override
+    {
+    }
+
+public:
+    TaskDFF() : TaskMem<InType, OutType, WorkerInfo>(1)
+    {
+    }
+
+    bool areInputsReady() const override
+    {
+        // Since areInputsReady() is called after calling of tick(), the
+        // input should already be in val_.
+        return true;
+    }
+
+    void tick() override
+    {
+        TaskMem<InType, OutType, WorkerInfo>::tick();
+
+        // We HAVE TO prefix 'this->' here. Thanks to:
+        // https://stackoverflow.com/questions/4643074/why-do-i-have-to-access-template-base-class-members-through-the-this-pointer
+        this->val() = this->input(0);
+        this->output() = this->val();
+    }
+
+    bool hasFinished() const override
+    {
+        // Since hasFinished() is called after calling of tick(), the
+        // input should already be in val_.
+        return true;
+    }
+};
+
+template <class InType, class OutType, class WorkerInfo>
+class TaskWIRE : public TaskMem<InType, OutType, WorkerInfo> {
+private:
+    AsyncThread thr_;
+
+private:
+    void startAsyncImpl(WorkerInfo) override
+    {
+        // We HAVE TO prefix 'this->' here. Thanks to:
+        // https://stackoverflow.com/questions/4643074/why-do-i-have-to-access-template-base-class-members-through-the-this-pointer
+        if (this->inputSize() == 0) {
+            thr_ = [&]() { this->output() = this->val(); };
+        }
+        else if (this->inputSize() == 1) {
+            thr_ = [&]() {
+                this->val() = this->input(0);
+                this->output() = this->val();
+            };
+        }
+        else {
+            assert(false);
+        }
+    }
+
+public:
+    TaskWIRE(bool inputNeeded)
+        : TaskMem<InType, OutType, WorkerInfo>(inputNeeded ? 1 : 0)
+    {
+    }
+
+    bool hasFinished() const override
+    {
+        return thr_.hasFinished();
+    }
+};
 #endif

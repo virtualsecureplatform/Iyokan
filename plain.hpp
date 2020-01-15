@@ -3,98 +3,10 @@
 
 #include "main.hpp"
 
-//
-#include <thread>
-
 using TaskPlainGate = Task<uint8_t, uint8_t, uint8_t /*dummy*/>;
-
-class TaskPlainGateMem : public TaskPlainGate {
-protected:
-    uint8_t val_;
-
-public:
-    TaskPlainGateMem(int numInputs) : TaskPlainGate(numInputs)
-    {
-    }
-
-    void set(uint8_t val)
-    {
-        val_ = val & 1;
-    }
-
-    uint8_t get() const
-    {
-        return val_;
-    }
-};
-
-// DFF/RAM
-class TaskPlainGateDFF : public TaskPlainGateMem {
-private:
-    void startAsyncImpl(uint8_t) override
-    {
-    }
-
-public:
-    TaskPlainGateDFF() : TaskPlainGateMem(1)
-    {
-    }
-
-    bool areInputsReady() const override
-    {
-        // Since areInputsReady() is called after calling of tick(), the
-        // input should already be in val_.
-        return true;
-    }
-
-    void tick() override
-    {
-        TaskPlainGate::tick();
-
-        val_ = input(0);
-        output() = val_;
-    }
-
-    bool hasFinished() const override
-    {
-        // Since hasFinished() is called after calling of tick(), the
-        // input should already be in val_.
-        return true;
-    }
-};
-
-// INPUT/OUTPUT/ROM
-class TaskPlainGateWIRE : public TaskPlainGateMem {
-private:
-    AsyncThread thr_;
-
-private:
-    void startAsyncImpl(uint8_t) override
-    {
-        if (inputSize() == 0) {  // INPUT / ROM
-            thr_ = [&]() { output() = val_; };
-        }
-        else if (inputSize() == 1) {  // OUTPUT
-            thr_ = [&]() {
-                val_ = input(0);
-                output() = val_;
-            };
-        }
-        else {
-            assert(false);
-        }
-    }
-
-public:
-    TaskPlainGateWIRE(bool inputNeeded) : TaskPlainGateMem(inputNeeded ? 1 : 0)
-    {
-    }
-
-    bool hasFinished() const override
-    {
-        return thr_.hasFinished();
-    }
-};
+using TaskPlainGateMem = TaskMem<uint8_t, uint8_t, uint8_t /* dummy */>;
+using TaskPlainGateDFF = TaskDFF<uint8_t, uint8_t, uint8_t /* dummy */>;
+using TaskPlainGateWIRE = TaskWIRE<uint8_t, uint8_t, uint8_t /* dummy */>;
 
 #define DEFINE_TASK_PLAIN_GATE(name, numInputs, expr)    \
     class TaskPlainGate##name : public TaskPlainGate {   \
