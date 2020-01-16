@@ -195,16 +195,9 @@ public:
 
     void start(WorkerInfo wi, ProgressGraphMaker &graph);
 
-    enum class STATUS {
-        CONT,
-        FINISHED,
-    };
-    STATUS update()
+    bool hasFinished() const
     {
-        if (!task_->hasFinished())
-            return STATUS::CONT;
-
-        return STATUS::FINISHED;
+        return task_->hasFinished();
     }
 
     void propagate(ReadyQueue<WorkerInfo> &readyQueue);
@@ -363,9 +356,7 @@ public:
         }
 
         if (target_ != nullptr) {
-            auto status = target_->update();
-            if (status == DepNode<WorkerInfo>::STATUS::FINISHED) {
-                // The task has finished.
+            if (target_->hasFinished()) {
                 if (graph_)
                     target_->propagate(readyQueue_, *graph_);
                 else
