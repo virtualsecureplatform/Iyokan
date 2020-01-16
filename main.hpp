@@ -830,36 +830,4 @@ public:
     }
 };
 
-template <class InType, class OutType, class WorkerInfo>
-class TaskWIRE : public TaskMem<InType, OutType, WorkerInfo> {
-private:
-    AsyncThread thr_;
-
-private:
-    void startAsyncImpl(WorkerInfo) override
-    {
-        // We HAVE TO prefix 'this->' here. Thanks to:
-        // https://stackoverflow.com/questions/4643074/why-do-i-have-to-access-template-base-class-members-through-the-this-pointer
-        if (this->inputSize() == 0) {
-            // Nothing to do!
-        }
-        else if (this->inputSize() == 1) {
-            thr_ = [&]() { this->output() = this->input(0); };
-        }
-        else {
-            assert(false);
-        }
-    }
-
-public:
-    TaskWIRE(bool inputNeeded)
-        : TaskMem<InType, OutType, WorkerInfo>(inputNeeded ? 1 : 0)
-    {
-    }
-
-    bool hasFinished() const override
-    {
-        return this->inputSize() == 0 || thr_.hasFinished();
-    }
-};
 #endif

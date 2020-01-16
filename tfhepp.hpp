@@ -15,8 +15,38 @@ using TaskTFHEppGateMem =
     TaskMem<TFHEpp::TLWElvl0, TFHEpp::TLWElvl0, TFHEppWorkerInfo>;
 using TaskTFHEppGateDFF =
     TaskDFF<TFHEpp::TLWElvl0, TFHEpp::TLWElvl0, TFHEppWorkerInfo>;
-using TaskTFHEppGateWIRE =
-    TaskWIRE<TFHEpp::TLWElvl0, TFHEpp::TLWElvl0, TFHEppWorkerInfo>;
+
+class TaskTFHEppGateWIRE
+    : public TaskMem<TFHEpp::TLWElvl0, TFHEpp::TLWElvl0, TFHEppWorkerInfo> {
+private:
+    AsyncThread thr_;
+
+private:
+    void startAsyncImpl(TFHEppWorkerInfo) override
+    {
+        if (inputSize() == 0) {
+            // Nothing to do!
+        }
+        else if (inputSize() == 1) {
+            thr_ = [&]() { output() = input(0); };
+        }
+        else {
+            assert(false);
+        }
+    }
+
+public:
+    TaskTFHEppGateWIRE(bool inputNeeded)
+        : TaskMem<TFHEpp::TLWElvl0, TFHEpp::TLWElvl0, TFHEppWorkerInfo>(
+              inputNeeded ? 1 : 0)
+    {
+    }
+
+    bool hasFinished() const override
+    {
+        return inputSize() == 0 || thr_.hasFinished();
+    }
+};
 
 #define DEFINE_TASK_GATE(name, numInputs, expr)            \
     class TaskTFHEppGate##name : public TaskTFHEppGate {   \

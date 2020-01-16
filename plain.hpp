@@ -6,7 +6,37 @@
 using TaskPlainGate = Task<uint8_t, uint8_t, uint8_t /*dummy*/>;
 using TaskPlainGateMem = TaskMem<uint8_t, uint8_t, uint8_t /* dummy */>;
 using TaskPlainGateDFF = TaskDFF<uint8_t, uint8_t, uint8_t /* dummy */>;
-using TaskPlainGateWIRE = TaskWIRE<uint8_t, uint8_t, uint8_t /* dummy */>;
+
+class TaskPlainGateWIRE
+    : public TaskMem<uint8_t, uint8_t, uint8_t /* dummy */> {
+private:
+    AsyncThread thr_;
+
+private:
+    void startAsyncImpl(uint8_t) override
+    {
+        if (inputSize() == 0) {
+            // Nothing to do!
+        }
+        else if (inputSize() == 1) {
+            thr_ = [&]() { output() = input(0); };
+        }
+        else {
+            assert(false);
+        }
+    }
+
+public:
+    TaskPlainGateWIRE(bool inputNeeded)
+        : TaskMem<uint8_t, uint8_t, uint8_t /* dummy */>(inputNeeded ? 1 : 0)
+    {
+    }
+
+    bool hasFinished() const override
+    {
+        return inputSize() == 0 || thr_.hasFinished();
+    }
+};
 
 #define DEFINE_TASK_PLAIN_GATE(name, numInputs, expr)    \
     class TaskPlainGate##name : public TaskPlainGate {   \
