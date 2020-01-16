@@ -10,16 +10,13 @@ using TaskPlainGateDFF = TaskDFF<uint8_t, uint8_t, uint8_t /* dummy */>;
 class TaskPlainGateWIRE
     : public TaskMem<uint8_t, uint8_t, uint8_t /* dummy */> {
 private:
-    AsyncThread thr_;
-
-private:
     void startAsyncImpl(uint8_t) override
     {
         if (inputSize() == 0) {
             // Nothing to do!
         }
         else if (inputSize() == 1) {
-            thr_ = [&]() { output() = input(0); };
+            output() = input(0);
         }
         else {
             assert(false);
@@ -34,19 +31,16 @@ public:
 
     bool hasFinished() const override
     {
-        return inputSize() == 0 || thr_.hasFinished();
+        return true;
     }
 };
 
 #define DEFINE_TASK_PLAIN_GATE(name, numInputs, expr)    \
     class TaskPlainGate##name : public TaskPlainGate {   \
     private:                                             \
-        AsyncThread thr_;                                \
-                                                         \
-    private:                                             \
         void startAsyncImpl(uint8_t) override            \
         {                                                \
-            thr_ = [&]() { output() = (expr)&1; };       \
+            output() = (expr)&1;                         \
         }                                                \
                                                          \
     public:                                              \
@@ -56,7 +50,7 @@ public:
                                                          \
         bool hasFinished() const override                \
         {                                                \
-            return thr_.hasFinished();                   \
+            return true;                                 \
         }                                                \
     };
 DEFINE_TASK_PLAIN_GATE(AND, 2, (input(0) & input(1)));
