@@ -464,6 +464,7 @@ class NetworkBuilder {
     friend TaskNetwork<TaskTypeMem, WorkerInfo>;
 
 public:
+    using ParamTaskTypeMem = TaskTypeMem;
     using NetworkType = TaskNetwork<TaskTypeMem, WorkerInfo>;
 
 private:
