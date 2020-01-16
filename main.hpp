@@ -761,7 +761,6 @@ public:
 
     bool hasFinished() const
     {
-        using namespace std::chrono_literals;
         return finished_;
     }
 };
