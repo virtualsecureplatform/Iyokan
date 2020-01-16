@@ -3,6 +3,21 @@
 //
 #include <fstream>
 
+template <class NetworkBuilder, class TaskNetwork>
+auto get(TaskNetwork& net, const std::string& kind, const std::string& portName,
+         int portBit)
+{
+    return net.template get<typename NetworkBuilder::ParamTaskTypeWIRE>(
+        kind, portName, portBit);
+}
+
+// Assume variable names 'NetworkBuilder' and 'net'
+#define ASSERT_OUTPUT_EQ(portName, portBit, expected)                          \
+    assert(getOutput(get<NetworkBuilder>(net, "output", portName, portBit)) == \
+           (expected))
+#define SET_INPUT(portName, portBit, val) \
+    setInput(get<NetworkBuilder>(net, "input", portName, portBit), val)
+
 template <class NetworkBuilder>
 void testNOT()
 {
@@ -14,12 +29,12 @@ void testNOT()
     builder.connect(1, 2);
 
     TaskNetwork net = std::move(builder);
-    auto out = net.output("out", 0).task;
+    auto out = get<NetworkBuilder>(net, "output", "out", 0);
 
     std::array<std::tuple<int, int>, 8> invals{{{0, 1}, {0, 1}}};
     for (int i = 0; i < 2; i++) {
         // Set inputs.
-        setInput(net.input("A", 0).task, std::get<0>(invals[i]));
+        SET_INPUT("A", 0, std::get<0>(invals[i]));
 
         processAllGates(net, 2);
 
@@ -45,7 +60,6 @@ void testMUX()
     builder.connect(3, 4);
 
     TaskNetwork net = std::move(builder);
-    auto out = net.output("out", 0).task;
 
     std::array<std::tuple<int, int, int, int>, 8> invals{{/*A,B, S, O*/
                                                           {0, 0, 0, 0},
@@ -58,14 +72,14 @@ void testMUX()
                                                           {1, 1, 1, 1}}};
     for (int i = 0; i < 8; i++) {
         // Set inputs.
-        setInput(net.input("A", 0).task, std::get<0>(invals[i]));
-        setInput(net.input("B", 0).task, std::get<1>(invals[i]));
-        setInput(net.input("S", 0).task, std::get<2>(invals[i]));
+        SET_INPUT("A", 0, std::get<0>(invals[i]));
+        SET_INPUT("B", 0, std::get<1>(invals[i]));
+        SET_INPUT("S", 0, std::get<2>(invals[i]));
 
         processAllGates(net, 2);
 
         // Check if results are okay.
-        assert(getOutput(out) == std::get<3>(invals[i]));
+        ASSERT_OUTPUT_EQ("out", 0, std::get<3>(invals[i]));
 
         net.tick();
     }
@@ -109,14 +123,14 @@ void testBinopGates()
     std::array<std::pair<int, int>, 4> invals{{{0, 0}, {0, 1}, {1, 0}, {1, 1}}};
     for (int i = 0; i < 4; i++) {
         // Set inputs.
-        setInput(net.input("in0", 0).task, invals[i].first ? 1 : 0);
-        setInput(net.input("in1", 0).task, invals[i].second ? 1 : 0);
+        SET_INPUT("in0", 0, invals[i].first ? 1 : 0);
+        SET_INPUT("in1", 0, invals[i].second ? 1 : 0);
 
         processAllGates(net, 1);
 
         // Check if results are okay.
         for (auto&& [portName, res] : id2res)
-            assert(res[i] == getOutput(net.output(portName, 0).task));
+            ASSERT_OUTPUT_EQ(portName, 0, res[i]);
 
         net.tick();
     }
@@ -132,17 +146,17 @@ void testFromJSONtest_pass_4bit()
     auto net = readNetworkFromJSON<NetworkBuilder>(ifs);
     assert(net.isValid());
 
-    setInput(net.input("io_in", 0).task, 0);
-    setInput(net.input("io_in", 1).task, 1);
-    setInput(net.input("io_in", 2).task, 1);
-    setInput(net.input("io_in", 3).task, 0);
+    SET_INPUT("io_in", 0, 0);
+    SET_INPUT("io_in", 1, 1);
+    SET_INPUT("io_in", 2, 1);
+    SET_INPUT("io_in", 3, 0);
 
     processAllGates(net, 2);
 
-    assert(getOutput(net.output("io_out", 0).task) == 0);
-    assert(getOutput(net.output("io_out", 1).task) == 1);
-    assert(getOutput(net.output("io_out", 2).task) == 1);
-    assert(getOutput(net.output("io_out", 3).task) == 0);
+    ASSERT_OUTPUT_EQ("io_out", 0, 0);
+    ASSERT_OUTPUT_EQ("io_out", 1, 1);
+    ASSERT_OUTPUT_EQ("io_out", 2, 1);
+    ASSERT_OUTPUT_EQ("io_out", 3, 0);
 }
 
 template <class NetworkBuilder>
@@ -155,21 +169,21 @@ void testFromJSONtest_and_4bit()
     auto net = readNetworkFromJSON<NetworkBuilder>(ifs);
     assert(net.isValid());
 
-    setInput(net.input("io_inA", 0).task, 0);
-    setInput(net.input("io_inA", 1).task, 0);
-    setInput(net.input("io_inA", 2).task, 1);
-    setInput(net.input("io_inA", 3).task, 1);
-    setInput(net.input("io_inB", 0).task, 0);
-    setInput(net.input("io_inB", 1).task, 1);
-    setInput(net.input("io_inB", 2).task, 0);
-    setInput(net.input("io_inB", 3).task, 1);
+    SET_INPUT("io_inA", 0, 0);
+    SET_INPUT("io_inA", 1, 0);
+    SET_INPUT("io_inA", 2, 1);
+    SET_INPUT("io_inA", 3, 1);
+    SET_INPUT("io_inB", 0, 0);
+    SET_INPUT("io_inB", 1, 1);
+    SET_INPUT("io_inB", 2, 0);
+    SET_INPUT("io_inB", 3, 1);
 
     processAllGates(net, 3);
 
-    assert(getOutput(net.output("io_out", 0).task) == 0);
-    assert(getOutput(net.output("io_out", 1).task) == 0);
-    assert(getOutput(net.output("io_out", 2).task) == 0);
-    assert(getOutput(net.output("io_out", 3).task) == 1);
+    ASSERT_OUTPUT_EQ("io_out", 0, 0);
+    ASSERT_OUTPUT_EQ("io_out", 1, 0);
+    ASSERT_OUTPUT_EQ("io_out", 2, 0);
+    ASSERT_OUTPUT_EQ("io_out", 3, 1);
 }
 
 template <class NetworkBuilder>
@@ -182,19 +196,19 @@ void testFromJSONtest_and_4_2bit()
     auto net = readNetworkFromJSON<NetworkBuilder>(ifs);
     assert(net.isValid());
 
-    setInput(net.input("io_inA", 0).task, 1);
-    setInput(net.input("io_inA", 1).task, 0);
-    setInput(net.input("io_inA", 2).task, 1);
-    setInput(net.input("io_inA", 3).task, 1);
-    setInput(net.input("io_inB", 0).task, 1);
-    setInput(net.input("io_inB", 1).task, 1);
-    setInput(net.input("io_inB", 2).task, 1);
-    setInput(net.input("io_inB", 3).task, 1);
+    SET_INPUT("io_inA", 0, 1);
+    SET_INPUT("io_inA", 1, 0);
+    SET_INPUT("io_inA", 2, 1);
+    SET_INPUT("io_inA", 3, 1);
+    SET_INPUT("io_inB", 0, 1);
+    SET_INPUT("io_inB", 1, 1);
+    SET_INPUT("io_inB", 2, 1);
+    SET_INPUT("io_inB", 3, 1);
 
     processAllGates(net, 3);
 
-    assert(getOutput(net.output("io_out", 0).task) == 1);
-    assert(getOutput(net.output("io_out", 1).task) == 0);
+    ASSERT_OUTPUT_EQ("io_out", 0, 1);
+    ASSERT_OUTPUT_EQ("io_out", 1, 0);
 }
 
 template <class NetworkBuilder>
@@ -207,29 +221,29 @@ void testFromJSONtest_mux_4bit()
     auto net = readNetworkFromJSON<NetworkBuilder>(ifs);
     assert(net.isValid());
 
-    setInput(net.input("io_inA", 0).task, 0);
-    setInput(net.input("io_inA", 1).task, 0);
-    setInput(net.input("io_inA", 2).task, 1);
-    setInput(net.input("io_inA", 3).task, 1);
-    setInput(net.input("io_inB", 0).task, 0);
-    setInput(net.input("io_inB", 1).task, 1);
-    setInput(net.input("io_inB", 2).task, 0);
-    setInput(net.input("io_inB", 3).task, 1);
+    SET_INPUT("io_inA", 0, 0);
+    SET_INPUT("io_inA", 1, 0);
+    SET_INPUT("io_inA", 2, 1);
+    SET_INPUT("io_inA", 3, 1);
+    SET_INPUT("io_inB", 0, 0);
+    SET_INPUT("io_inB", 1, 1);
+    SET_INPUT("io_inB", 2, 0);
+    SET_INPUT("io_inB", 3, 1);
 
-    setInput(net.input("io_sel", 0).task, 0);
+    SET_INPUT("io_sel", 0, 0);
     processAllGates(net, 3);
-    assert(getOutput(net.output("io_out", 0).task) == 0);
-    assert(getOutput(net.output("io_out", 1).task) == 0);
-    assert(getOutput(net.output("io_out", 2).task) == 1);
-    assert(getOutput(net.output("io_out", 3).task) == 1);
+    ASSERT_OUTPUT_EQ("io_out", 0, 0);
+    ASSERT_OUTPUT_EQ("io_out", 1, 0);
+    ASSERT_OUTPUT_EQ("io_out", 2, 1);
+    ASSERT_OUTPUT_EQ("io_out", 3, 1);
     net.tick();
 
-    setInput(net.input("io_sel", 0).task, 1);
+    SET_INPUT("io_sel", 0, 1);
     processAllGates(net, 3);
-    assert(getOutput(net.output("io_out", 0).task) == 0);
-    assert(getOutput(net.output("io_out", 1).task) == 1);
-    assert(getOutput(net.output("io_out", 2).task) == 0);
-    assert(getOutput(net.output("io_out", 3).task) == 1);
+    ASSERT_OUTPUT_EQ("io_out", 0, 0);
+    ASSERT_OUTPUT_EQ("io_out", 1, 1);
+    ASSERT_OUTPUT_EQ("io_out", 2, 0);
+    ASSERT_OUTPUT_EQ("io_out", 3, 1);
 }
 
 template <class NetworkBuilder>
@@ -242,21 +256,21 @@ void testFromJSONtest_addr_4bit()
     auto net = readNetworkFromJSON<NetworkBuilder>(ifs);
     assert(net.isValid());
 
-    setInput(net.input("io_inA", 0).task, 0);
-    setInput(net.input("io_inA", 1).task, 0);
-    setInput(net.input("io_inA", 2).task, 1);
-    setInput(net.input("io_inA", 3).task, 1);
-    setInput(net.input("io_inB", 0).task, 0);
-    setInput(net.input("io_inB", 1).task, 1);
-    setInput(net.input("io_inB", 2).task, 0);
-    setInput(net.input("io_inB", 3).task, 1);
+    SET_INPUT("io_inA", 0, 0);
+    SET_INPUT("io_inA", 1, 0);
+    SET_INPUT("io_inA", 2, 1);
+    SET_INPUT("io_inA", 3, 1);
+    SET_INPUT("io_inB", 0, 0);
+    SET_INPUT("io_inB", 1, 1);
+    SET_INPUT("io_inB", 2, 0);
+    SET_INPUT("io_inB", 3, 1);
 
     processAllGates(net, 3);
 
-    assert(getOutput(net.output("io_out", 0).task) == 0);
-    assert(getOutput(net.output("io_out", 1).task) == 1);
-    assert(getOutput(net.output("io_out", 2).task) == 1);
-    assert(getOutput(net.output("io_out", 3).task) == 0);
+    ASSERT_OUTPUT_EQ("io_out", 0, 0);
+    ASSERT_OUTPUT_EQ("io_out", 1, 1);
+    ASSERT_OUTPUT_EQ("io_out", 2, 1);
+    ASSERT_OUTPUT_EQ("io_out", 3, 0);
 }
 
 template <class NetworkBuilder>
@@ -269,13 +283,13 @@ void testFromJSONtest_register_4bit()
     auto net = readNetworkFromJSON<NetworkBuilder>(ifs);
     assert(net.isValid());
 
-    setInput(net.input("io_in", 0).task, 0);
-    setInput(net.input("io_in", 1).task, 0);
-    setInput(net.input("io_in", 2).task, 1);
-    setInput(net.input("io_in", 3).task, 1);
+    SET_INPUT("io_in", 0, 0);
+    SET_INPUT("io_in", 1, 0);
+    SET_INPUT("io_in", 2, 1);
+    SET_INPUT("io_in", 3, 1);
 
     // 1: Reset all DFFs.
-    setInput(net.input("reset", 0).task, 1);
+    SET_INPUT("reset", 0, 1);
     processAllGates(net, 3);
     net.tick();
 
@@ -293,7 +307,7 @@ void testFromJSONtest_register_4bit()
                net.node(16)->task())) == 0);
 
     // 2: Store values into DFFs.
-    setInput(net.input("reset", 0).task, 0);
+    SET_INPUT("reset", 0, 0);
     processAllGates(net, 3);
     net.tick();
 
@@ -310,20 +324,20 @@ void testFromJSONtest_register_4bit()
                      typename NetworkBuilder::ParamTaskTypeMem>(
                net.node(16)->task())) == 1);
 
-    assert(getOutput(net.output("io_out", 0).task) == 0);
-    assert(getOutput(net.output("io_out", 1).task) == 0);
-    assert(getOutput(net.output("io_out", 2).task) == 0);
-    assert(getOutput(net.output("io_out", 3).task) == 0);
+    ASSERT_OUTPUT_EQ("io_out", 0, 0);
+    ASSERT_OUTPUT_EQ("io_out", 1, 0);
+    ASSERT_OUTPUT_EQ("io_out", 2, 0);
+    ASSERT_OUTPUT_EQ("io_out", 3, 0);
 
     // 3: Get outputs.
-    setInput(net.input("reset", 0).task, 0);
+    SET_INPUT("reset", 0, 0);
     processAllGates(net, 3);
     net.tick();
 
-    assert(getOutput(net.output("io_out", 0).task) == 0);
-    assert(getOutput(net.output("io_out", 1).task) == 0);
-    assert(getOutput(net.output("io_out", 2).task) == 1);
-    assert(getOutput(net.output("io_out", 3).task) == 1);
+    ASSERT_OUTPUT_EQ("io_out", 0, 0);
+    ASSERT_OUTPUT_EQ("io_out", 1, 0);
+    ASSERT_OUTPUT_EQ("io_out", 2, 1);
+    ASSERT_OUTPUT_EQ("io_out", 3, 1);
 }
 
 template <class NetworkBuilder>
@@ -356,30 +370,30 @@ void testSequentialCircuit()
     auto dff =
         std::dynamic_pointer_cast<typename NetworkBuilder::ParamTaskTypeMem>(
             net.node(2)->task());
-    auto out = net.output("out", 0).task;
+    auto out = get<NetworkBuilder>(net, "output", "out", 0);
 
     // 1:
-    setInput(net.input("reset", 0).task, 1);
+    SET_INPUT("reset", 0, 1);
     processAllGates(net, 3);
 
     // 2:
     net.tick();
     assert(getOutput(dff) == 0);
-    setInput(net.input("reset", 0).task, 0);
+    SET_INPUT("reset", 0, 0);
     processAllGates(net, 3);
-    assert(getOutput(out) == 0);
+    ASSERT_OUTPUT_EQ("out", 0, 0);
 
     // 3:
     net.tick();
     assert(getOutput(dff) == 1);
     processAllGates(net, 3);
-    assert(getOutput(out) == 1);
+    ASSERT_OUTPUT_EQ("out", 0, 1);
 
     // 4:
     net.tick();
     assert(getOutput(dff) == 0);
     processAllGates(net, 3);
-    assert(getOutput(out) == 0);
+    ASSERT_OUTPUT_EQ("out", 0, 0);
 }
 
 template <class NetworkBuilder>
@@ -409,17 +423,17 @@ void testFromJSONtest_counter_4bit()
                                              {0, 1, 1, 1},
                                              {1, 1, 1, 1}}};
 
-    setInput(net.input("reset", 0).task, 1);
+    SET_INPUT("reset", 0, 1);
     processAllGates(net, 3);
 
-    setInput(net.input("reset", 0).task, 0);
+    SET_INPUT("reset", 0, 0);
     for (size_t i = 0; i < outvals.size(); i++) {
         net.tick();
         processAllGates(net, 3);
-        assert(getOutput(net.output("io_out", 0).task) == outvals[i][0]);
-        assert(getOutput(net.output("io_out", 1).task) == outvals[i][1]);
-        assert(getOutput(net.output("io_out", 2).task) == outvals[i][2]);
-        assert(getOutput(net.output("io_out", 3).task) == outvals[i][3]);
+        ASSERT_OUTPUT_EQ("io_out", 0, outvals[i][0]);
+        ASSERT_OUTPUT_EQ("io_out", 1, outvals[i][1]);
+        ASSERT_OUTPUT_EQ("io_out", 2, outvals[i][2]);
+        ASSERT_OUTPUT_EQ("io_out", 3, outvals[i][3]);
     }
 }
 
@@ -435,68 +449,68 @@ void testFromJSONdiamond_core()
 
     // 0: 74 80     lsi ra, 24
     // 2: 00 00     nop
-    setInput(net.mem("rom", "0", 0x00).task, 0);
-    setInput(net.mem("rom", "0", 0x01).task, 0);
-    setInput(net.mem("rom", "0", 0x02).task, 1);
-    setInput(net.mem("rom", "0", 0x03).task, 0);
-    setInput(net.mem("rom", "0", 0x04).task, 1);
-    setInput(net.mem("rom", "0", 0x05).task, 1);
-    setInput(net.mem("rom", "0", 0x06).task, 1);
-    setInput(net.mem("rom", "0", 0x07).task, 0);
+    setInput(get<NetworkBuilder>(net, "rom", "0", 0x00), 0);
+    setInput(get<NetworkBuilder>(net, "rom", "0", 0x01), 0);
+    setInput(get<NetworkBuilder>(net, "rom", "0", 0x02), 1);
+    setInput(get<NetworkBuilder>(net, "rom", "0", 0x03), 0);
+    setInput(get<NetworkBuilder>(net, "rom", "0", 0x04), 1);
+    setInput(get<NetworkBuilder>(net, "rom", "0", 0x05), 1);
+    setInput(get<NetworkBuilder>(net, "rom", "0", 0x06), 1);
+    setInput(get<NetworkBuilder>(net, "rom", "0", 0x07), 0);
 
-    setInput(net.mem("rom", "0", 0x08).task, 0);
-    setInput(net.mem("rom", "0", 0x09).task, 0);
-    setInput(net.mem("rom", "0", 0x0a).task, 0);
-    setInput(net.mem("rom", "0", 0x0b).task, 0);
-    setInput(net.mem("rom", "0", 0x0c).task, 0);
-    setInput(net.mem("rom", "0", 0x0d).task, 0);
-    setInput(net.mem("rom", "0", 0x0e).task, 0);
-    setInput(net.mem("rom", "0", 0x0f).task, 1);
+    setInput(get<NetworkBuilder>(net, "rom", "0", 0x08), 0);
+    setInput(get<NetworkBuilder>(net, "rom", "0", 0x09), 0);
+    setInput(get<NetworkBuilder>(net, "rom", "0", 0x0a), 0);
+    setInput(get<NetworkBuilder>(net, "rom", "0", 0x0b), 0);
+    setInput(get<NetworkBuilder>(net, "rom", "0", 0x0c), 0);
+    setInput(get<NetworkBuilder>(net, "rom", "0", 0x0d), 0);
+    setInput(get<NetworkBuilder>(net, "rom", "0", 0x0e), 0);
+    setInput(get<NetworkBuilder>(net, "rom", "0", 0x0f), 1);
 
-    setInput(net.mem("rom", "0", 0x10).task, 0);
-    setInput(net.mem("rom", "0", 0x11).task, 0);
-    setInput(net.mem("rom", "0", 0x12).task, 0);
-    setInput(net.mem("rom", "0", 0x13).task, 0);
-    setInput(net.mem("rom", "0", 0x14).task, 0);
-    setInput(net.mem("rom", "0", 0x15).task, 0);
-    setInput(net.mem("rom", "0", 0x16).task, 0);
-    setInput(net.mem("rom", "0", 0x17).task, 0);
+    setInput(get<NetworkBuilder>(net, "rom", "0", 0x10), 0);
+    setInput(get<NetworkBuilder>(net, "rom", "0", 0x11), 0);
+    setInput(get<NetworkBuilder>(net, "rom", "0", 0x12), 0);
+    setInput(get<NetworkBuilder>(net, "rom", "0", 0x13), 0);
+    setInput(get<NetworkBuilder>(net, "rom", "0", 0x14), 0);
+    setInput(get<NetworkBuilder>(net, "rom", "0", 0x15), 0);
+    setInput(get<NetworkBuilder>(net, "rom", "0", 0x16), 0);
+    setInput(get<NetworkBuilder>(net, "rom", "0", 0x17), 0);
 
-    setInput(net.mem("rom", "0", 0x18).task, 0);
-    setInput(net.mem("rom", "0", 0x19).task, 0);
-    setInput(net.mem("rom", "0", 0x1a).task, 0);
-    setInput(net.mem("rom", "0", 0x1b).task, 0);
-    setInput(net.mem("rom", "0", 0x1c).task, 0);
-    setInput(net.mem("rom", "0", 0x1d).task, 0);
-    setInput(net.mem("rom", "0", 0x1e).task, 0);
-    setInput(net.mem("rom", "0", 0x1f).task, 0);
+    setInput(get<NetworkBuilder>(net, "rom", "0", 0x18), 0);
+    setInput(get<NetworkBuilder>(net, "rom", "0", 0x19), 0);
+    setInput(get<NetworkBuilder>(net, "rom", "0", 0x1a), 0);
+    setInput(get<NetworkBuilder>(net, "rom", "0", 0x1b), 0);
+    setInput(get<NetworkBuilder>(net, "rom", "0", 0x1c), 0);
+    setInput(get<NetworkBuilder>(net, "rom", "0", 0x1d), 0);
+    setInput(get<NetworkBuilder>(net, "rom", "0", 0x1e), 0);
+    setInput(get<NetworkBuilder>(net, "rom", "0", 0x1f), 0);
 
-    setInput(net.input("reset", 0).task, 1);
+    SET_INPUT("reset", 0, 1);
     processAllGates(net, 7);
 
-    setInput(net.input("reset", 0).task, 0);
+    SET_INPUT("reset", 0, 0);
 
     for (int i = 0; i < 5; i++) {
         net.tick();
         processAllGates(net, 7);
     }
 
-    assert(getOutput(net.output("io_regOut_x0", 0x00).task) == 0);
-    assert(getOutput(net.output("io_regOut_x0", 0x01).task) == 0);
-    assert(getOutput(net.output("io_regOut_x0", 0x02).task) == 0);
-    assert(getOutput(net.output("io_regOut_x0", 0x03).task) == 1);
-    assert(getOutput(net.output("io_regOut_x0", 0x04).task) == 1);
-    assert(getOutput(net.output("io_regOut_x0", 0x05).task) == 0);
-    assert(getOutput(net.output("io_regOut_x0", 0x06).task) == 0);
-    assert(getOutput(net.output("io_regOut_x0", 0x07).task) == 0);
-    assert(getOutput(net.output("io_regOut_x0", 0x08).task) == 0);
-    assert(getOutput(net.output("io_regOut_x0", 0x09).task) == 0);
-    assert(getOutput(net.output("io_regOut_x0", 0x0a).task) == 0);
-    assert(getOutput(net.output("io_regOut_x0", 0x0b).task) == 0);
-    assert(getOutput(net.output("io_regOut_x0", 0x0c).task) == 0);
-    assert(getOutput(net.output("io_regOut_x0", 0x0d).task) == 0);
-    assert(getOutput(net.output("io_regOut_x0", 0x0e).task) == 0);
-    assert(getOutput(net.output("io_regOut_x0", 0x0f).task) == 0);
+    ASSERT_OUTPUT_EQ("io_regOut_x0", 0x00, 0);
+    ASSERT_OUTPUT_EQ("io_regOut_x0", 0x01, 0);
+    ASSERT_OUTPUT_EQ("io_regOut_x0", 0x02, 0);
+    ASSERT_OUTPUT_EQ("io_regOut_x0", 0x03, 1);
+    ASSERT_OUTPUT_EQ("io_regOut_x0", 0x04, 1);
+    ASSERT_OUTPUT_EQ("io_regOut_x0", 0x05, 0);
+    ASSERT_OUTPUT_EQ("io_regOut_x0", 0x06, 0);
+    ASSERT_OUTPUT_EQ("io_regOut_x0", 0x07, 0);
+    ASSERT_OUTPUT_EQ("io_regOut_x0", 0x08, 0);
+    ASSERT_OUTPUT_EQ("io_regOut_x0", 0x09, 0);
+    ASSERT_OUTPUT_EQ("io_regOut_x0", 0x0a, 0);
+    ASSERT_OUTPUT_EQ("io_regOut_x0", 0x0b, 0);
+    ASSERT_OUTPUT_EQ("io_regOut_x0", 0x0c, 0);
+    ASSERT_OUTPUT_EQ("io_regOut_x0", 0x0d, 0);
+    ASSERT_OUTPUT_EQ("io_regOut_x0", 0x0e, 0);
+    ASSERT_OUTPUT_EQ("io_regOut_x0", 0x0f, 0);
 }
 
 //

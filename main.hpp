@@ -380,20 +380,17 @@ template <class TaskType, class TaskTypeMem, class TaskTypeDFF,
           class TaskTypeWIRE, class WorkerInfo>
 class NetworkBuilder;
 
-template <class TaskTypeMem, class WorkerInfo>
+template <class WorkerInfo>
 class TaskNetwork {
-public:
-    struct MemNode {
-        std::shared_ptr<TaskTypeMem> task;
-        std::shared_ptr<DepNode<WorkerInfo>> depnode;
-    };
-
 private:
     std::unordered_map<int, std::shared_ptr<DepNode<WorkerInfo>>> id2node_;
-    std::map<std::tuple<std::string, std::string, int>, MemNode> namedMems_;
+    std::map<std::tuple<std::string, std::string, int>,
+             std::shared_ptr<TaskBase<WorkerInfo>>>
+        namedMems_;
 
 public:
-    template <class TaskType, class TaskTypeDFF, class TaskTypeWIRE>
+    template <class TaskType, class TaskTypeMem, class TaskTypeDFF,
+              class TaskTypeWIRE>
     TaskNetwork(NetworkBuilder<TaskType, TaskTypeMem, TaskTypeDFF, TaskTypeWIRE,
                                WorkerInfo> &&builder);
 
@@ -416,22 +413,13 @@ public:
         return id2node_[id];
     }
 
-    MemNode &mem(const std::string &kind, const std::string &portName,
-                 int portBit)
+    template <class T>
+    std::shared_ptr<T> get(const std::string &kind, const std::string &portName,
+                           int portBit)
     {
         auto it = namedMems_.find(std::make_tuple(kind, portName, portBit));
         assert(it != namedMems_.end());
-        return it->second;
-    }
-
-    MemNode &input(const std::string &portName, int portBit)
-    {
-        return mem("input", portName, portBit);
-    }
-
-    MemNode &output(const std::string &portName, int portBit)
-    {
-        return mem("output", portName, portBit);
+        return std::dynamic_pointer_cast<T>(it->second);
     }
 
     void tick()
@@ -452,27 +440,28 @@ public:
 template <class TaskType, class TaskTypeMem, class TaskTypeDFF,
           class TaskTypeWIRE, class WorkerInfo>
 class NetworkBuilder {
-    friend TaskNetwork<TaskTypeMem, WorkerInfo>;
+    friend TaskNetwork<WorkerInfo>;
 
 public:
+    using NetworkType = TaskNetwork<WorkerInfo>;
+    using ParamTaskTypeWIRE = TaskTypeWIRE;
     using ParamTaskTypeMem = TaskTypeMem;
-    using NetworkType = TaskNetwork<TaskTypeMem, WorkerInfo>;
 
 private:
     std::unordered_map<int, std::shared_ptr<DepNode<WorkerInfo>>> id2node_;
 
     std::map<std::tuple<std::string, std::string, int>,
-             typename NetworkType::MemNode>
+             std::shared_ptr<TaskBase<WorkerInfo>>>
         namedMems_;
 
 private:
-    typename NetworkType::MemNode addDFF(int id, int priority = 0)
+    std::shared_ptr<TaskTypeDFF> addDFF(int id, int priority = 0)
     {
         auto task = std::make_shared<TaskTypeDFF>();
         auto depnode = std::make_shared<DepNode<WorkerInfo>>(
             priority, task, NodeLabel{id, "DFF", ""});
         id2node_.emplace(id, depnode);
-        return typename NetworkType::MemNode{task, depnode};
+        return task;
     }
 
     void addNamedDFF(int id, const std::string &kind,
@@ -490,8 +479,7 @@ private:
             priority, task,
             NodeLabel{id, "WIRE", detail::fok(portName, " ", portBit)});
         id2node_.emplace(id, depnode);
-        namedMems_.emplace(std::make_tuple(kind, portName, portBit),
-                           typename NetworkType::MemNode{task, depnode});
+        namedMems_.emplace(std::make_tuple(kind, portName, portBit), task);
     }
 
 public:
@@ -564,9 +552,10 @@ public:                                                       \
 #undef DEFINE_GATE
 };
 
-template <class TaskTypeMem, class WorkerInfo>
-template <class TaskType, class TaskTypeDFF, class TaskTypeWIRE>
-TaskNetwork<TaskTypeMem, WorkerInfo>::TaskNetwork(
+template <class WorkerInfo>
+template <class TaskType, class TaskTypeMem, class TaskTypeDFF,
+          class TaskTypeWIRE>
+TaskNetwork<WorkerInfo>::TaskNetwork(
     NetworkBuilder<TaskType, TaskTypeMem, TaskTypeDFF, TaskTypeWIRE, WorkerInfo>
         &&builder)
     : id2node_(std::move(builder.id2node_)),
