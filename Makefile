@@ -5,7 +5,8 @@ CXXFLAGS_SANITIZE=$(CXXFLAGS) -O0 -g3 \
 				  -fno-optimize-sibling-calls
 CXXFLAGS_RELEASE=$(CXXFLAGS) -O3 -march=native -g3
 INC=-I picojson/ -I TFHEpp/include/ \
-	-I TFHEpp/thirdparties/randen/ -I TFHEpp/thirdparties/spqlios/
+	-I TFHEpp/thirdparties/randen/ -I TFHEpp/thirdparties/spqlios/ \
+	-I ThreadPool/
 LIB=-lpthread \
 	-L TFHEpp/build/src/ -ltfhe++ \
 	-L TFHEpp/build/thirdparties/randen/ -lranden \

@@ -743,30 +743,38 @@ void readNetworkFromJSONImpl(NetworkBuilder &builder, picojson::value &v)
     }
 }
 
+#include <ThreadPool.h>
+
 #include <future>
 
 class AsyncThread {
 private:
-    std::future<void> ftr_;
+    static ThreadPool pool_;
+    std::atomic_bool finished_;
 
 public:
-    AsyncThread()
+    AsyncThread() : finished_(false)
     {
     }
 
     template <class Func>
-    AsyncThread &operator=(Func &&func)
+    AsyncThread &operator=(Func func)
     {
-        ftr_ = std::async(std::launch::async, std::forward<Func>(func));
+        finished_ = false;
+        pool_.enqueue([this, func]() {
+            func();
+            finished_ = true;
+        });
         return *this;
     }
 
     bool hasFinished() const
     {
         using namespace std::chrono_literals;
-        return ftr_.wait_for(0ms) == std::future_status::ready;
+        return finished_;
     }
 };
+ThreadPool AsyncThread::pool_{10};
 
 template <class InType, class OutType, class WorkerInfo>
 class TaskMem : public Task<InType, OutType, WorkerInfo> {
