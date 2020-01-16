@@ -4,3 +4,6 @@
 [submodule "TFHEpp"]
 	path = TFHEpp
 	url = https://github.com/virtualsecureplatform/TFHEpp.git
+[submodule "ThreadPool"]
+	path = ThreadPool
+	url = https://github.com/progschj/ThreadPool.git
