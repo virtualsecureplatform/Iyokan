@@ -667,6 +667,8 @@ int getOutput(std::shared_ptr<TaskTFHEppGateMem> task)
 
 int main()
 {
+    AsyncThread::setNumThreads(std::thread::hardware_concurrency());
+
     testNOT<PlainNetworkBuilder>();
     testMUX<PlainNetworkBuilder>();
     testBinopGates<PlainNetworkBuilder>();

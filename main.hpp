@@ -740,19 +740,26 @@ void readNetworkFromJSONImpl(NetworkBuilder &builder, picojson::value &v)
 
 class AsyncThread {
 private:
-    static ThreadPool pool_;
+    // The C++17 keyword 'inline' is necessary here to avoid duplicate
+    // definition of 'pool_'. Thanks to:
+    // https://stackoverflow.com/questions/11709859/how-to-have-static-data-members-in-a-header-only-library
+    static inline std::shared_ptr<ThreadPool> pool_;
     std::atomic_bool finished_;
 
 public:
     AsyncThread() : finished_(false)
     {
+        if (!pool_) {
+            const int DEFAULT_NUM_THREADS = 10;
+            pool_ = std::make_shared<ThreadPool>(DEFAULT_NUM_THREADS);
+        }
     }
 
     template <class Func>
     AsyncThread &operator=(Func func)
     {
         finished_ = false;
-        pool_.enqueue([this, func]() {
+        pool_->enqueue([this, func]() {
             func();
             finished_ = true;
         });
@@ -763,8 +770,12 @@ public:
     {
         return finished_;
     }
+
+    static void setNumThreads(int newNumThreads)
+    {
+        pool_ = std::make_shared<ThreadPool>(newNumThreads);
+    }
 };
-ThreadPool AsyncThread::pool_{10};
 
 template <class InType, class OutType, class WorkerInfo>
 class TaskMem : public Task<InType, OutType, WorkerInfo> {
