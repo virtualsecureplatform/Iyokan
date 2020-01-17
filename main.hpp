@@ -36,8 +36,25 @@ std::string fok(Args... args)
 }  // namespace detail
 
 template <class WorkerInfo>
+class DepNode;
+template <class WorkerInfo>
+class NetworkBuilderBase;
+struct NodeLabel;
+
+template <class WorkerInfo>
 class TaskBase {
+    friend void NetworkBuilderBase<WorkerInfo>::addTask(
+        NodeLabel, int, std::shared_ptr<TaskBase<WorkerInfo>>);
+
+private:
+    std::weak_ptr<DepNode<WorkerInfo>> depnode_;
+
 public:
+    std::shared_ptr<DepNode<WorkerInfo>> depnode() const
+    {
+        return depnode_.lock();
+    }
+
     virtual bool isValid() = 0;
     virtual void notifyOneInputReady() = 0;
     virtual bool areInputsReady() const = 0;
@@ -110,7 +127,8 @@ public:
 
     virtual bool isValid() override
     {
-        return std::all_of(inputs_.begin(), inputs_.end(),
+        return this->depnode() &&
+               std::all_of(inputs_.begin(), inputs_.end(),
                            [](auto &&in) { return in.use_count() != 0; });
     }
 
@@ -155,8 +173,7 @@ struct NodeLabel {
 };
 
 template <class WorkerInfo>
-class DepNode {
-public:
+class DepNode : public std::enable_shared_from_this<DepNode<WorkerInfo>> {
 private:
     int priority_;
     std::shared_ptr<TaskBase<WorkerInfo>> task_;
@@ -169,7 +186,7 @@ private:
 public:
     DepNode(int priority, std::shared_ptr<TaskBase<WorkerInfo>> task,
             NodeLabel label)
-        : priority_(priority), task_(task), label_(std::move(label))
+        : priority_(priority), task_(std::move(task)), label_(std::move(label))
     {
     }
 
@@ -378,9 +395,8 @@ protected:
     virtual WorkerInfo getWorkerInfo() = 0;
 };
 
-template <class TaskType, class TaskTypeMem, class TaskTypeDFF,
-          class TaskTypeWIRE, class WorkerInfo>
-class NetworkBuilder;
+template <class WorkerInfo>
+class NetworkBuilderBase;
 
 template <class WorkerInfo>
 class TaskNetwork {
@@ -391,10 +407,16 @@ private:
         namedMems_;
 
 public:
-    template <class TaskType, class TaskTypeMem, class TaskTypeDFF,
-              class TaskTypeWIRE>
-    TaskNetwork(NetworkBuilder<TaskType, TaskTypeMem, TaskTypeDFF, TaskTypeWIRE,
-                               WorkerInfo> &&builder);
+    TaskNetwork(
+        std::unordered_map<int, std::shared_ptr<DepNode<WorkerInfo>>> id2node,
+        std::map<std::tuple<std::string, std::string, int>,
+                 std::shared_ptr<TaskBase<WorkerInfo>>>
+            namedMems)
+        : id2node_(std::move(id2node)), namedMems_(namedMems)
+    {
+    }
+
+    TaskNetwork(NetworkBuilderBase<WorkerInfo> &&builder);
 
     size_t numNodes() const
     {
@@ -439,15 +461,12 @@ public:
     }
 };
 
-template <class TaskType, class TaskTypeMem, class TaskTypeDFF,
-          class TaskTypeWIRE, class WorkerInfo>
-class NetworkBuilder {
+template <class WorkerInfo>
+class NetworkBuilderBase {
     friend TaskNetwork<WorkerInfo>;
 
 public:
     using NetworkType = TaskNetwork<WorkerInfo>;
-    using ParamTaskTypeWIRE = TaskTypeWIRE;
-    using ParamTaskTypeMem = TaskTypeMem;
 
 private:
     std::unordered_map<int, std::shared_ptr<DepNode<WorkerInfo>>> id2node_;
@@ -456,32 +475,98 @@ private:
              std::shared_ptr<TaskBase<WorkerInfo>>>
         namedMems_;
 
+protected:
+    std::shared_ptr<DepNode<WorkerInfo>> node(int index)
+    {
+        return id2node_.at(index);
+    }
+
+public:
+    void addTask(NodeLabel label, int priority,
+                 std::shared_ptr<TaskBase<WorkerInfo>> task)
+    {
+        auto depnode =
+            std::make_shared<DepNode<WorkerInfo>>(priority, task, label);
+        task->depnode_ = depnode;
+        id2node_.emplace(label.id, depnode);
+    }
+
+    void registerTask(const std::string &kind, const std::string &portName,
+                      int portBit,
+                      const std::shared_ptr<TaskBase<WorkerInfo>> &task)
+    {
+        namedMems_.emplace(std::make_tuple(kind, portName, portBit), task);
+    }
+
+    template <class T, class... Args>
+    std::shared_ptr<T> addINPUT(int id, int priority,
+                                const std::string &portName, int portBit,
+                                Args &&... args)
+    {
+        NodeLabel label{id, "INPUT", detail::fok(portName, "[", portBit, "]")};
+        auto task = std::make_shared<T>(std::forward<Args>(args)...);
+        addTask(label, priority, task);
+        registerTask("input", portName, portBit, task);
+        return task;
+    }
+
+    template <class T, class... Args>
+    std::shared_ptr<T> addOUTPUT(int id, int priority,
+                                 const std::string &portName, int portBit,
+                                 Args &&... args)
+    {
+        NodeLabel label{id, "OUTPUT", detail::fok(portName, "[", portBit, "]")};
+        auto task = std::make_shared<T>(std::forward<Args>(args)...);
+        addTask(label, priority, task);
+        registerTask("output", portName, portBit, task);
+        return task;
+    }
+
+    template <class T0, class T1>
+    void connectTasks(const std::shared_ptr<T0> &from,
+                      const std::shared_ptr<T1> &to)
+    {
+        to->addInputPtr(from->getOutputPtr());
+        from->depnode()->addDependent(to->depnode());
+    }
+
+    static int genid()
+    {
+        // FIXME: Assume that ids over (1 << 16) will not be passed by the user.
+        static int id = (1 << 16);
+        return id++;
+    }
+};
+
+template <class TaskType, class TaskTypeMem, class TaskTypeDFF,
+          class TaskTypeWIRE, class WorkerInfo>
+class NetworkBuilder : public NetworkBuilderBase<WorkerInfo> {
+public:
+    using ParamTaskTypeWIRE = TaskTypeWIRE;
+    using ParamTaskTypeMem = TaskTypeMem;
+
 private:
     std::shared_ptr<TaskTypeDFF> addDFF(int id, int priority = 0)
     {
         auto task = std::make_shared<TaskTypeDFF>();
-        auto depnode = std::make_shared<DepNode<WorkerInfo>>(
-            priority, task, NodeLabel{id, "DFF", ""});
-        id2node_.emplace(id, depnode);
+        this->addTask(NodeLabel{id, "DFF", ""}, priority, task);
         return task;
     }
 
     void addNamedDFF(int id, const std::string &kind,
                      const std::string &portName, int portBit, int priority)
     {
-        namedMems_.emplace(std::make_tuple(kind, portName, portBit),
-                           addDFF(id, priority));
+        this->registerTask(kind, portName, portBit, addDFF(id, priority));
     }
 
     void addNamedWIRE(bool inputNeeded, int id, const std::string &kind,
                       const std::string &portName, int portBit, int priority)
     {
         auto task = std::make_shared<TaskTypeWIRE>(inputNeeded);
-        auto depnode = std::make_shared<DepNode<WorkerInfo>>(
-            priority, task,
-            NodeLabel{id, "WIRE", detail::fok(portName, " ", portBit)});
-        id2node_.emplace(id, depnode);
-        namedMems_.emplace(std::make_tuple(kind, portName, portBit), task);
+        this->addTask(
+            NodeLabel{id, "WIRE", detail::fok(portName, "[", portBit, "]")},
+            priority, task);
+        this->registerTask(kind, portName, portBit, task);
     }
 
 public:
@@ -503,43 +588,33 @@ public:
     void INPUT(int id, const std::string &portName, int portBit,
                int priority = 0)
     {
-        addNamedWIRE(false, id, "input", portName, portBit, priority);
+        this->template addINPUT<TaskTypeWIRE>(id, priority, portName, portBit,
+                                              false);
     }
 
     void OUTPUT(int id, const std::string &portName, int portBit,
                 int priority = 0)
     {
-        addNamedWIRE(true, id, "output", portName, portBit, priority);
+        this->template addOUTPUT<TaskTypeWIRE>(id, priority, portName, portBit,
+                                               true);
     }
 
     void connect(int from, int to)
     {
-        auto fromIt = id2node_.find(from);
-        assert(fromIt != id2node_.end());
-        auto toIt = id2node_.find(to);
-        assert(toIt != id2node_.end());
-
-        auto toTask = std::dynamic_pointer_cast<TaskType>(toIt->second->task());
-        assert(toTask);
-        auto fromTask =
-            std::dynamic_pointer_cast<TaskType>(fromIt->second->task());
-        assert(fromTask);
-
-        toTask->addInputPtr(fromTask->getOutputPtr());
-        fromIt->second->addDependent(toIt->second);
+        this->connectTasks(
+            std::dynamic_pointer_cast<TaskType>(this->node(from)->task()),
+            std::dynamic_pointer_cast<TaskType>(this->node(to)->task()));
     }
 
-#define DEFINE_GATE(name)                                     \
-protected:                                                    \
-    virtual std::shared_ptr<TaskType> name##Impl() = 0;       \
-                                                              \
-public:                                                       \
-    void name(int id, int priority = 0)                       \
-    {                                                         \
-        auto task = name##Impl();                             \
-        auto depnode = std::make_shared<DepNode<WorkerInfo>>( \
-            priority, task, NodeLabel{id, #name, ""});        \
-        id2node_.emplace(id, depnode);                        \
+#define DEFINE_GATE(name)                                        \
+protected:                                                       \
+    virtual std::shared_ptr<TaskType> name##Impl() = 0;          \
+                                                                 \
+public:                                                          \
+    void name(int id, int priority = 0)                          \
+    {                                                            \
+        auto task = name##Impl();                                \
+        this->addTask(NodeLabel{id, #name, ""}, priority, task); \
     }
     DEFINE_GATE(AND);
     DEFINE_GATE(NAND);
@@ -555,11 +630,7 @@ public:                                                       \
 };
 
 template <class WorkerInfo>
-template <class TaskType, class TaskTypeMem, class TaskTypeDFF,
-          class TaskTypeWIRE>
-TaskNetwork<WorkerInfo>::TaskNetwork(
-    NetworkBuilder<TaskType, TaskTypeMem, TaskTypeDFF, TaskTypeWIRE, WorkerInfo>
-        &&builder)
+TaskNetwork<WorkerInfo>::TaskNetwork(NetworkBuilderBase<WorkerInfo> &&builder)
     : id2node_(std::move(builder.id2node_)),
       namedMems_(std::move(builder.namedMems_))
 {
