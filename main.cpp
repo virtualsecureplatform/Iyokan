@@ -584,11 +584,11 @@ void testProgressGraphMaker()
     std::stringstream ss;
     graph->dumpDOT(ss);
     std::string dot = ss.str();
-    assert(dot.find("n0 [label = \"{WIRE|reset 0}\"]") != std::string::npos);
-    assert(dot.find("n1 [label = \"{WIRE|out 0}\"]") != std::string::npos);
-    assert(dot.find("n2 [label = \"{DFF|}\"]") != std::string::npos);
-    assert(dot.find("n3 [label = \"{NOT|}\"]") != std::string::npos);
-    assert(dot.find("n4 [label = \"{ANDNOT|}\"]") != std::string::npos);
+    assert(dot.find("n0 [label = \"{INPUT|reset[0]}\"]") != std::string::npos);
+    assert(dot.find("n1 [label = \"{OUTPUT|out[0]}\"]") != std::string::npos);
+    assert(dot.find("n2 [label = \"{DFF}\"]") != std::string::npos);
+    assert(dot.find("n3 [label = \"{NOT}\"]") != std::string::npos);
+    assert(dot.find("n4 [label = \"{ANDNOT}\"]") != std::string::npos);
     assert(dot.find("n2 -> n1") != std::string::npos);
     assert(dot.find("n4 -> n2") != std::string::npos);
     assert(dot.find("n2 -> n3") != std::string::npos);

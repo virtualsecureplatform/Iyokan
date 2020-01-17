@@ -274,8 +274,10 @@ public:
         os << "digraph progress_graph_maker {" << std::endl;
         os << "node [ shape = record ];" << std::endl;
         for (auto &&[id, node] : nodes_) {
-            os << "n" << id << " [label = \"{" << node.label.kind << "|"
-               << node.label.desc << "}\"];" << std::endl;
+            os << "n" << id << " [label = \"{" << node.label.kind;
+            if (!node.label.desc.empty())
+                os << "|" << node.label.desc;
+            os << "}\"];" << std::endl;
         }
         os << std::endl;
         for (auto &&edge : edges_) {
