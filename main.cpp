@@ -1,5 +1,7 @@
 #include "main.hpp"
 
+#include "serialize.hpp"
+
 //
 #include <fstream>
 
@@ -679,6 +681,66 @@ int getOutput(std::shared_ptr<TaskTFHEppGateMem> task)
                                    *TFHEppTestHelper::instance().sk())[0];
 }
 
+void testTFHEppSerialization()
+{
+    auto& h = TFHEppTestHelper::instance();
+    const std::shared_ptr<TFHEpp::SecretKey>& sk = h.sk();
+    const std::shared_ptr<TFHEpp::GateKey>& gk = h.gk();
+
+    // Test for secret key
+    {
+        // Dump
+        dump_as_binary(*sk, "_test_sk");
+        // Load
+        const std::shared_ptr<TFHEpp::SecretKey>& sk2 =
+            import_secret_key("_test_sk");
+
+        auto zero = TFHEpp::bootsSymEncrypt({0}, *sk2).at(0);
+        auto one = TFHEpp::bootsSymEncrypt({1}, *sk2).at(0);
+        TFHEpp::TLWElvl0 res;
+        TFHEpp::HomANDNY(res, zero, one, *gk);
+        assert(TFHEpp::bootsSymDecrypt({res}, *sk2).at(0) == 1);
+    }
+
+    // Test for gate key
+    {
+        std::stringstream ss{std::ios::binary | std::ios::out | std::ios::in};
+
+        // Dump
+        dump_as_binary(*gk, ss);
+        // Load
+        auto gk2 = std::make_shared<TFHEpp::GateKey>();
+        import_from_binary(*gk2, ss);
+
+        auto zero = TFHEpp::bootsSymEncrypt({0}, *sk).at(0);
+        auto one = TFHEpp::bootsSymEncrypt({1}, *sk).at(0);
+        TFHEpp::TLWElvl0 res;
+        TFHEpp::HomANDNY(res, zero, one, *gk2);
+        assert(TFHEpp::bootsSymDecrypt({res}, *sk).at(0) == 1);
+    }
+
+    // Test for TLWE level 0
+    {
+        std::stringstream ss{std::ios::binary | std::ios::out | std::ios::in};
+
+        {
+            auto zero = TFHEpp::bootsSymEncrypt({0}, *sk).at(0);
+            auto one = TFHEpp::bootsSymEncrypt({1}, *sk).at(0);
+            dump_as_binary(zero, ss);
+            dump_as_binary(one, ss);
+            ss.seekg(0);
+        }
+
+        {
+            TFHEpp::TLWElvl0 res, zero, one;
+            import_from_binary(zero, ss);
+            import_from_binary(one, ss);
+            TFHEpp::HomANDNY(res, zero, one, *gk);
+            assert(TFHEpp::bootsSymDecrypt({res}, *sk).at(0) == 1);
+        }
+    }
+}
+
 int main()
 {
     AsyncThread::setNumThreads(std::thread::hardware_concurrency());
@@ -709,6 +771,7 @@ int main()
     testSequentialCircuit<TFHEppNetworkBuilder>();
     testFromJSONtest_counter_4bit<TFHEppNetworkBuilder>();
     testFromJSONdiamond_core<TFHEppNetworkBuilder>();
+    testTFHEppSerialization();
 
     testProgressGraphMaker();
 }
