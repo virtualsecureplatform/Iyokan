@@ -835,7 +835,7 @@ void testKVSPPacket()
         assert(ss.get() == ifs.get());
 }
 
-int main()
+int main(int argc, char** argv)
 {
     AsyncThread::setNumThreads(std::thread::hardware_concurrency());
 
@@ -864,9 +864,12 @@ int main()
     testFromJSONtest_register_4bit<TFHEppNetworkBuilder>();
     testSequentialCircuit<TFHEppNetworkBuilder>();
     testFromJSONtest_counter_4bit<TFHEppNetworkBuilder>();
-    testFromJSONdiamond_core<TFHEppNetworkBuilder>();
     testTFHEppSerialization();
-    testKVSPPacket();
 
     testProgressGraphMaker();
+
+    if (argc >= 2 && strcmp(argv[1], "slow") == 0) {
+        testFromJSONdiamond_core<TFHEppNetworkBuilder>();
+        testKVSPPacket();
+    }
 }
