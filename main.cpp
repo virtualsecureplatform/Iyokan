@@ -835,6 +835,70 @@ void testKVSPPacket()
         assert(ss.get() == ifs.get());
 }
 
+void testKVSPPlainPacket()
+{
+    // Read packet
+    const auto reqPacket = []() {
+        std::ifstream ifs{"test/kvsp_plain_req_packet00.in"};
+        assert(ifs);
+        return KVSPPlainReqPacket::readFrom(ifs);
+    }();
+
+    // Load network
+    auto net = []() {
+        const std::string fileName = "test/diamond-core.json";
+        std::ifstream ifs{fileName};
+        assert(ifs);
+        return readNetworkFromJSON<PlainNetworkBuilder>(ifs);
+    }();
+    assert(net.isValid());
+
+    // Set ROM
+    for (int addr = 0; addr < 128; addr++)
+        for (int bit = 0; bit < 32; bit++)
+            net.get<TaskPlainGateMem>("rom", std::to_string(addr), bit)
+                ->set((reqPacket.rom.at((addr * 32 + bit) / 8) >> (bit % 8)) &
+                      1);
+    // Set RAM
+    for (int addr = 0; addr < 512; addr++)
+        for (int bit = 0; bit < 8; bit++)
+            net.get<TaskPlainGateMem>("ram", std::to_string(addr), bit)
+                ->set((reqPacket.ram.at(addr) >> bit) & 1);
+
+    // Reset
+    setInput(net.get<TaskPlainGateMem>("input", "reset", 0), 1);
+    processAllGates(net, 7);
+
+    // Run
+    setInput(net.get<TaskPlainGateMem>("input", "reset", 0), 0);
+    for (int i = 0; i < 8; i++) {
+        net.tick();
+        processAllGates(net, 7);
+    }
+
+    // Assert
+    auto assertOutput = [&](int bit, int expected) {
+        assert(getOutput(net.get<TaskPlainGateMem>("output", "io_regOut_x0",
+                                                   bit)) == expected);
+    };
+    assertOutput(0x00, 0);
+    assertOutput(0x01, 1);
+    assertOutput(0x02, 0);
+    assertOutput(0x03, 1);
+    assertOutput(0x04, 0);
+    assertOutput(0x05, 1);
+    assertOutput(0x06, 0);
+    assertOutput(0x07, 0);
+    assertOutput(0x08, 0);
+    assertOutput(0x09, 0);
+    assertOutput(0x0a, 0);
+    assertOutput(0x0b, 0);
+    assertOutput(0x0c, 0);
+    assertOutput(0x0d, 0);
+    assertOutput(0x0e, 0);
+    assertOutput(0x0f, 0);
+}
+
 int main(int argc, char** argv)
 {
     AsyncThread::setNumThreads(std::thread::hardware_concurrency());
@@ -851,6 +915,7 @@ int main(int argc, char** argv)
     testSequentialCircuit<PlainNetworkBuilder>();
     testFromJSONtest_counter_4bit<PlainNetworkBuilder>();
     testFromJSONdiamond_core<PlainNetworkBuilder>();
+    testKVSPPlainPacket();
 
     testNOT<TFHEppNetworkBuilder>();
     testMUX<TFHEppNetworkBuilder>();

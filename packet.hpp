@@ -175,4 +175,43 @@ struct KVSPResPacket {
     }
 };
 
+struct KVSPPlainReqPacket {
+    std::vector<uint8_t> rom, ram;
+
+    static KVSPPlainReqPacket readFrom(std::istream &is)
+    {
+        if (!is)
+            throw std::runtime_error("Invalid input stream");
+
+        // Check if the signature ('KVSP') is correct.
+        char signature[4];
+        is.read(signature, sizeof(signature));
+        if (signature[0] != 'K' || signature[1] != 'V' || signature[2] != 'S' ||
+            signature[3] != 'P')
+            throw std::runtime_error("Invalid signature");
+
+        // Check if the version is correct ('0').
+        if (detail::read32le(is) != 0)
+            throw std::runtime_error("Invalid version");
+
+        // Get sizes of components.
+        int64_t romSize = detail::read64le(is);
+        int64_t ramSize = detail::read64le(is);
+        int64_t headerSize = is.tellg();
+
+        // Read ROM binary. Assume char is 8-bit wide.
+        std::vector<uint8_t> rom(romSize);
+        is.read(reinterpret_cast<char *>(rom.data()), romSize);
+
+        // Read RAM binary. Assume char is 8-bit wide.
+        std::vector<uint8_t> ram(ramSize);
+        is.read(reinterpret_cast<char *>(ram.data()), ramSize);
+
+        if (is.tellg() != headerSize + romSize + ramSize)
+            throw std::runtime_error("Invalid encrypted RAM data");
+
+        return KVSPPlainReqPacket{rom, ram};
+    }
+};
+
 #endif
