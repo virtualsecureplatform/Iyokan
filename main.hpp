@@ -584,7 +584,8 @@ public:
         auto depnode =
             std::make_shared<DepNode<WorkerInfo>>(priority, task, label);
         task->depnode_ = depnode;
-        id2node_.emplace(label.id, depnode);
+        auto [it, inserted] = id2node_.emplace(label.id, depnode);
+        assert(inserted);
     }
 
     void registerTask(const std::string &kind, const std::string &portName,
