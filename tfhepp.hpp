@@ -24,10 +24,10 @@ private:
 private:
     void startAsyncImpl(TFHEppWorkerInfo) override
     {
-        if (inputSize() == 0) {
+        if (getInputSize() == 0) {
             // Nothing to do!
         }
-        else if (inputSize() == 1) {
+        else if (getInputSize() == 1) {
             thr_ = [&]() { output() = input(0); };
         }
         else {
@@ -44,7 +44,7 @@ public:
 
     bool hasFinished() const override
     {
-        return inputSize() == 0 || thr_.hasFinished();
+        return getInputSize() == 0 || thr_.hasFinished();
     }
 };
 

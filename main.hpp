@@ -21,6 +21,7 @@
 #include <map>
 #include <memory>
 #include <queue>
+#include <set>
 #include <sstream>
 #include <unordered_map>
 #include <vector>
@@ -55,6 +56,7 @@ public:
         return depnode_.lock();
     }
 
+    virtual size_t getInputSize() const = 0;
     virtual bool isValid() = 0;
     virtual void notifyOneInputReady() = 0;
     virtual bool areInputsReady() const = 0;
@@ -75,11 +77,6 @@ private:
     std::vector<std::weak_ptr<const InType>> inputs_;
 
 protected:
-    size_t inputSize() const
-    {
-        return inputs_.size();
-    }
-
     const InType &input(size_t index) const
     {
         std::shared_ptr<const InType> in = inputs_.at(index).lock();
@@ -110,6 +107,11 @@ public:
 
     virtual ~Task()
     {
+    }
+
+    size_t getInputSize() const override
+    {
+        return inputs_.size();
     }
 
     void addInputPtr(const std::shared_ptr<const InType> &input)
@@ -165,6 +167,9 @@ public:
 template <class WorkerInfo>
 class ReadyQueue;
 
+template <class WorkerInfo>
+class TaskNetwork;
+
 class ProgressGraphMaker;
 
 struct NodeLabel {
@@ -174,6 +179,8 @@ struct NodeLabel {
 
 template <class WorkerInfo>
 class DepNode : public std::enable_shared_from_this<DepNode<WorkerInfo>> {
+    friend TaskNetwork<WorkerInfo>;
+
 private:
     int priority_;
     std::shared_ptr<TaskBase<WorkerInfo>> task_;
@@ -406,6 +413,23 @@ private:
              std::shared_ptr<TaskBase<WorkerInfo>>>
         namedMems_;
 
+private:
+    bool verifyInputSizeExpected() const
+    {
+        std::unordered_map<std::shared_ptr<DepNode<WorkerInfo>>,
+                           std::set<std::shared_ptr<DepNode<WorkerInfo>>>>
+            sources;
+        for (auto &&[id, depnode] : id2node_)
+            for (auto &&dependent : depnode->dependents_)
+                sources[dependent.lock()].insert(depnode);
+
+        for (auto &&[dst, srcs] : sources)
+            if (dst->task()->getInputSize() != srcs.size())
+                return false;
+
+        return true;
+    }
+
 public:
     TaskNetwork(
         std::unordered_map<int, std::shared_ptr<DepNode<WorkerInfo>>> id2node,
@@ -457,6 +481,10 @@ public:
         for (auto &&[key, node] : id2node_)
             if (!node->task()->isValid())
                 return false;
+
+        if (!verifyInputSizeExpected())
+            return false;
+
         return true;
     }
 };

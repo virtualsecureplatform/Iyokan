@@ -12,10 +12,10 @@ class TaskPlainGateWIRE
 private:
     void startAsyncImpl(uint8_t) override
     {
-        if (inputSize() == 0) {
+        if (getInputSize() == 0) {
             // Nothing to do!
         }
-        else if (inputSize() == 1) {
+        else if (getInputSize() == 1) {
             output() = input(0);
         }
         else {
