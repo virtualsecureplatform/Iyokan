@@ -180,8 +180,11 @@ struct NodeLabel {
 template <class WorkerInfo>
 class DepNode : public std::enable_shared_from_this<DepNode<WorkerInfo>> {
     friend TaskNetwork<WorkerInfo>;
+    friend void ReadyQueue<WorkerInfo>::push(
+        const std::shared_ptr<DepNode<WorkerInfo>> &);
 
 private:
+    bool hasQueued_;
     int priority_;
     std::shared_ptr<TaskBase<WorkerInfo>> task_;
 
@@ -193,8 +196,16 @@ private:
 public:
     DepNode(int priority, std::shared_ptr<TaskBase<WorkerInfo>> task,
             NodeLabel label)
-        : priority_(priority), task_(std::move(task)), label_(std::move(label))
+        : hasQueued_(false),
+          priority_(priority),
+          task_(std::move(task)),
+          label_(std::move(label))
     {
+    }
+
+    bool hasQueued() const
+    {
+        return hasQueued_;
     }
 
     int priority() const
@@ -227,6 +238,12 @@ public:
     void propagate(ReadyQueue<WorkerInfo> &readyQueue);
     void propagate(ReadyQueue<WorkerInfo> &readyQueue,
                    ProgressGraphMaker &graph);
+
+    void tick()
+    {
+        hasQueued_ = false;
+        task_->tick();
+    }
 };
 
 template <class WorkerInfo>
@@ -251,6 +268,7 @@ public:
     void push(const std::shared_ptr<DepNode<WorkerInfo>> &depnode)
     {
         queue_.emplace(depnode->priority(), depnode);
+        depnode->hasQueued_ = true;
     }
 };
 
@@ -330,7 +348,7 @@ void DepNode<WorkerInfo>::propagate(ReadyQueue<WorkerInfo> &readyQueue)
         auto &&task = dep->task_;
 
         task->notifyOneInputReady();
-        if (!task->hasStarted() && task->areInputsReady())
+        if (!dep->hasQueued() && !task->hasStarted() && task->areInputsReady())
             readyQueue.push(dep);
     }
 }
@@ -473,7 +491,7 @@ public:
     void tick()
     {
         for (auto &&[key, node] : id2node_)
-            node->task()->tick();
+            node->tick();
     }
 
     bool isValid()
