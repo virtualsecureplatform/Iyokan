@@ -516,6 +516,80 @@ void testFromJSONdiamond_core()
     ASSERT_OUTPUT_EQ("io_regOut_x0", 0x0f, 0);
 }
 
+template <class NetworkBuilder, class TaskROM, class ROMNetwork>
+void testFromJSONdiamond_core_wo_rom(ROMNetwork rom)
+{
+    assert(rom.isValid());
+
+    const std::string fileName = "test/diamond-core-wo-rom.json";
+    std::ifstream ifs{fileName};
+    assert(ifs);
+
+    auto core = readNetworkFromJSON<NetworkBuilder>(ifs);
+    assert(core.isValid());
+
+    auto net = core.template merge<uint8_t>(
+        rom,
+        {
+            {"io_romAddr", 0, "ROM", 0},
+            {"io_romAddr", 1, "ROM", 1},
+            {"io_romAddr", 2, "ROM", 2},
+            {"io_romAddr", 3, "ROM", 3},
+            {"io_romAddr", 4, "ROM", 4},
+            {"io_romAddr", 5, "ROM", 5},
+            {"io_romAddr", 6, "ROM", 6},
+        },
+        {
+            {"ROM", 0, "io_romData", 0},   {"ROM", 1, "io_romData", 1},
+            {"ROM", 2, "io_romData", 2},   {"ROM", 3, "io_romData", 3},
+            {"ROM", 4, "io_romData", 4},   {"ROM", 5, "io_romData", 5},
+            {"ROM", 6, "io_romData", 6},   {"ROM", 7, "io_romData", 7},
+            {"ROM", 8, "io_romData", 8},   {"ROM", 9, "io_romData", 9},
+            {"ROM", 10, "io_romData", 10}, {"ROM", 11, "io_romData", 11},
+            {"ROM", 12, "io_romData", 12}, {"ROM", 13, "io_romData", 13},
+            {"ROM", 14, "io_romData", 14}, {"ROM", 15, "io_romData", 15},
+            {"ROM", 16, "io_romData", 16}, {"ROM", 17, "io_romData", 17},
+            {"ROM", 18, "io_romData", 18}, {"ROM", 19, "io_romData", 19},
+            {"ROM", 20, "io_romData", 20}, {"ROM", 21, "io_romData", 21},
+            {"ROM", 22, "io_romData", 22}, {"ROM", 23, "io_romData", 23},
+            {"ROM", 24, "io_romData", 24}, {"ROM", 25, "io_romData", 25},
+            {"ROM", 26, "io_romData", 26}, {"ROM", 27, "io_romData", 27},
+            {"ROM", 28, "io_romData", 28}, {"ROM", 29, "io_romData", 29},
+            {"ROM", 30, "io_romData", 30}, {"ROM", 31, "io_romData", 31},
+        });
+    assert(net.isValid());
+
+    // 0: 74 80     lsi ra, 24
+    // 2: 00 00     nop
+    net.template get<TaskROM>("rom", "all", 0)->set4le(0, 0x00008074);
+
+    SET_INPUT("reset", 0, 1);
+    processAllGates(net, 7);
+
+    SET_INPUT("reset", 0, 0);
+    for (int i = 0; i < 5; i++) {
+        net.tick();
+        processAllGates(net, 7);
+    }
+
+    ASSERT_OUTPUT_EQ("io_regOut_x0", 0x00, 0);
+    ASSERT_OUTPUT_EQ("io_regOut_x0", 0x01, 0);
+    ASSERT_OUTPUT_EQ("io_regOut_x0", 0x02, 0);
+    ASSERT_OUTPUT_EQ("io_regOut_x0", 0x03, 1);
+    ASSERT_OUTPUT_EQ("io_regOut_x0", 0x04, 1);
+    ASSERT_OUTPUT_EQ("io_regOut_x0", 0x05, 0);
+    ASSERT_OUTPUT_EQ("io_regOut_x0", 0x06, 0);
+    ASSERT_OUTPUT_EQ("io_regOut_x0", 0x07, 0);
+    ASSERT_OUTPUT_EQ("io_regOut_x0", 0x08, 0);
+    ASSERT_OUTPUT_EQ("io_regOut_x0", 0x09, 0);
+    ASSERT_OUTPUT_EQ("io_regOut_x0", 0x0a, 0);
+    ASSERT_OUTPUT_EQ("io_regOut_x0", 0x0b, 0);
+    ASSERT_OUTPUT_EQ("io_regOut_x0", 0x0c, 0);
+    ASSERT_OUTPUT_EQ("io_regOut_x0", 0x0d, 0);
+    ASSERT_OUTPUT_EQ("io_regOut_x0", 0x0e, 0);
+    ASSERT_OUTPUT_EQ("io_regOut_x0", 0x0f, 0);
+}
+
 //
 #include "plain.hpp"
 
@@ -915,6 +989,8 @@ int main(int argc, char** argv)
     testSequentialCircuit<PlainNetworkBuilder>();
     testFromJSONtest_counter_4bit<PlainNetworkBuilder>();
     testFromJSONdiamond_core<PlainNetworkBuilder>();
+    testFromJSONdiamond_core_wo_rom<PlainNetworkBuilder, TaskPlainROM>(
+        makePlainROMNetwork());
     testKVSPPlainPacket();
 
     testNOT<TFHEppNetworkBuilder>();

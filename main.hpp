@@ -114,6 +114,11 @@ public:
         return inputs_.size();
     }
 
+    void acceptOneMoreInput()
+    {
+        inputs_.resize(inputs_.size() + 1);
+    }
+
     void addInputPtr(const std::shared_ptr<const InType> &input)
     {
         auto it = std::find_if(inputs_.begin(), inputs_.end(),
@@ -505,6 +510,62 @@ public:
 
         return true;
     }
+
+    template <class T>
+    TaskNetwork<WorkerInfo> merge(
+        const TaskNetwork<WorkerInfo> &rhs,
+        const std::vector<std::tuple<std::string, int, std::string, int>>
+            &lhs2rhs,
+        const std::vector<std::tuple<std::string, int, std::string, int>>
+            &rhs2lhs)
+    {
+        TaskNetwork<WorkerInfo> ret{*this};
+
+        for (auto &&item : rhs.id2node_)
+            ret.id2node_.insert(item);
+        for (auto &&item : rhs.namedMems_)
+            ret.namedMems_.insert(item);
+
+        for (auto &&[lPortName, lPortBit, rPortName, rPortBit] : lhs2rhs) {
+            /*
+               ------------+  in           out  +-----------
+               LHS OUTPUT  |--> connects to >---|  RHS INPUT
+               ------------+                    +-----------
+            */
+            auto inkey = std::make_tuple("output", lPortName, lPortBit);
+            auto outkey = std::make_tuple("input", rPortName, rPortBit);
+            auto in = std::dynamic_pointer_cast<Task<T, T, WorkerInfo>>(
+                namedMems_.at(inkey));
+            auto out = std::dynamic_pointer_cast<Task<T, T, WorkerInfo>>(
+                rhs.namedMems_.at(outkey));
+
+            ret.namedMems_.erase(inkey);
+            ret.namedMems_.erase(outkey);
+            out->acceptOneMoreInput();
+            NetworkBuilderBase<WorkerInfo>::connectTasks(in, out);
+        }
+
+        for (auto &&[rPortName, rPortBit, lPortName, lPortBit] : rhs2lhs) {
+            /*
+               ------------+  in           out  +-----------
+               RHS OUTPUT  |--> connects to >---|  LHS INPUT
+               ------------+                    +-----------
+            */
+            auto inkey = std::make_tuple("output", rPortName, rPortBit);
+            auto outkey = std::make_tuple("input", lPortName, lPortBit);
+            auto in = std::dynamic_pointer_cast<Task<T, T, WorkerInfo>>(
+                rhs.namedMems_.at(inkey));
+            auto out = std::dynamic_pointer_cast<Task<T, T, WorkerInfo>>(
+                namedMems_.at(outkey));
+
+            ret.namedMems_.erase(inkey);
+            ret.namedMems_.erase(outkey);
+            out->acceptOneMoreInput();
+            NetworkBuilderBase<WorkerInfo>::connectTasks(in, out);
+        }
+
+        return ret;
+    }
 };
 
 template <class WorkerInfo>
@@ -569,8 +630,8 @@ public:
     }
 
     template <class T0, class T1>
-    void connectTasks(const std::shared_ptr<T0> &from,
-                      const std::shared_ptr<T1> &to)
+    static void connectTasks(const std::shared_ptr<T0> &from,
+                             const std::shared_ptr<T1> &to)
     {
         to->addInputPtr(from->getOutputPtr());
         from->depnode()->addDependent(to->depnode());

@@ -104,4 +104,124 @@ public:
     }
 };
 
+class TaskPlainROM : public Task<uint8_t, uint32_t, uint8_t /* dummy */> {
+private:
+    std::vector<uint32_t> data_;
+
+private:
+    void startAsyncImpl(uint8_t) override
+    {
+        size_t addr = 0;
+        for (int i = 6; i >= 0; i--)
+            addr = (addr << 1) | (input(i) & 1u);
+        output() = data_.at(addr);
+    }
+
+public:
+    TaskPlainROM() : Task<uint8_t, uint32_t, uint8_t>(7), data_(1 << 7)
+    {
+    }
+
+    void set4le(size_t addr, uint32_t val)
+    {
+        assert((addr & 0x11) == 0);
+        data_.at(addr >> 2) = val;
+    }
+
+    uint32_t get4le(size_t addr)
+    {
+        assert((addr & 0x11) == 0);
+        return data_.at(addr >> 2);
+    }
+
+    bool hasFinished() const override
+    {
+        return true;
+    }
+};
+
+class TaskPlainSplitter : public Task<uint32_t, uint8_t, uint8_t /* dummy */> {
+private:
+    size_t index_;
+
+private:
+    void startAsyncImpl(uint8_t) override
+    {
+        output() = (input(0) >> index_) & 1u;
+    }
+
+public:
+    TaskPlainSplitter(size_t index)
+        : Task<uint32_t, uint8_t, uint8_t>(1), index_(index)
+    {
+    }
+
+    bool hasFinished() const override
+    {
+        return true;
+    }
+};
+
+inline TaskNetwork<uint8_t> makePlainROMNetwork()
+{
+    /*
+       INPUT (ROM[0]) ---+-----+  +-- SPLITTER --- OUTPUT (ROM[0])
+                         |     |  |
+       INPUT (ROM[1]) ---+ ROM +--+-- SPLITTER --- OUTPUT (ROM[1])
+                         |     |  |
+       INPUT (ROM[2]) ---+     +  +-- SPLITTER --- OUTPUT (ROM[2])
+                         |     |  |
+                           ...       ...
+                         |     |  |
+       INPUT (ROM[6]) ---+-----+  +-- SPLITTER --- OUTPUT (ROM[6])
+                                  |
+                                  +-- SPLITTER --- OUTPUT (ROM[7])
+                                  |
+                                     ...
+                                  |
+                                  +-- SPLITTER --- OUTPUT (ROM[31])
+    */
+
+    NetworkBuilderBase<uint8_t> builder;
+
+    // Create inputs.
+    std::vector<std::shared_ptr<TaskPlainGateWIRE>> inputs;
+    for (int i = 0; i < 7; i++) {
+        auto taskINPUT = builder.addINPUT<TaskPlainGateWIRE>(builder.genid(), 0,
+                                                             "ROM", i, false);
+        inputs.push_back(taskINPUT);
+    }
+
+    // Create ROM.
+    auto taskROM = std::make_shared<TaskPlainROM>();
+    builder.addTask(NodeLabel{builder.genid(), "ROM", "body"}, 0, taskROM);
+    builder.registerTask("rom", "all", 0, taskROM);
+
+    // Connect inputs and ROM.
+    for (auto &&in : inputs)
+        builder.connectTasks(in, taskROM);
+
+    // Create splitters and connect ROM to each of them.
+    std::vector<std::shared_ptr<TaskPlainSplitter>> taskSplitters;
+    for (int i = 0; i < 32; i++) {
+        auto taskSplitter = std::make_shared<TaskPlainSplitter>(i);
+        builder.addTask(
+            NodeLabel{builder.genid(), "SPLITTER", detail::fok("ROM[", i, "]")},
+            0, taskSplitter);
+        taskSplitters.push_back(taskSplitter);
+
+        builder.connectTasks(taskROM, taskSplitter);
+    }
+
+    // Create outputs and connect corresponding splitter to it.
+    for (int i = 0; i < 32; i++) {
+        auto taskOUTPUT = builder.addOUTPUT<TaskPlainGateWIRE>(
+            builder.genid(), 0, "ROM", i, true);
+        auto &&splitter = taskSplitters[i];
+        builder.connectTasks(splitter, taskOUTPUT);
+    }
+
+    return TaskNetwork<uint8_t>(std::move(builder));
+}
+
 #endif
