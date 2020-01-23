@@ -139,7 +139,6 @@ public:
     virtual void tick() override
     {
         numReadyInputs_ = 0;
-        // FIXME: Should inputs_ be reset?
     }
 
     virtual void notifyOneInputReady() override
@@ -756,7 +755,6 @@ typename NetworkBuilder::NetworkType readNetworkFromJSON(std::istream &is)
 template <class NetworkBuilder>
 void readNetworkFromJSONImpl(NetworkBuilder &builder, picojson::value &v)
 {
-    // FIXME: Make use of attribute `priority`
     picojson::object &obj = v.get<picojson::object>();
     picojson::array &cells = obj["cells"].get<picojson::array>();
     picojson::array &ports = obj["ports"].get<picojson::array>();
