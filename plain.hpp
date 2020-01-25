@@ -124,13 +124,13 @@ public:
 
     void set4le(size_t addr, uint32_t val)
     {
-        assert((addr & 0x11) == 0);
+        assert((addr & 0b11) == 0);
         data_.at(addr >> 2) = val;
     }
 
     uint32_t get4le(size_t addr)
     {
-        assert((addr & 0x11) == 0);
+        assert((addr & 0b11) == 0);
         return data_.at(addr >> 2);
     }
 
