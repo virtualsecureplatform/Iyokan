@@ -9,6 +9,9 @@
 using TFHEppWorkerInfo = std::shared_ptr<const TFHEpp::GateKey>;
 using TaskTFHEppGate =
     Task<TFHEpp::TLWElvl0, TFHEpp::TLWElvl0, TFHEppWorkerInfo>;
+
+using TaskAsyncTFHEpp =
+    TaskAsync<TFHEpp::TLWElvl0, TFHEpp::TLWElvl0, TFHEppWorkerInfo>;
 using TaskTFHEppGate =
     Task<TFHEpp::TLWElvl0, TFHEpp::TLWElvl0, TFHEppWorkerInfo>;
 using TaskTFHEppGateMem =
@@ -48,26 +51,19 @@ public:
     }
 };
 
-#define DEFINE_TASK_GATE(name, numInputs, expr)            \
-    class TaskTFHEppGate##name : public TaskTFHEppGate {   \
-    private:                                               \
-        AsyncThread thr_;                                  \
-                                                           \
-    private:                                               \
-        void startAsyncImpl(TFHEppWorkerInfo gk) override  \
-        {                                                  \
-            thr_ = [this, gk]() { (expr); };               \
-        }                                                  \
-                                                           \
-    public:                                                \
-        TaskTFHEppGate##name() : TaskTFHEppGate(numInputs) \
-        {                                                  \
-        }                                                  \
-                                                           \
-        bool hasFinished() const override                  \
-        {                                                  \
-            return thr_.hasFinished();                     \
-        }                                                  \
+#define DEFINE_TASK_GATE(name, numInputs, expr)             \
+    class TaskTFHEppGate##name : public TaskAsyncTFHEpp {   \
+    private:                                                \
+        void startSync(TFHEppWorkerInfo wi) override        \
+        {                                                   \
+            auto gk = wi.gateKey;                           \
+            (expr);                                         \
+        }                                                   \
+                                                            \
+    public:                                                 \
+        TaskTFHEppGate##name() : TaskAsyncTFHEpp(numInputs) \
+        {                                                   \
+        }                                                   \
     };
 DEFINE_TASK_GATE(AND, 2, TFHEpp::HomAND(output(), input(0), input(1), *gk));
 DEFINE_TASK_GATE(NAND, 2, TFHEpp::HomNAND(output(), input(0), input(1), *gk));

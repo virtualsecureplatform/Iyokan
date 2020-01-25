@@ -989,4 +989,28 @@ public:
     }
 };
 
+template <class InType, class OutType, class WorkerInfo>
+class TaskAsync : public Task<InType, OutType, WorkerInfo> {
+private:
+    AsyncThread thr_;
+
+private:
+    virtual void startSync(WorkerInfo wi) = 0;
+
+    void startAsyncImpl(WorkerInfo wi) override
+    {
+        thr_ = [this, wi] { startSync(wi); };
+    }
+
+public:
+    TaskAsync(size_t expectedNumInputs)
+        : Task<InType, OutType, WorkerInfo>(expectedNumInputs)
+    {
+    }
+
+    bool hasFinished() const override
+    {
+        return thr_.hasFinished();
+    }
+};
 #endif
