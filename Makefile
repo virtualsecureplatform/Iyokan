@@ -13,7 +13,7 @@ LIB=-lpthread \
 	-L TFHEpp/build/thirdparties/randen/ -lranden \
 	-L TFHEpp/build/thirdparties/spqlios/ -lspqlios
 
-main: main.cpp main.hpp plain.hpp tfhepp.hpp
+test0: test0.cpp main.hpp plain.hpp tfhepp.hpp
 	#clang++ $(CXXFLAGS_SANITIZE) -o $@ $< $(INC) $(LIB)
 	clang++ $(CXXFLAGS_DEBUG) -o $@ $< $(INC) $(LIB)
 	#clang++ $(CXXFLAGS_RELEASE) -o $@ $< $(INC) $(LIB)
