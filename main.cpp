@@ -516,7 +516,7 @@ void testFromJSONdiamond_core()
     ASSERT_OUTPUT_EQ("io_regOut_x0", 0x0f, 0);
 }
 
-template <class NetworkBuilder, class TaskROM, class ROMNetwork>
+template <class NetworkBuilder, class TaskROM, class NormalT, class ROMNetwork>
 void testFromJSONdiamond_core_wo_rom(ROMNetwork rom)
 {
     assert(rom.isValid());
@@ -528,7 +528,7 @@ void testFromJSONdiamond_core_wo_rom(ROMNetwork rom)
     auto core = readNetworkFromJSON<NetworkBuilder>(ifs);
     assert(core.isValid());
 
-    auto net = core.template merge<uint8_t>(
+    auto net = core.template merge<NormalT>(
         rom,
         {
             {"io_romAddr", 0, "ROM", 0},
@@ -561,7 +561,8 @@ void testFromJSONdiamond_core_wo_rom(ROMNetwork rom)
 
     // 0: 74 80     lsi ra, 24
     // 2: 00 00     nop
-    net.template get<TaskROM>("rom", "all", 0)->set4le(0, 0x00008074);
+    setROM(*net.template get<TaskROM>("rom", "all", 0),
+           std::vector<uint8_t>{0x74, 0x80});
 
     SET_INPUT("reset", 0, 1);
     processAllGates(net, 7);
@@ -623,6 +624,18 @@ void setInput(std::shared_ptr<TaskPlainGateMem> task, int val)
     task->set(val);
 }
 
+void setROM(TaskPlainROM& rom, const std::vector<uint8_t>& src)
+{
+    for (int i = 0; i < 512 / 4; i++) {
+        int val = 0;
+        for (int j = 3; j >= 0; j--) {
+            size_t offset = i * 4 + j;
+            val = (val << 8) | (offset < src.size() ? src[offset] : 0x00);
+        }
+        rom.set4le(i << 2, val);
+    }
+}
+
 int getOutput(std::shared_ptr<TaskPlainGateMem> task)
 {
     return task->get();
@@ -679,6 +692,7 @@ class TFHEppTestHelper {
 private:
     std::shared_ptr<TFHEpp::SecretKey> sk_;
     std::shared_ptr<TFHEpp::GateKey> gk_;
+    std::shared_ptr<TFHEpp::CircuitKey> ck_;
     TFHEpp::TLWElvl0 zero_, one_;
 
 private:
@@ -697,14 +711,19 @@ public:
         return inst;
     }
 
+    void prepareCircuitKey()
+    {
+        ck_ = std::make_shared<TFHEpp::CircuitKey>(*sk_);
+    }
+
+    TFHEppWorkerInfo wi() const
+    {
+        return TFHEppWorkerInfo{TFHEpp::lweParams{}, gk_, ck_};
+    }
+
     const std::shared_ptr<TFHEpp::SecretKey>& sk() const
     {
         return sk_;
-    }
-
-    const std::shared_ptr<TFHEpp::GateKey>& gk() const
-    {
-        return gk_;
     }
 
     const TFHEpp::TLWElvl0& zero() const
@@ -727,7 +746,7 @@ void processAllGates(TFHEppNetwork& net, int numWorkers,
     size_t numFinishedTargets = 0;
     std::vector<TFHEppWorker> workers;
     for (int i = 0; i < numWorkers; i++)
-        workers.emplace_back(TFHEppTestHelper::instance().gk(), readyQueue,
+        workers.emplace_back(TFHEppTestHelper::instance().wi(), readyQueue,
                              numFinishedTargets, graph);
 
     // Process all targets.
@@ -750,6 +769,27 @@ void setInput(std::shared_ptr<TaskTFHEppGateMem> task, int val)
     task->set(val ? h.one() : h.zero());
 }
 
+void setROM(TaskTFHEppROMUX& rom, const std::vector<uint8_t>& src)
+{
+    auto& h = TFHEppTestHelper::instance();
+    auto params = h.wi().params;
+
+    for (size_t i = 0; i < 512 / (params.N / 8); i++) {
+        TFHEpp::Polynomiallvl1 pmu;
+        for (size_t j = 0; j < params.N; j++) {
+            size_t offset = i * params.N + j;
+            size_t byteOffset = offset / 8, bitOffset = offset % 8;
+            uint8_t val = byteOffset < src.size()
+                              ? (src[byteOffset] >> bitOffset) & 1u
+                              : 0;
+            pmu[j] = val ? params.μ : -params.μ;
+        }
+        rom.set128le(
+            i * (params.N / 8),
+            TFHEpp::trlweSymEncryptlvl1(pmu, params.αbk, h.sk()->key.lvl1));
+    }
+}
+
 int getOutput(std::shared_ptr<TaskTFHEppGateMem> task)
 {
     return TFHEpp::bootsSymDecrypt({task->get()},
@@ -759,8 +799,8 @@ int getOutput(std::shared_ptr<TaskTFHEppGateMem> task)
 void testTFHEppSerialization()
 {
     auto& h = TFHEppTestHelper::instance();
-    const std::shared_ptr<TFHEpp::SecretKey>& sk = h.sk();
-    const std::shared_ptr<TFHEpp::GateKey>& gk = h.gk();
+    const std::shared_ptr<const TFHEpp::SecretKey>& sk = h.sk();
+    const std::shared_ptr<const TFHEpp::GateKey>& gk = h.wi().gateKey;
 
     // Test for secret key
     {
@@ -989,7 +1029,7 @@ int main(int argc, char** argv)
     testSequentialCircuit<PlainNetworkBuilder>();
     testFromJSONtest_counter_4bit<PlainNetworkBuilder>();
     testFromJSONdiamond_core<PlainNetworkBuilder>();
-    testFromJSONdiamond_core_wo_rom<PlainNetworkBuilder, TaskPlainROM>(
+    testFromJSONdiamond_core_wo_rom<PlainNetworkBuilder, TaskPlainROM, uint8_t>(
         makePlainROMNetwork());
     testKVSPPlainPacket();
 
@@ -1010,7 +1050,12 @@ int main(int argc, char** argv)
     testProgressGraphMaker();
 
     if (argc >= 2 && strcmp(argv[1], "slow") == 0) {
+        TFHEppTestHelper::instance().prepareCircuitKey();
+
         testFromJSONdiamond_core<TFHEppNetworkBuilder>();
+        testFromJSONdiamond_core_wo_rom<TFHEppNetworkBuilder, TaskTFHEppROMUX,
+                                        TFHEpp::TLWElvl0>(
+            makeTFHEppROMNetwork());
         testKVSPPacket();
     }
 }

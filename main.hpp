@@ -527,6 +527,8 @@ public:
                 namedMems_.at(inkey));
             auto out = std::dynamic_pointer_cast<Task<T, T, WorkerInfo>>(
                 rhs.namedMems_.at(outkey));
+            assert(in);
+            assert(out);
 
             ret.namedMems_.erase(inkey);
             ret.namedMems_.erase(outkey);
