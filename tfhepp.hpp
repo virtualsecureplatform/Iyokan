@@ -1,7 +1,7 @@
 #ifndef VIRTUALSECUREPLATFORM_IYOKAN_TFHEPP_HPP
 #define VIRTUALSECUREPLATFORM_IYOKAN_TFHEPP_HPP
 
-#include "main.hpp"
+#include "iyokan.hpp"
 
 //
 #include <tfhe++.hpp>

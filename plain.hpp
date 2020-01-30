@@ -1,7 +1,7 @@
 #ifndef VIRTUALSECUREPLATFORM_IYOKAN_PLAIN_HPP
 #define VIRTUALSECUREPLATFORM_IYOKAN_PLAIN_HPP
 
-#include "main.hpp"
+#include "iyokan.hpp"
 
 using TaskPlainGate = Task<uint8_t, uint8_t, uint8_t /*dummy*/>;
 using TaskPlainGateMem = TaskMem<uint8_t, uint8_t, uint8_t /* dummy */>;
