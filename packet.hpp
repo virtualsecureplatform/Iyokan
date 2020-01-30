@@ -1,6 +1,7 @@
 #ifndef VIRTUALSECUREPLATFORM_IYOKAN_PACKET_HPP
 #define VIRTUALSECUREPLATFORM_IYOKAN_PACKET_HPP
 
+#include <iomanip>
 #include <memory>
 
 //
@@ -211,6 +212,45 @@ struct KVSPPlainReqPacket {
             throw std::runtime_error("Invalid encrypted RAM data");
 
         return KVSPPlainReqPacket{rom, ram};
+    }
+};
+
+struct KVSPPlainResPacket {
+    std::vector<uint8_t> flags;
+    std::vector<uint16_t> regs;
+    std::vector<uint8_t> ram;
+
+    void print(std::ostream &os)
+    {
+        assert(flags.size() == 1);
+        assert(regs.size() == 16);
+        assert(ram.size() == 512);
+
+        // Print values of flags
+        for (size_t i = 0; i < flags.size(); i++)
+            os << "f" << i << "\t" << static_cast<int>(flags[i]) << std::endl;
+        os << std::endl;
+
+        // Print values of registers
+        for (size_t reg = 0; reg < regs.size(); reg++)
+            os << "x" << reg << "\t" << regs[reg] << std::endl;
+        os << std::endl;
+
+        // Print values of RAM
+        const int WIDTH = 16;
+        os << "      ";
+        for (int i = 0; i < WIDTH; i++)
+            os << std::setw(3) << i;
+        os << std::endl;
+        for (size_t addr = 0; addr < ram.size(); addr++) {
+            if (addr % WIDTH == 0)
+                os << std::setw(6) << std::setfill('0') << std::hex << addr
+                   << " ";
+            os << std::setw(2) << std::setfill('0') << std::hex
+               << static_cast<int>(ram[addr]) << " ";
+            if (addr % WIDTH == WIDTH - 1)
+                os << std::endl;
+        }
     }
 };
 
