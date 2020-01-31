@@ -58,12 +58,21 @@ struct KVSPPlainResPacket {
     std::vector<uint8_t> flags;
     std::vector<uint16_t> regs;
     std::vector<uint8_t> ram;
+    int numCycles = -1;
 
     void print(std::ostream& os)
     {
         assert(flags.size() == 1);
         assert(regs.size() == 16);
         assert(ram.size() == 512);
+
+        // Print the number of cycles
+        os << "#cycle\t";
+        if (numCycles < 0)
+            os << "unknown";
+        else
+            os << numCycles;
+        os << std::endl << std::endl;
 
         // Print values of flags
         for (size_t i = 0; i < flags.size(); i++)
@@ -170,11 +179,12 @@ struct KVSPResPacket {
     std::vector<TFHEpp::TLWElvl0> flags;
     std::vector<std::vector<TFHEpp::TLWElvl0>> regs;
     std::vector<TFHEpp::TLWElvl0> ram;
+    int numCycles = -1;
 
     template <class Archive>
     void serialize(Archive& ar)
     {
-        ar(flags, regs, ram);
+        ar(flags, regs, ram, numCycles);
     }
 };
 
@@ -207,7 +217,7 @@ inline KVSPPlainResPacket decrypt(const TFHEpp::SecretKey& key,
         regs.push_back(bytes[0] | (bytes[1] << 8u));
     }
 
-    return KVSPPlainResPacket{flags, regs, ram};
+    return KVSPPlainResPacket{flags, regs, ram, src.numCycles};
 }
 
 template <class T>

@@ -175,6 +175,7 @@ void doPlain(const Options &opt)
     }
 
     KVSPPlainResPacket resPacket;
+    resPacket.numCycles = numCycles;
     // Get values of flags
     resPacket.flags.emplace_back(get(net, "output", "io_finishFlag", 0)->get());
     // Get values of registers
@@ -281,6 +282,7 @@ void doTFHE(const Options &opt)
     }
 
     KVSPResPacket resPacket;
+    resPacket.numCycles = numCycles;
     // Get values of flags
     resPacket.flags.push_back(get(net, "output", "io_finishFlag", 0)->get());
     // Get values of registers
