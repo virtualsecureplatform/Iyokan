@@ -59,7 +59,6 @@ check_code "./test0", ["slow"] if $SLOW_MODE_ENABLED
 
 ##### iyokan #####
 
-check_code "./kvsp-packet", ["genkey", "_test_sk"]
 check_code "./kvsp-packet", ["plain", "test/test00.elf", "_test_plain_req_packet00"]
 
 test_iyokan [
@@ -79,6 +78,23 @@ test_iyokan [
 ] do |r|
   assert_regex r, /f0\t1/
   assert_regex r, /x0\t42/
+end
+
+if $SLOW_MODE_ENABLED
+  check_code "./kvsp-packet", ["genkey", "_test_sk"]
+  check_code "./kvsp-packet", ["enc", "_test_sk", "test/test00.elf", "_test_req_packet00"]
+
+  test_iyokan [
+    "tfhe",
+    "-l", "test/diamond-core.json",
+    "-i", "_test_req_packet00",
+    "-o", "_test_res_packet00",
+    "-c", "8",
+  ] do |_|
+    r = check_code "./kvsp-packet", ["dec", "_test_sk", "_test_res_packet00"]
+    assert_regex r, /f0\t1/
+    assert_regex r, /x0\t42/
+  end
 end
 
 exit 1 if $has_any_error
