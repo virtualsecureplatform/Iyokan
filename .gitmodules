@@ -16,3 +16,6 @@
 [submodule "ELFIO"]
 	path = ELFIO
 	url = https://github.com/serge1/ELFIO.git
+[submodule "sanitizers-cmake"]
+	path = sanitizers-cmake
+	url = https://github.com/arsenm/sanitizers-cmake.git
