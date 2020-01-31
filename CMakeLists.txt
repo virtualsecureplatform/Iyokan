@@ -32,6 +32,13 @@ set(IYOKAN_INCLUDE_DIRS
 )
 set(IYOKAN_LIBS tfhe++ Threads::Threads OpenMP::OpenMP_CXX)
 
+set(CMAKE_C_FLAGS "")
+set(CMAKE_C_FLAGS_DEBUG "")
+set(CMAKE_C_FLAGS_RELEASE "")
+set(CMAKE_CXX_FLAGS "")
+set(CMAKE_CXX_FLAGS_DEBUG "")
+set(CMAKE_CXX_FLAGS_RELEASE "")
+
 ##### iyokan
 add_executable(iyokan iyokan.cpp)
 add_sanitizers(iyokan)
