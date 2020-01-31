@@ -17,6 +17,7 @@
 
 #include <algorithm>
 #include <cassert>
+#include <future>
 #include <iostream>
 #include <map>
 #include <memory>
@@ -25,6 +26,20 @@
 #include <sstream>
 #include <unordered_map>
 #include <vector>
+
+#include <ThreadPool.h>
+
+// Forward declarations
+template <class WorkerInfo>
+class DepNode;
+template <class WorkerInfo>
+class NetworkBuilderBase;
+struct NodeLabel;
+template <class WorkerInfo>
+class ReadyQueue;
+template <class WorkerInfo>
+class TaskNetwork;
+class ProgressGraphMaker;
 
 namespace detail {
 template <class... Args>
@@ -35,12 +50,6 @@ std::string fok(Args... args)
     return ss.str();
 }
 }  // namespace detail
-
-template <class WorkerInfo>
-class DepNode;
-template <class WorkerInfo>
-class NetworkBuilderBase;
-struct NodeLabel;
 
 template <class WorkerInfo>
 class TaskBase {
@@ -157,14 +166,6 @@ public:
         startAsyncImpl(std::move(wi));
     }
 };
-
-template <class WorkerInfo>
-class ReadyQueue;
-
-template <class WorkerInfo>
-class TaskNetwork;
-
-class ProgressGraphMaker;
 
 struct NodeLabel {
     int id;
@@ -413,9 +414,6 @@ public:
 protected:
     virtual WorkerInfo getWorkerInfo() = 0;
 };
-
-template <class WorkerInfo>
-class NetworkBuilderBase;
 
 template <class WorkerInfo>
 class TaskNetwork {
@@ -893,10 +891,6 @@ void readNetworkFromJSONImpl(NetworkBuilder &builder, picojson::value &v)
         }
     }
 }
-
-#include <ThreadPool.h>
-
-#include <future>
 
 class AsyncThread {
 private:
