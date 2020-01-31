@@ -1,7 +1,6 @@
 #include "iyokan.hpp"
 
 #include "packet.hpp"
-#include "serialize.hpp"
 
 //
 #include <fstream>
@@ -805,10 +804,10 @@ void testTFHEppSerialization()
     // Test for secret key
     {
         // Dump
-        dump_as_binary(*sk, "_test_sk");
+        writeToArchive("_test_sk", *sk);
         // Load
-        const std::shared_ptr<TFHEpp::SecretKey>& sk2 =
-            import_secret_key("_test_sk");
+        auto sk2 = std::make_shared<TFHEpp::SecretKey>();
+        readFromArchive<TFHEpp::SecretKey>(*sk2, "_test_sk");
 
         auto zero = TFHEpp::bootsSymEncrypt({0}, *sk2).at(0);
         auto one = TFHEpp::bootsSymEncrypt({1}, *sk2).at(0);
@@ -822,10 +821,10 @@ void testTFHEppSerialization()
         std::stringstream ss{std::ios::binary | std::ios::out | std::ios::in};
 
         // Dump
-        dump_as_binary(*gk, ss);
+        writeToArchive(ss, *gk);
         // Load
         auto gk2 = std::make_shared<TFHEpp::GateKey>();
-        import_from_binary(*gk2, ss);
+        readFromArchive<TFHEpp::GateKey>(*gk2, ss);
 
         auto zero = TFHEpp::bootsSymEncrypt({0}, *sk).at(0);
         auto one = TFHEpp::bootsSymEncrypt({1}, *sk).at(0);
@@ -841,15 +840,15 @@ void testTFHEppSerialization()
         {
             auto zero = TFHEpp::bootsSymEncrypt({0}, *sk).at(0);
             auto one = TFHEpp::bootsSymEncrypt({1}, *sk).at(0);
-            dump_as_binary(zero, ss);
-            dump_as_binary(one, ss);
+            writeToArchive(ss, zero);
+            writeToArchive(ss, one);
             ss.seekg(0);
         }
 
         {
             TFHEpp::TLWElvl0 res, zero, one;
-            import_from_binary(zero, ss);
-            import_from_binary(one, ss);
+            readFromArchive(zero, ss);
+            readFromArchive(one, ss);
             TFHEpp::HomANDNY(res, zero, one, *gk);
             assert(TFHEpp::bootsSymDecrypt({res}, *sk).at(0) == 1);
         }
@@ -859,11 +858,8 @@ void testTFHEppSerialization()
 void testKVSPPacket()
 {
     // Read packet
-    const auto reqPacket = []() {
-        std::ifstream ifs{"test/kvsp_req_packet00.in"};
-        assert(ifs);
-        return KVSPReqPacket::readFrom(ifs);
-    }();
+    const KVSPReqPacket reqPacket{*TFHEppTestHelper::instance().sk(),
+                                  parseELF("test/test00.elf")};
 
     // Load network
     auto net = []() {
@@ -939,24 +935,18 @@ void testKVSPPacket()
     assertOutput(0x0e, 0);
     assertOutput(0x0f, 0);
 
-    // Dump packet and assert
-    std::stringstream ss{std::ios::binary | std::ios::out | std::ios::in};
-    resPacket.writeTo(ss);
-    ss.seekg(0);
-    std::ifstream ifs{"test/kvsp_req_packet00.out"};
-    assert(ifs);
-    while (ss && ifs)
-        assert(ss.get() == ifs.get());
+    {
+        KVSPPlainResPacket plain =
+            decrypt(*TFHEppTestHelper::instance().sk(), resPacket);
+        assert(plain.flags.at(0) == 1);
+        assert(plain.regs.at(0) == 42);
+    }
 }
 
 void testKVSPPlainPacket()
 {
     // Read packet
-    const auto reqPacket = []() {
-        std::ifstream ifs{"test/kvsp_plain_req_packet00.in"};
-        assert(ifs);
-        return KVSPPlainReqPacket::readFrom(ifs);
-    }();
+    const KVSPPlainReqPacket reqPacket = parseELF("test/test00.elf");
 
     // Load network
     auto net = []() {

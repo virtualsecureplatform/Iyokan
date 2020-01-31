@@ -1,217 +1,56 @@
 #ifndef VIRTUALSECUREPLATFORM_IYOKAN_PACKET_HPP
 #define VIRTUALSECUREPLATFORM_IYOKAN_PACKET_HPP
 
+#include <fstream>
 #include <iomanip>
 #include <memory>
 
-//
+#include <elfio/elfio.hpp>
+
+#include <cereal/archives/portable_binary.hpp>
+#include <cereal/cereal.hpp>
+#include <cereal/types/array.hpp>
+#include <cereal/types/memory.hpp>
+#include <cereal/types/vector.hpp>
+
 #include <tfhe++.hpp>
 
-//
-#include "serialize.hpp"
-
-namespace detail {
-uint32_t read32le(std::istream &is)
+namespace TFHEpp {
+template <class Archive>
+void serialize(Archive& ar, lweParams& src)
 {
-    uint32_t ret = 0;
-    int ch = 0;
-    ch = is.get();
-    if (ch == EOF)
-        throw std::runtime_error("Invalid input stream");
-    ret |= (ch << 0);
-    ch = is.get();
-    if (ch == EOF)
-        throw std::runtime_error("Invalid input stream");
-    ret |= (ch << 8);
-    ch = is.get();
-    if (ch == EOF)
-        throw std::runtime_error("Invalid input stream");
-    ret |= (ch << 16);
-    ch = is.get();
-    if (ch == EOF)
-        throw std::runtime_error("Invalid input stream");
-    ret |= (ch << 24);
-
-    return ret;
+    ar(src.n, src.α, src.Nbit, src.N, src.l, src.Bgbit, src.Bg, src.αbk, src.t,
+       src.basebit, src.αks, src.μ, src.nbarbit, src.nbar, src.lbar,
+       src.Bgbitbar, src.Bgbar, src.αbklvl02, src.tbar, src.basebitlvl21,
+       src.αprivks, src.μbar);
 }
 
-uint64_t read64le(std::istream &is)
+template <class Archive>
+void serialize(Archive& ar, lweKey& src)
 {
-    uint64_t l = read32le(is);
-    uint64_t h = read32le(is);
-    return (h << 32) | l;
+    ar(src.lvl0, src.lvl1, src.lvl2);
 }
 
-void write16le(std::ostream &os, uint16_t val)
+template <class Archive>
+void serialize(Archive& ar, SecretKey& src)
 {
-    char buf[2] = {static_cast<char>(val), static_cast<char>(val >> 8)};
-    os.write(buf, sizeof(buf));
+    ar(src.key, src.params);
 }
 
-void write32le(std::ostream &os, uint32_t val)
+template <class Archive>
+void serialize(Archive& ar, GateKey& src)
 {
-    write16le(os, val & 0xffff);
-    write16le(os, val >> 16);
+    ar(src.ksk, src.bkfftlvl01);
 }
-
-void write64le(std::ostream &os, uint64_t val)
-{
-    write32le(os, val & 0xffffffff);
-    write32le(os, val >> 32);
-}
-}  // namespace detail
-
-struct KVSPReqPacket {
-    std::shared_ptr<TFHEpp::GateKey> gateKey;
-    std::vector<TFHEpp::TLWElvl0> rom, ram;
-
-    static KVSPReqPacket readFrom(std::istream &is)
-    {
-        if (!is)
-            throw std::runtime_error("Invalid input stream");
-
-        // Check if the signature ('KVSP') is correct.
-        char signature[4];
-        is.read(signature, sizeof(signature));
-        if (signature[0] != 'K' || signature[1] != 'V' || signature[2] != 'S' ||
-            signature[3] != 'P')
-            throw std::runtime_error("Invalid signature");
-
-        // Check if the version is correct ('0').
-        if (detail::read32le(is) != 0)
-            throw std::runtime_error("Invalid version");
-
-        // Get sizes of components.
-        int64_t cloudKeySize = detail::read64le(is);
-        int64_t romSize = detail::read64le(is);
-        int64_t ramSize = detail::read64le(is);
-        int64_t headerSize = is.tellg();
-
-        // Read cloud key.
-        auto gateKey = std::make_shared<TFHEpp::GateKey>();
-        import_from_binary(*gateKey, is);
-
-        if (!gateKey || is.tellg() != headerSize + cloudKeySize)
-            throw std::runtime_error("Invalid cloud key");
-
-        // Read encrypted ROM binary.
-        std::vector<TFHEpp::TLWElvl0> rom;
-        for (int64_t initialPos = is.tellg();
-             is.tellg() < initialPos + romSize;) {
-            TFHEpp::TLWElvl0 tlwe;
-            import_from_binary(tlwe, is);
-            rom.push_back(tlwe);
-        }
-
-        if (is.tellg() != headerSize + cloudKeySize + romSize)
-            throw std::runtime_error("Invalid encrypted ROM data");
-
-        // Read encrypted RAM binary.
-        std::vector<TFHEpp::TLWElvl0> ram;
-        for (int64_t initialPos = is.tellg();
-             is.tellg() < initialPos + ramSize;) {
-            TFHEpp::TLWElvl0 tlwe;
-            import_from_binary(tlwe, is);
-            ram.push_back(tlwe);
-        }
-
-        if (is.tellg() != headerSize + cloudKeySize + romSize + ramSize)
-            throw std::runtime_error("Invalid encrypted RAM data");
-
-        return KVSPReqPacket{gateKey, rom, ram};
-    }
-};
-
-struct KVSPResPacket {
-    std::vector<TFHEpp::TLWElvl0> flags;
-    std::vector<std::vector<TFHEpp::TLWElvl0>> regs;
-    std::vector<TFHEpp::TLWElvl0> ram;
-
-    void writeTo(std::ostream &os)
-    {
-        if (!os)
-            throw std::runtime_error("Invalid output stream");
-
-        // Write the signature ('KVSP').
-        char signature[4] = {'K', 'V', 'S', 'P'};
-        os.write(signature, sizeof(signature));
-
-        // Write the version ('0').
-        uint32_t version = 0;
-        detail::write32le(os, version);
-
-        // Write the number of flags and regs.
-        detail::write16le(os, flags.size());
-        detail::write16le(os, regs.size());
-
-        // Skip components' sizes; we will fill them later.
-        os.seekp(24, std::ios_base::cur);
-        uint64_t bodyBegin = os.tellp();
-
-        // Write encrypted flags.
-        for (auto &&sample : flags)
-            dump_as_binary(sample, os);
-        uint64_t flagsSize = static_cast<uint64_t>(os.tellp()) - bodyBegin;
-
-        // Write encrypted regs.
-        for (auto &&reg : regs)
-            for (auto &&sample : reg)
-                dump_as_binary(sample, os);
-        uint64_t regsSize =
-            static_cast<uint64_t>(os.tellp()) - (bodyBegin + flagsSize);
-
-        // Write encrypted RAM.
-        for (auto &&sample : ram)
-            dump_as_binary(sample, os);
-        uint64_t ramSize = static_cast<uint64_t>(os.tellp()) -
-                           (bodyBegin + flagsSize + regsSize);
-        auto bodyEnd = os.tellp();
-
-        // Now we place the size of each component in the header.
-        os.seekp(bodyBegin - 24);
-        detail::write64le(os, flagsSize);
-        detail::write64le(os, regsSize);
-        detail::write64le(os, ramSize);
-        os.seekp(bodyEnd);
-    }
-};
+}  // namespace TFHEpp
 
 struct KVSPPlainReqPacket {
     std::vector<uint8_t> rom, ram;
 
-    static KVSPPlainReqPacket readFrom(std::istream &is)
+    template <class Archive>
+    void serialize(Archive& ar)
     {
-        if (!is)
-            throw std::runtime_error("Invalid input stream");
-
-        // Check if the signature ('KVSP') is correct.
-        char signature[4];
-        is.read(signature, sizeof(signature));
-        if (signature[0] != 'K' || signature[1] != 'V' || signature[2] != 'S' ||
-            signature[3] != 'P')
-            throw std::runtime_error("Invalid signature");
-
-        // Check if the version is correct ('0').
-        if (detail::read32le(is) != 0)
-            throw std::runtime_error("Invalid version");
-
-        // Get sizes of components.
-        int64_t romSize = detail::read64le(is);
-        int64_t ramSize = detail::read64le(is);
-        int64_t headerSize = is.tellg();
-
-        // Read ROM binary. Assume char is 8-bit wide.
-        std::vector<uint8_t> rom(romSize);
-        is.read(reinterpret_cast<char *>(rom.data()), romSize);
-
-        // Read RAM binary. Assume char is 8-bit wide.
-        std::vector<uint8_t> ram(ramSize);
-        is.read(reinterpret_cast<char *>(ram.data()), ramSize);
-
-        if (is.tellg() != headerSize + romSize + ramSize)
-            throw std::runtime_error("Invalid encrypted RAM data");
-
-        return KVSPPlainReqPacket{rom, ram};
+        ar(rom, ram);
     }
 };
 
@@ -220,7 +59,7 @@ struct KVSPPlainResPacket {
     std::vector<uint16_t> regs;
     std::vector<uint8_t> ram;
 
-    void print(std::ostream &os)
+    void print(std::ostream& os)
     {
         assert(flags.size() == 1);
         assert(regs.size() == 16);
@@ -253,5 +92,168 @@ struct KVSPPlainResPacket {
         }
     }
 };
+
+inline std::vector<TFHEpp::TLWElvl0> encrypt(const TFHEpp::SecretKey& key,
+                                             const std::vector<uint8_t>& src)
+{
+    std::vector<TFHEpp::TLWElvl0> ret;
+    for (uint8_t v : src) {
+        for (uint32_t i = 0; i < 8; i++) {
+            uint8_t b = (v >> i) & 1u;
+            ret.push_back(TFHEpp::bootsSymEncrypt(std::vector{b}, key).at(0));
+        }
+    }
+    return ret;
+}
+
+inline KVSPPlainReqPacket parseELF(std::istream& is)
+{
+    ELFIO::elfio reader;
+    assert(reader.load(is) && "Invalid input stream; maybe file not found?");
+
+    std::vector<uint8_t> rom(512), ram(512);
+    for (ELFIO::segment* pseg : reader.segments) {
+        ELFIO::segment& seg = *pseg;
+        auto size = seg.get_file_size();
+        if (size == 0)
+            continue;
+
+        auto addr = seg.get_virtual_address();
+        assert(0 <= addr && addr < rom.size() ||
+               0x10000 <= addr && addr < 0x10000 + ram.size());
+
+        const char* src = seg.get_data();
+        std::copy(src, src + size,
+                  &(addr < 0x10000 ? rom.at(addr) : ram.at(addr - 0x10000)));
+    }
+
+    return KVSPPlainReqPacket{rom, ram};
+}
+
+inline KVSPPlainReqPacket parseELF(const std::string& path)
+{
+    std::ifstream ifs{path, std::ios::binary};
+    assert(ifs);
+    return parseELF(ifs);
+}
+
+struct KVSPReqPacket {
+    std::shared_ptr<TFHEpp::GateKey> gateKey;
+    std::vector<TFHEpp::TLWElvl0> rom, ram;
+
+    template <class Archive>
+    void serialize(Archive& ar)
+    {
+        ar(gateKey, rom, ram);
+    }
+
+    KVSPReqPacket()
+    {
+    }
+
+    KVSPReqPacket(std::shared_ptr<TFHEpp::GateKey> gateKey,
+                  std::vector<TFHEpp::TLWElvl0> rom,
+                  std::vector<TFHEpp::TLWElvl0> ram)
+        : gateKey(std::move(gateKey)), rom(std::move(rom)), ram(std::move(ram))
+    {
+    }
+
+    KVSPReqPacket(const TFHEpp::SecretKey& key, const KVSPPlainReqPacket& plain)
+        : gateKey(std::make_shared<TFHEpp::GateKey>(key)),
+          rom(encrypt(key, plain.rom)),
+          ram(encrypt(key, plain.ram))
+    {
+    }
+};
+
+struct KVSPResPacket {
+    std::vector<TFHEpp::TLWElvl0> flags;
+    std::vector<std::vector<TFHEpp::TLWElvl0>> regs;
+    std::vector<TFHEpp::TLWElvl0> ram;
+
+    template <class Archive>
+    void serialize(Archive& ar)
+    {
+        ar(flags, regs, ram);
+    }
+};
+
+inline std::vector<uint8_t> decrypt(const TFHEpp::SecretKey& key,
+                                    const std::vector<TFHEpp::TLWElvl0>& src)
+{
+    std::vector<uint8_t> ret;
+    for (auto it = src.begin(); it != src.end();) {
+        uint8_t byte = 0;
+        for (uint32_t i = 0; i < 8; i++, ++it) {
+            assert(it != src.end());
+            uint8_t val = TFHEpp::bootsSymDecrypt(std::vector{*it}, key).at(0);
+            byte |= (val & 1u) << i;
+        }
+        ret.push_back(byte);
+    }
+    return ret;
+}
+
+inline KVSPPlainResPacket decrypt(const TFHEpp::SecretKey& key,
+                                  const KVSPResPacket& src)
+{
+    std::vector<uint8_t> flags = decrypt(key, src.flags),
+                         ram = decrypt(key, src.ram);
+
+    std::vector<uint16_t> regs;
+    for (auto&& encReg : src.regs) {
+        std::vector<uint8_t> bytes = decrypt(key, encReg);
+        assert(bytes.size() == 2);
+        regs.push_back(bytes[0] | (bytes[1] << 8u));
+    }
+
+    return KVSPPlainResPacket{flags, regs, ram};
+}
+
+template <class T>
+void readFromArchive(T& res, std::istream& is)
+{
+    cereal::PortableBinaryInputArchive ar{is};
+    ar(res);
+}
+
+template <class T>
+void readFromArchive(T& res, const std::string& path)
+{
+    std::ifstream ifs{path, std::ios::binary};
+    assert(ifs && "Can't open the file to read from; maybe not found?");
+    readFromArchive<T>(res, ifs);
+}
+
+template <class T>
+T readFromArchive(std::istream& is)
+{
+    T ret;
+    readFromArchive(ret, is);
+    return ret;
+}
+
+template <class T>
+T readFromArchive(const std::string& path)
+{
+    T ret;
+    readFromArchive(ret, path);
+    return ret;
+}
+
+template <class T>
+void writeToArchive(std::ostream& os, const T& src)
+{
+    cereal::PortableBinaryOutputArchive ar{os};
+    ar(src);
+}
+
+template <class T>
+void writeToArchive(const std::string& path, const T& src)
+{
+    std::ofstream ofs{path, std::ios::binary};
+    assert(ofs && "Can't open the file to write in; maybe not allowed?");
+    return writeToArchive(ofs, src);
+}
 
 #endif

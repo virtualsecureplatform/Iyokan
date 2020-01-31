@@ -59,10 +59,13 @@ check_code "./test0", ["slow"] if $SLOW_MODE_ENABLED
 
 ##### iyokan #####
 
+check_code "./kvsp-packet", ["genkey", "_test_sk"]
+check_code "./kvsp-packet", ["plain", "test/test00.elf", "_test_plain_req_packet00"]
+
 test_iyokan [
   "plain",
   "-l", "test/diamond-core.json",
-  "-i", "test/kvsp_plain_req_packet00.in",
+  "-i", "_test_plain_req_packet00",
 ] do |r|
   assert_regex r, /f0\t1/
   assert_regex r, /x0\t42/
@@ -71,7 +74,7 @@ end
 test_iyokan [
   "plain",
   "-l", "test/diamond-core-wo-rom.json",
-  "-i", "test/kvsp_plain_req_packet00.in",
+  "-i", "_test_plain_req_packet00",
   "--enable-rom", "io_romAddr:7:io_romData:32",
 ] do |r|
   assert_regex r, /f0\t1/

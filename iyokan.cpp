@@ -4,7 +4,6 @@
 
 #include "packet.hpp"
 #include "plain.hpp"
-#include "serialize.hpp"
 #include "tfhepp.hpp"
 
 auto get(PlainNetwork &net, const std::string &kind,
@@ -98,11 +97,7 @@ struct Options {
 void doPlain(const Options &opt)
 {
     // Read packet
-    const KVSPPlainReqPacket reqPacket = [&opt] {
-        std::ifstream ifs{opt.inputFile};
-        assert(ifs);
-        return KVSPPlainReqPacket::readFrom(ifs);
-    }();
+    const auto reqPacket = readFromArchive<KVSPPlainReqPacket>(opt.inputFile);
 
     // Read network
     PlainNetworkBuilder::NetworkType net = [&opt, &reqPacket] {
@@ -205,11 +200,7 @@ void doPlain(const Options &opt)
 void doTFHE(const Options &opt)
 {
     // Read packet
-    const KVSPReqPacket reqPacket = [&opt] {
-        std::ifstream ifs{opt.inputFile};
-        assert(ifs);
-        return KVSPReqPacket::readFrom(ifs);
-    }();
+    const auto reqPacket = readFromArchive<KVSPReqPacket>(opt.inputFile);
 
     // Read network
     TFHEppNetworkBuilder::NetworkType net = [&opt, &reqPacket] {
@@ -307,9 +298,7 @@ void doTFHE(const Options &opt)
                 get(net, "ram", std::to_string(addr), bit)->get());
 
     // Dump result packet
-    std::ofstream ofs{opt.outputFile, std::ios::binary};
-    assert(ofs);
-    resPacket.writeTo(ofs);
+    writeToArchive(opt.outputFile, resPacket);
 }
 
 int main(int argc, char **argv)
