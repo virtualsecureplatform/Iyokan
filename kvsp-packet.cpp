@@ -47,7 +47,7 @@ int main(int argc, char** argv)
     /*
        kvsp-packet genkey KEY-FILE
        kvsp-packet enc KEY-FILE INPUT-FILE OUTPUT-FILE
-       kvsp-packet dec KEY-FILE INPUT-FILE OUTPUT-FILE
+       kvsp-packet dec KEY-FILE INPUT-FILE
        kvsp-packet plain INPUT-FILE OUTPUT-FILE
     */
 
