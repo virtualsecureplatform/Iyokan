@@ -13,6 +13,7 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 project(iyokan)
 
 find_package(Threads REQUIRED)
+find_package(OpenMP REQUIRED)
 
 add_subdirectory(TFHEpp)
 
@@ -26,7 +27,7 @@ set(IYOKAN_INCLUDE_DIRS
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/cereal/include>
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/ELFIO>
 )
-set(IYOKAN_LIBS tfhe++ Threads::Threads)
+set(IYOKAN_LIBS tfhe++ Threads::Threads OpenMP::OpenMP_CXX)
 
 ##### iyokan
 add_executable(iyokan iyokan.cpp)
