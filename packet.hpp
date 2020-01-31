@@ -129,8 +129,8 @@ inline KVSPPlainReqPacket parseELF(std::istream& is)
             continue;
 
         auto addr = seg.get_virtual_address();
-        assert(0 <= addr && addr < rom.size() ||
-               0x10000 <= addr && addr < 0x10000 + ram.size());
+        assert(0 <= addr && addr < rom.size() - size ||
+               0x10000 <= addr && addr < 0x10000 + ram.size() - size);
 
         const char* src = seg.get_data();
         std::copy(src, src + size,
