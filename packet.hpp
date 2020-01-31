@@ -118,7 +118,8 @@ inline std::vector<TFHEpp::TLWElvl0> encrypt(const TFHEpp::SecretKey& key,
 inline KVSPPlainReqPacket parseELF(std::istream& is)
 {
     ELFIO::elfio reader;
-    assert(reader.load(is) && "Invalid input stream; maybe file not found?");
+    reader.load(is);
+    assert(reader.segments.size() != 0);
 
     std::vector<uint8_t> rom(512), ram(512);
     for (ELFIO::segment* pseg : reader.segments) {
