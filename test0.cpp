@@ -858,8 +858,8 @@ void testTFHEppSerialization()
 void testKVSPPacket()
 {
     // Read packet
-    const KVSPReqPacket reqPacket{*TFHEppTestHelper::instance().sk(),
-                                  parseELF("test/test00.elf")};
+    const auto reqPacket = KVSPReqPacket::make(
+        *TFHEppTestHelper::instance().sk(), parseELF("test/test00.elf"));
 
     // Load network
     auto net = []() {

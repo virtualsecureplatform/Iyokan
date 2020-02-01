@@ -225,17 +225,16 @@ void doTFHE(const Options &opt)
             return core;
         }
 
+        assert(reqPacket.circuitKey);
+
         // Create ROM as external module and set data
         auto rom = makeTFHEppROMNetwork();
         const int ROM_UNIT = 1024 / 8;
+        assert(reqPacket.romCk.size() == 512 / ROM_UNIT);
         for (int i = 0; i < 512 / ROM_UNIT; i++) {
-            // FIXME: external RAM on TFHEpp
-            // int offset = ROM_UNIT * i;
-            // TLWElvl0 -> TRLWElvl1
-            // rom.get<TaskTFHEppROMUX>("rom", "all", 0)
-            //    ->set128le(offset, std::vector(reqPacket.rom.begin() + offset,
-            //                                   reqPacket.rom.begin() +
-            //                                       (offset + ROM_UNIT)));
+            int offset = ROM_UNIT * i;
+            rom.get<TaskTFHEppROMUX>("rom", "all", 0)
+                ->set128le(offset, reqPacket.romCk[i]);
         }
 
         // Merge core and ROM
@@ -266,7 +265,8 @@ void doTFHE(const Options &opt)
         return one;
     }());
     // Reset
-    TFHEppWorkerInfo wi{TFHEpp::lweParams{}, reqPacket.gateKey, nullptr};
+    TFHEppWorkerInfo wi{TFHEpp::lweParams{}, reqPacket.gateKey,
+                        reqPacket.circuitKey};
     processAllGates(net, opt.numWorkers, wi);
 
     // Turn reset off

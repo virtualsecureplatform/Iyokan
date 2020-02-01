@@ -30,7 +30,7 @@ void doEnc(std::string keyFileName, std::string inputFileName,
 {
     std::shared_ptr<TFHEpp::SecretKey> sk = import_secret_key(keyFileName);
     auto plain = parseELF(inputFileName);
-    KVSPReqPacket reqPacket{*sk, plain};
+    auto reqPacket = KVSPReqPacket::makeWithCk(*sk, plain);
     writeToArchive(outputFileName, reqPacket);
 }
 

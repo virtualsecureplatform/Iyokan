@@ -42,6 +42,12 @@ void serialize(Archive& ar, GateKey& src)
 {
     ar(src.ksk, src.bkfftlvl01);
 }
+
+template <class Archive>
+void serialize(Archive& ar, CircuitKey& src)
+{
+    ar(src.privksk, src.bkfftlvl02);
+}
 }  // namespace TFHEpp
 
 struct KVSPPlainReqPacket {
@@ -115,6 +121,29 @@ inline std::vector<TFHEpp::TLWElvl0> encrypt(const TFHEpp::SecretKey& key,
     return ret;
 }
 
+inline std::vector<TFHEpp::TRLWElvl1> encryptTRLWElvl1(
+    const TFHEpp::SecretKey& key, const std::vector<uint8_t>& src)
+{
+    const TFHEpp::lweParams& params = key.params;
+    std::vector<TFHEpp::TRLWElvl1> ret;
+
+    for (size_t i = 0; i < src.size() / (params.N / 8); i++) {
+        TFHEpp::Polynomiallvl1 pmu;
+        for (size_t j = 0; j < params.N; j++) {
+            size_t offset = i * params.N + j;
+            size_t byteOffset = offset / 8, bitOffset = offset % 8;
+            uint8_t val = byteOffset < src.size()
+                              ? (src[byteOffset] >> bitOffset) & 1u
+                              : 0;
+            pmu[j] = val ? params.μ : -params.μ;
+        }
+        ret.push_back(
+            TFHEpp::trlweSymEncryptlvl1(pmu, params.αbk, key.key.lvl1));
+    }
+
+    return ret;
+}
+
 inline KVSPPlainReqPacket parseELF(std::istream& is)
 {
     ELFIO::elfio reader;
@@ -151,10 +180,13 @@ struct KVSPReqPacket {
     std::shared_ptr<TFHEpp::GateKey> gateKey;
     std::vector<TFHEpp::TLWElvl0> rom, ram;
 
+    std::shared_ptr<TFHEpp::CircuitKey> circuitKey;
+    std::vector<TFHEpp::TRLWElvl1> romCk;
+
     template <class Archive>
     void serialize(Archive& ar)
     {
-        ar(gateKey, rom, ram);
+        ar(gateKey, rom, ram, circuitKey, romCk);
     }
 
     KVSPReqPacket()
@@ -163,16 +195,34 @@ struct KVSPReqPacket {
 
     KVSPReqPacket(std::shared_ptr<TFHEpp::GateKey> gateKey,
                   std::vector<TFHEpp::TLWElvl0> rom,
-                  std::vector<TFHEpp::TLWElvl0> ram)
-        : gateKey(std::move(gateKey)), rom(std::move(rom)), ram(std::move(ram))
+                  std::vector<TFHEpp::TLWElvl0> ram,
+                  std::shared_ptr<TFHEpp::CircuitKey> ck,
+                  std::vector<TFHEpp::TRLWElvl1> romCk)
+        : gateKey(std::move(gateKey)),
+          rom(std::move(rom)),
+          ram(std::move(ram)),
+          circuitKey(std::move(ck)),
+          romCk(std::move(romCk))
     {
     }
 
-    KVSPReqPacket(const TFHEpp::SecretKey& key, const KVSPPlainReqPacket& plain)
-        : gateKey(std::make_shared<TFHEpp::GateKey>(key)),
-          rom(encrypt(key, plain.rom)),
-          ram(encrypt(key, plain.ram))
+    static KVSPReqPacket make(const TFHEpp::SecretKey& key,
+                              const KVSPPlainReqPacket& plain)
     {
+        auto gk = std::make_shared<TFHEpp::GateKey>(key);
+        auto rom = encrypt(key, plain.rom);
+        auto ram = encrypt(key, plain.ram);
+        return KVSPReqPacket{gk, rom, ram, nullptr,
+                             std::vector<TFHEpp::TRLWElvl1>{}};
+    }
+
+    static KVSPReqPacket makeWithCk(const TFHEpp::SecretKey& key,
+                                    const KVSPPlainReqPacket& plain)
+    {
+        auto packet = make(key, plain);
+        packet.circuitKey = std::make_shared<TFHEpp::CircuitKey>(key);
+        packet.romCk = encryptTRLWElvl1(key, plain.rom);
+        return packet;
     }
 };
 

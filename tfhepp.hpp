@@ -131,6 +131,7 @@ private:
     void startSync(TFHEppWorkerInfo wi) override
     {
         auto ck = wi.circuitKey;
+        assert(ck);
         TFHEpp::CircuitBootstrappingFFT(output(), input(0), *ck);
     }
 
