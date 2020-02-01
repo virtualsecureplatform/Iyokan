@@ -1003,6 +1003,100 @@ void testKVSPPlainPacket()
     assertOutput(0x0f, 0);
 }
 
+#ifdef IYOKAN_CUDA_ENABLED
+#include "iyokan_cufhe.hpp"
+
+class CUFHETestHelper {
+private:
+    std::shared_ptr<cufhe::PriKey> sk_;
+    std::shared_ptr<cufhe::PubKey> gk_;
+    cufhe::Ctxt zero_, one_;
+
+private:
+    CUFHETestHelper()
+    {
+        cufhe::SetSeed();
+
+        sk_ = std::make_shared<cufhe::PriKey>();
+        gk_ = std::make_shared<cufhe::PubKey>();
+        cufhe::KeyGen(*gk_, *sk_);
+
+        cufhe::Initialize(*gk_);
+
+        cufhe::Ptxt p;
+        p = 0;
+        cufhe::Encrypt(zero_, p, *sk_);
+        p = 1;
+        cufhe::Encrypt(one_, p, *sk_);
+    }
+
+    ~CUFHETestHelper()
+    {
+        cufhe::CleanUp();
+    }
+
+public:
+    static CUFHETestHelper& instance()
+    {
+        static CUFHETestHelper inst;
+        return inst;
+    }
+
+    const std::shared_ptr<cufhe::PriKey>& sk() const
+    {
+        return sk_;
+    }
+
+    const cufhe::Ctxt& zero() const
+    {
+        return zero_;
+    }
+
+    const cufhe::Ctxt& one() const
+    {
+        return one_;
+    }
+};
+
+void setInput(std::shared_ptr<TaskCUFHEGateMem> task, int val)
+{
+    auto& h = CUFHETestHelper::instance();
+    task->set(val ? h.one() : h.zero());
+}
+
+void processAllGates(CUFHENetwork& net, int numWorkers,
+                     std::shared_ptr<ProgressGraphMaker> graph = nullptr)
+{
+    auto readyQueue = net.getReadyQueue();
+
+    // Create workers.
+    size_t numFinishedTargets = 0;
+    std::vector<CUFHEWorker> workers;
+    for (int i = 0; i < numWorkers; i++)
+        workers.emplace_back(readyQueue, numFinishedTargets, graph);
+
+    // Process all targets.
+    while (numFinishedTargets < net.numNodes()) {
+        // Detect infinite loops.
+        assert(std::any_of(workers.begin(), workers.end(),
+                           [](auto&& w) { return w.isWorking(); }) ||
+               !readyQueue.empty());
+
+        for (auto&& w : workers)
+            w.update();
+    }
+
+    assert(readyQueue.empty());
+}
+
+int getOutput(std::shared_ptr<TaskCUFHEGateMem> task)
+{
+    cufhe::Ptxt p;
+    cufhe::Decrypt(p, task->get(), *CUFHETestHelper::instance().sk());
+    return p.get();
+}
+#endif
+
 int main(int argc, char** argv)
 {
     AsyncThread::setNumThreads(std::thread::hardware_concurrency());
@@ -1037,6 +1131,20 @@ int main(int argc, char** argv)
     testFromJSONtest_counter_4bit<TFHEppNetworkBuilder>();
     testTFHEppSerialization();
 
+#ifdef IYOKAN_CUDA_ENABLED
+    testNOT<CUFHENetworkBuilder>();
+    testMUX<CUFHENetworkBuilder>();
+    testBinopGates<CUFHENetworkBuilder>();
+    testFromJSONtest_pass_4bit<CUFHENetworkBuilder>();
+    testFromJSONtest_and_4bit<CUFHENetworkBuilder>();
+    testFromJSONtest_and_4_2bit<CUFHENetworkBuilder>();
+    testFromJSONtest_mux_4bit<CUFHENetworkBuilder>();
+    testFromJSONtest_addr_4bit<CUFHENetworkBuilder>();
+    testFromJSONtest_register_4bit<CUFHENetworkBuilder>();
+    testSequentialCircuit<CUFHENetworkBuilder>();
+    testFromJSONtest_counter_4bit<CUFHENetworkBuilder>();
+#endif
+
     testProgressGraphMaker();
 
     if (argc >= 2 && strcmp(argv[1], "slow") == 0) {
@@ -1047,5 +1155,9 @@ int main(int argc, char** argv)
                                         TFHEpp::TLWElvl0>(
             makeTFHEppROMNetwork());
         testKVSPPacket();
+
+#ifdef IYOKAN_CUDA_ENABLED
+        testFromJSONdiamond_core<CUFHENetworkBuilder>();
+#endif
     }
 }
