@@ -19,3 +19,6 @@
 [submodule "sanitizers-cmake"]
 	path = sanitizers-cmake
 	url = https://github.com/arsenm/sanitizers-cmake.git
+[submodule "cuFHE"]
+	path = cuFHE
+	url = https://github.com/virtualsecureplatform/cuFHE.git
