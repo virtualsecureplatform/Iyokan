@@ -313,5 +313,7 @@ inline TaskNetwork<TFHEppWorkerInfo> makeTFHEppROMNetwork()
 }
 
 void doTFHE(const Options &opt);
+void processAllGates(TFHEppNetwork &net, int numWorkers, TFHEppWorkerInfo wi,
+                     std::shared_ptr<ProgressGraphMaker> graph = nullptr);
 
 #endif

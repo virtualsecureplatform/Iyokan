@@ -10,7 +10,7 @@ auto get(PlainNetwork &net, const std::string &kind,
 }
 
 void processAllGates(PlainNetwork &net, int numWorkers,
-                     std::shared_ptr<ProgressGraphMaker> graph = nullptr)
+                     std::shared_ptr<ProgressGraphMaker> graph)
 {
     auto readyQueue = net.getReadyQueue();
 

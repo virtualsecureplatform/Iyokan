@@ -225,5 +225,7 @@ inline TaskNetwork<uint8_t> makePlainROMNetwork()
 }
 
 void doPlain(const Options &opt);
+void processAllGates(PlainNetwork &net, int numWorkers,
+                     std::shared_ptr<ProgressGraphMaker> graph = nullptr);
 
 #endif

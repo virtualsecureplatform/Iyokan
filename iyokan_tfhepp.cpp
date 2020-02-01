@@ -10,7 +10,7 @@ auto get(TFHEppNetwork &net, const std::string &kind,
 }
 
 void processAllGates(TFHEppNetwork &net, int numWorkers, TFHEppWorkerInfo wi,
-                     std::shared_ptr<ProgressGraphMaker> graph = nullptr)
+                     std::shared_ptr<ProgressGraphMaker> graph)
 {
     auto readyQueue = net.getReadyQueue();
 

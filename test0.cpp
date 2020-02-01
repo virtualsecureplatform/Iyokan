@@ -593,31 +593,6 @@ void testFromJSONdiamond_core_wo_rom(ROMNetwork rom)
 //
 #include "iyokan_plain.hpp"
 
-void processAllGates(PlainNetwork& net, int numWorkers,
-                     std::shared_ptr<ProgressGraphMaker> graph = nullptr)
-{
-    auto readyQueue = net.getReadyQueue();
-
-    // Create workers.
-    size_t numFinishedTargets = 0;
-    std::vector<PlainWorker> workers;
-    for (int i = 0; i < numWorkers; i++)
-        workers.emplace_back(readyQueue, numFinishedTargets, graph);
-
-    // Process all targets.
-    while (numFinishedTargets < net.numNodes()) {
-        // Detect infinite loops.
-        assert(std::any_of(workers.begin(), workers.end(),
-                           [](auto&& w) { return w.isWorking(); }) ||
-               !readyQueue.empty());
-
-        for (auto&& w : workers)
-            w.update();
-    }
-
-    assert(readyQueue.empty());
-}
-
 void setInput(std::shared_ptr<TaskPlainGateMem> task, int val)
 {
     task->set(val);
@@ -739,27 +714,7 @@ public:
 void processAllGates(TFHEppNetwork& net, int numWorkers,
                      std::shared_ptr<ProgressGraphMaker> graph = nullptr)
 {
-    auto readyQueue = net.getReadyQueue();
-
-    // Create workers.
-    size_t numFinishedTargets = 0;
-    std::vector<TFHEppWorker> workers;
-    for (int i = 0; i < numWorkers; i++)
-        workers.emplace_back(TFHEppTestHelper::instance().wi(), readyQueue,
-                             numFinishedTargets, graph);
-
-    // Process all targets.
-    while (numFinishedTargets < net.numNodes()) {
-        // Detect infinite loops.
-        assert(std::any_of(workers.begin(), workers.end(),
-                           [](auto&& w) { return w.isWorking(); }) ||
-               !readyQueue.empty());
-
-        for (auto&& w : workers)
-            w.update();
-    }
-
-    assert(readyQueue.empty());
+    processAllGates(net, numWorkers, TFHEppTestHelper::instance().wi(), graph);
 }
 
 void setInput(std::shared_ptr<TaskTFHEppGateMem> task, int val)
@@ -1062,31 +1017,6 @@ void setInput(std::shared_ptr<TaskCUFHEGateMem> task, int val)
 {
     auto& h = CUFHETestHelper::instance();
     task->set(val ? h.one() : h.zero());
-}
-
-void processAllGates(CUFHENetwork& net, int numWorkers,
-                     std::shared_ptr<ProgressGraphMaker> graph = nullptr)
-{
-    auto readyQueue = net.getReadyQueue();
-
-    // Create workers.
-    size_t numFinishedTargets = 0;
-    std::vector<CUFHEWorker> workers;
-    for (int i = 0; i < numWorkers; i++)
-        workers.emplace_back(readyQueue, numFinishedTargets, graph);
-
-    // Process all targets.
-    while (numFinishedTargets < net.numNodes()) {
-        // Detect infinite loops.
-        assert(std::any_of(workers.begin(), workers.end(),
-                           [](auto&& w) { return w.isWorking(); }) ||
-               !readyQueue.empty());
-
-        for (auto&& w : workers)
-            w.update();
-    }
-
-    assert(readyQueue.empty());
 }
 
 int getOutput(std::shared_ptr<TaskCUFHEGateMem> task)
