@@ -38,7 +38,7 @@ void testNOT()
         // Set inputs.
         SET_INPUT("A", 0, std::get<0>(invals[i]));
 
-        processAllGates(net, 2);
+        processAllGates(net);
 
         // Check if results are okay.
         assert(getOutput(out) == std::get<1>(invals[i]));
@@ -78,7 +78,7 @@ void testMUX()
         SET_INPUT("B", 0, std::get<1>(invals[i]));
         SET_INPUT("S", 0, std::get<2>(invals[i]));
 
-        processAllGates(net, 2);
+        processAllGates(net);
 
         // Check if results are okay.
         ASSERT_OUTPUT_EQ("out", 0, std::get<3>(invals[i]));
@@ -128,7 +128,7 @@ void testBinopGates()
         SET_INPUT("in0", 0, invals[i].first ? 1 : 0);
         SET_INPUT("in1", 0, invals[i].second ? 1 : 0);
 
-        processAllGates(net, 1);
+        processAllGates(net);
 
         // Check if results are okay.
         for (auto&& [portName, res] : id2res)
@@ -153,7 +153,7 @@ void testFromJSONtest_pass_4bit()
     SET_INPUT("io_in", 2, 1);
     SET_INPUT("io_in", 3, 0);
 
-    processAllGates(net, 2);
+    processAllGates(net);
 
     ASSERT_OUTPUT_EQ("io_out", 0, 0);
     ASSERT_OUTPUT_EQ("io_out", 1, 1);
@@ -180,7 +180,7 @@ void testFromJSONtest_and_4bit()
     SET_INPUT("io_inB", 2, 0);
     SET_INPUT("io_inB", 3, 1);
 
-    processAllGates(net, 3);
+    processAllGates(net);
 
     ASSERT_OUTPUT_EQ("io_out", 0, 0);
     ASSERT_OUTPUT_EQ("io_out", 1, 0);
@@ -207,7 +207,7 @@ void testFromJSONtest_and_4_2bit()
     SET_INPUT("io_inB", 2, 1);
     SET_INPUT("io_inB", 3, 1);
 
-    processAllGates(net, 3);
+    processAllGates(net);
 
     ASSERT_OUTPUT_EQ("io_out", 0, 1);
     ASSERT_OUTPUT_EQ("io_out", 1, 0);
@@ -233,7 +233,7 @@ void testFromJSONtest_mux_4bit()
     SET_INPUT("io_inB", 3, 1);
 
     SET_INPUT("io_sel", 0, 0);
-    processAllGates(net, 3);
+    processAllGates(net);
     ASSERT_OUTPUT_EQ("io_out", 0, 0);
     ASSERT_OUTPUT_EQ("io_out", 1, 0);
     ASSERT_OUTPUT_EQ("io_out", 2, 1);
@@ -241,7 +241,7 @@ void testFromJSONtest_mux_4bit()
     net.tick();
 
     SET_INPUT("io_sel", 0, 1);
-    processAllGates(net, 3);
+    processAllGates(net);
     ASSERT_OUTPUT_EQ("io_out", 0, 0);
     ASSERT_OUTPUT_EQ("io_out", 1, 1);
     ASSERT_OUTPUT_EQ("io_out", 2, 0);
@@ -267,7 +267,7 @@ void testFromJSONtest_addr_4bit()
     SET_INPUT("io_inB", 2, 0);
     SET_INPUT("io_inB", 3, 1);
 
-    processAllGates(net, 3);
+    processAllGates(net);
 
     ASSERT_OUTPUT_EQ("io_out", 0, 0);
     ASSERT_OUTPUT_EQ("io_out", 1, 1);
@@ -292,7 +292,7 @@ void testFromJSONtest_register_4bit()
 
     // 1: Reset all DFFs.
     SET_INPUT("reset", 0, 1);
-    processAllGates(net, 3);
+    processAllGates(net);
     net.tick();
 
     assert(getOutput(std::dynamic_pointer_cast<
@@ -310,7 +310,7 @@ void testFromJSONtest_register_4bit()
 
     // 2: Store values into DFFs.
     SET_INPUT("reset", 0, 0);
-    processAllGates(net, 3);
+    processAllGates(net);
     net.tick();
 
     assert(getOutput(std::dynamic_pointer_cast<
@@ -333,7 +333,7 @@ void testFromJSONtest_register_4bit()
 
     // 3: Get outputs.
     SET_INPUT("reset", 0, 0);
-    processAllGates(net, 3);
+    processAllGates(net);
     net.tick();
 
     ASSERT_OUTPUT_EQ("io_out", 0, 0);
@@ -376,25 +376,25 @@ void testSequentialCircuit()
 
     // 1:
     SET_INPUT("reset", 0, 1);
-    processAllGates(net, 3);
+    processAllGates(net);
 
     // 2:
     net.tick();
     assert(getOutput(dff) == 0);
     SET_INPUT("reset", 0, 0);
-    processAllGates(net, 3);
+    processAllGates(net);
     ASSERT_OUTPUT_EQ("out", 0, 0);
 
     // 3:
     net.tick();
     assert(getOutput(dff) == 1);
-    processAllGates(net, 3);
+    processAllGates(net);
     ASSERT_OUTPUT_EQ("out", 0, 1);
 
     // 4:
     net.tick();
     assert(getOutput(dff) == 0);
-    processAllGates(net, 3);
+    processAllGates(net);
     ASSERT_OUTPUT_EQ("out", 0, 0);
 }
 
@@ -426,12 +426,12 @@ void testFromJSONtest_counter_4bit()
                                              {1, 1, 1, 1}}};
 
     SET_INPUT("reset", 0, 1);
-    processAllGates(net, 3);
+    processAllGates(net);
 
     SET_INPUT("reset", 0, 0);
     for (size_t i = 0; i < outvals.size(); i++) {
         net.tick();
-        processAllGates(net, 3);
+        processAllGates(net);
         ASSERT_OUTPUT_EQ("io_out", 0, outvals[i][0]);
         ASSERT_OUTPUT_EQ("io_out", 1, outvals[i][1]);
         ASSERT_OUTPUT_EQ("io_out", 2, outvals[i][2]);
@@ -488,13 +488,13 @@ void testFromJSONdiamond_core()
     setInput(get<NetworkBuilder>(net, "rom", "0", 0x1f), 0);
 
     SET_INPUT("reset", 0, 1);
-    processAllGates(net, 7);
+    processAllGates(net);
 
     SET_INPUT("reset", 0, 0);
 
     for (int i = 0; i < 5; i++) {
         net.tick();
-        processAllGates(net, 7);
+        processAllGates(net);
     }
 
     ASSERT_OUTPUT_EQ("io_regOut_x0", 0x00, 0);
@@ -564,12 +564,12 @@ void testFromJSONdiamond_core_wo_rom(ROMNetwork rom)
            std::vector<uint8_t>{0x74, 0x80});
 
     SET_INPUT("reset", 0, 1);
-    processAllGates(net, 7);
+    processAllGates(net);
 
     SET_INPUT("reset", 0, 0);
     for (int i = 0; i < 5; i++) {
         net.tick();
-        processAllGates(net, 7);
+        processAllGates(net);
     }
 
     ASSERT_OUTPUT_EQ("io_regOut_x0", 0x00, 0);
@@ -592,6 +592,12 @@ void testFromJSONdiamond_core_wo_rom(ROMNetwork rom)
 
 //
 #include "iyokan_plain.hpp"
+
+void processAllGates(PlainNetwork& net,
+                     std::shared_ptr<ProgressGraphMaker> graph = nullptr)
+{
+    processAllGates(net, std::thread::hardware_concurrency(), graph);
+}
 
 void setInput(std::shared_ptr<TaskPlainGateMem> task, int val)
 {
@@ -643,7 +649,7 @@ void testProgressGraphMaker()
 
     auto graph = std::make_shared<ProgressGraphMaker>();
 
-    processAllGates(net, 1, graph);
+    processAllGates(net, graph);
 
     std::stringstream ss;
     graph->dumpDOT(ss);
@@ -711,10 +717,11 @@ public:
     }
 };
 
-void processAllGates(TFHEppNetwork& net, int numWorkers,
+void processAllGates(TFHEppNetwork& net,
                      std::shared_ptr<ProgressGraphMaker> graph = nullptr)
 {
-    processAllGates(net, numWorkers, TFHEppTestHelper::instance().wi(), graph);
+    processAllGates(net, std::thread::hardware_concurrency(),
+                    TFHEppTestHelper::instance().wi(), graph);
 }
 
 void setInput(std::shared_ptr<TaskTFHEppGateMem> task, int val)
@@ -838,13 +845,13 @@ void testKVSPPacket()
 
     // Reset
     setInput(net.get<TaskTFHEppGateMem>("input", "reset", 0), 1);
-    processAllGates(net, 7);
+    processAllGates(net);
 
     // Run
     setInput(net.get<TaskTFHEppGateMem>("input", "reset", 0), 0);
     for (int i = 0; i < 8; i++) {
         net.tick();
-        processAllGates(net, 7);
+        processAllGates(net);
     }
 
     KVSPResPacket resPacket;
@@ -926,13 +933,13 @@ void testKVSPPlainPacket()
 
     // Reset
     setInput(net.get<TaskPlainGateMem>("input", "reset", 0), 1);
-    processAllGates(net, 7);
+    processAllGates(net);
 
     // Run
     setInput(net.get<TaskPlainGateMem>("input", "reset", 0), 0);
     for (int i = 0; i < 8; i++) {
         net.tick();
-        processAllGates(net, 7);
+        processAllGates(net);
     }
 
     // Assert
@@ -1012,6 +1019,12 @@ public:
         return one_;
     }
 };
+
+void processAllGates(CUFHENetwork& net,
+                     std::shared_ptr<ProgressGraphMaker> graph = nullptr)
+{
+    processAllGates(net, 240, graph);
+}
 
 void setInput(std::shared_ptr<TaskCUFHEGateMem> task, int val)
 {
