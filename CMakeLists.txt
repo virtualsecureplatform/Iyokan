@@ -41,7 +41,7 @@ set(CMAKE_CXX_FLAGS_DEBUG "")
 set(CMAKE_CXX_FLAGS_RELEASE "")
 
 ##### iyokan
-add_executable(iyokan iyokan.cpp)
+add_executable(iyokan iyokan.cpp iyokan_plain.cpp iyokan_tfhepp.cpp)
 add_sanitizers(iyokan)
 target_compile_options(iyokan PUBLIC "$<$<CONFIG:DEBUG>:${IYOKAN_CXXFLAGS_DEBUG}>")
 target_compile_options(iyokan PUBLIC "$<$<CONFIG:RELEASE>:${IYOKAN_CXXFLAGS_RELEASE}>")

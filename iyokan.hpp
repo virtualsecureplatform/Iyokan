@@ -1009,4 +1009,40 @@ public:
         return thr_.hasFinished();
     }
 };
+
+struct Options {
+    // Processor's logic file.
+    std::string logicFile;
+    // Port corresponding between core and ROM if enabled.
+    std::vector<std::string> romPorts;
+    // Misc.
+    std::string inputFile, outputFile;
+    int numWorkers = std::thread::hardware_concurrency(), numCycles = 0;
+};
+
+template <class Func>
+int processCycles(int numCycles, Func func)
+{
+    for (int i = 0; i < numCycles; i++) {
+        std::cout << "#" << (i + 1) << std::flush;
+
+        auto begin = std::chrono::high_resolution_clock::now();
+        bool shouldBreak = func();
+        auto end = std::chrono::high_resolution_clock::now();
+
+        std::cout << "\tdone. ("
+                  << std::chrono::duration_cast<std::chrono::microseconds>(
+                         end - begin)
+                         .count()
+                  << " us)" << std::endl;
+
+        if (shouldBreak) {
+            std::cout << "break." << std::endl;
+            return i + 1;
+        }
+    }
+
+    return numCycles;
+}
+
 #endif

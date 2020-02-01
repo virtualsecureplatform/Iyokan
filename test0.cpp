@@ -591,7 +591,7 @@ void testFromJSONdiamond_core_wo_rom(ROMNetwork rom)
 }
 
 //
-#include "plain.hpp"
+#include "iyokan_plain.hpp"
 
 void processAllGates(PlainNetwork& net, int numWorkers,
                      std::shared_ptr<ProgressGraphMaker> graph = nullptr)
@@ -685,7 +685,7 @@ void testProgressGraphMaker()
     assert(dot.find("n3 -> n4") != std::string::npos);
 }
 
-#include "tfhepp.hpp"
+#include "iyokan_tfhepp.hpp"
 
 class TFHEppTestHelper {
 private:

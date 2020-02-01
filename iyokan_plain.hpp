@@ -224,4 +224,6 @@ inline TaskNetwork<uint8_t> makePlainROMNetwork()
     return TaskNetwork<uint8_t>(std::move(builder));
 }
 
+void doPlain(const Options &opt);
+
 #endif

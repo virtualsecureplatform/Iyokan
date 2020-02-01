@@ -312,4 +312,6 @@ inline TaskNetwork<TFHEppWorkerInfo> makeTFHEppROMNetwork()
     return TaskNetwork<TFHEppWorkerInfo>(std::move(builder));
 }
 
+void doTFHE(const Options &opt);
+
 #endif
