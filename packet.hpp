@@ -208,8 +208,10 @@ inline std::vector<uint8_t> decrypt(const TFHEpp::SecretKey& key,
 inline KVSPPlainResPacket decrypt(const TFHEpp::SecretKey& key,
                                   const KVSPResPacket& src)
 {
-    std::vector<uint8_t> flags = decrypt(key, src.flags),
-                         ram = decrypt(key, src.ram);
+    std::vector<uint8_t> flags;
+    for (auto&& encFlag : src.flags)
+        flags.push_back(
+            TFHEpp::bootsSymDecrypt(std::vector{encFlag}, key).at(0));
 
     std::vector<uint16_t> regs;
     for (auto&& encReg : src.regs) {
@@ -217,6 +219,8 @@ inline KVSPPlainResPacket decrypt(const TFHEpp::SecretKey& key,
         assert(bytes.size() == 2);
         regs.push_back(bytes[0] | (bytes[1] << 8u));
     }
+
+    std::vector<uint8_t> ram = decrypt(key, src.ram);
 
     return KVSPPlainResPacket{flags, regs, ram, src.numCycles};
 }
