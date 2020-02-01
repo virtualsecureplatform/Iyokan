@@ -1,7 +1,8 @@
-#include "iyokan.hpp"
+#include <chrono>
 
 #include <CLI/CLI.hpp>
 
+#include "iyokan.hpp"
 #include "packet.hpp"
 #include "plain.hpp"
 #include "tfhepp.hpp"
@@ -70,6 +71,31 @@ void processAllGates(TFHEppNetwork &net, int numWorkers, TFHEppWorkerInfo wi,
     }
 
     assert(readyQueue.empty());
+}
+
+template <class Func>
+int processCycles(int numCycles, Func func)
+{
+    for (int i = 0; i < numCycles; i++) {
+        std::cout << "#" << (i + 1) << std::flush;
+
+        auto begin = std::chrono::high_resolution_clock::now();
+        bool shouldBreak = func();
+        auto end = std::chrono::high_resolution_clock::now();
+
+        std::cout << "\tdone. ("
+                  << std::chrono::duration_cast<std::chrono::microseconds>(
+                         end - begin)
+                         .count()
+                  << " us)" << std::endl;
+
+        if (shouldBreak) {
+            std::cout << "break." << std::endl;
+            return i + 1;
+        }
+    }
+
+    return numCycles;
 }
 
 // Thanks to: https://faithandbrave.hateblo.jp/entry/2014/05/01/171631
@@ -163,16 +189,13 @@ void doPlain(const Options &opt)
 
     // Go computing
     get(net, "input", "reset", 0)->set(0);
-    for (int i = 0; i < numCycles; i++) {
+    numCycles = processCycles(numCycles, [&] {
         net.tick();
         processAllGates(net, opt.numWorkers);
 
         bool hasFinished = get(net, "output", "io_finishFlag", 0)->get();
-        if (hasFinished) {
-            numCycles = i + 1;
-            break;
-        }
-    }
+        return hasFinished;
+    });
 
     KVSPPlainResPacket resPacket;
     resPacket.numCycles = numCycles;
@@ -276,10 +299,11 @@ void doTFHE(const Options &opt)
         return zero;
     }());
     // Go computing
-    for (int i = 0; i < numCycles; i++) {
+    processCycles(numCycles, [&] {
         net.tick();
         processAllGates(net, opt.numWorkers, wi);
-    }
+        return false;
+    });
 
     KVSPResPacket resPacket;
     resPacket.numCycles = numCycles;
