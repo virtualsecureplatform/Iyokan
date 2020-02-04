@@ -5,6 +5,10 @@
 #include "iyokan_plain.hpp"
 #include "iyokan_tfhepp.hpp"
 
+#ifdef IYOKAN_CUDA_ENABLED
+#include "iyokan_cufhe.hpp"
+#endif
+
 // Thanks to: https://faithandbrave.hateblo.jp/entry/2014/05/01/171631
 std::vector<std::string> split(const std::string &input, char delimiter)
 {
@@ -23,6 +27,7 @@ int main(int argc, char **argv)
 
     Options opt;
     std::string enableROM;
+    bool enableGPU = false;
 
     app.require_subcommand();
     enum class TYPE { PLAIN, TFHE } type;
@@ -47,6 +52,10 @@ int main(int argc, char **argv)
         tfhe->fallthrough();
         tfhe->add_option("-c", opt.numCycles, "")->required();
         tfhe->add_option("-o", opt.outputFile, "")->required();
+#ifdef IYOKAN_CUDA_ENABLED
+        tfhe->add_flag("--enable-gpu", enableGPU, "");
+        opt.numWorkers = 240;
+#endif
         tfhe->parse_complete_callback([&] { type = TYPE::TFHE; });
     }
 
@@ -63,7 +72,12 @@ int main(int argc, char **argv)
         doPlain(opt);
         break;
     case TYPE::TFHE:
-        doTFHE(opt);
+#ifdef IYOKAN_CUDA_ENABLED
+        if (enableGPU)
+            doCUFHE(opt);
+        else
+#endif
+            doTFHE(opt);
         break;
     }
 }

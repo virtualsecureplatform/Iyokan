@@ -775,6 +775,17 @@ public:
     {
         return one_;
     }
+
+    std::string getELFAsPacketFile(const std::string& elfFilePath) const
+    {
+        // Read packet
+        const auto reqPacket =
+            KVSPReqPacket::make(*sk(), parseELF(elfFilePath));
+        // Write packet into temporary file
+        static const std::string outFilePath = "_test_req_packet00";
+        writeToArchive(outFilePath, reqPacket);
+        return outFilePath;
+    }
 };
 
 void processAllGates(TFHEppNetwork& net,
@@ -1038,6 +1049,25 @@ int getOutput(std::shared_ptr<TaskCUFHEGateMem> task)
     cufhe::Decrypt(p, task->get(), *CUFHETestHelper::instance().sk());
     return p.get();
 }
+
+void testDoCUFHE()
+{
+    auto& h = TFHEppTestHelper::instance();
+
+    Options opt;
+    opt.logicFile = "test/diamond-core.json";
+    opt.inputFile = h.getELFAsPacketFile("test/test00.elf");
+    opt.outputFile = "_test_res_packet00";
+    opt.numWorkers = 240;
+    opt.numCycles = 8;
+
+    doCUFHE(opt);
+
+    writeToArchive("_test_sk", *h.sk());
+    auto resPacket = readFromArchive<KVSPResPacket>("_test_res_packet00");
+    auto plainResPacket = decrypt(*h.sk(), resPacket);
+    assert(plainResPacket.regs.at(0) == 42);
+}
 #endif
 
 int main(int argc, char** argv)
@@ -1101,6 +1131,7 @@ int main(int argc, char** argv)
 
 #ifdef IYOKAN_CUDA_ENABLED
         testFromJSONdiamond_core<CUFHENetworkBuilder>();
+        testDoCUFHE();
 #endif
     }
 }

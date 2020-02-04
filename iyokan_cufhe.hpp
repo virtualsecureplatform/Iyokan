@@ -183,6 +183,7 @@ public:
     }
 };
 
+void doCUFHE(const Options& opt);
 void processAllGates(CUFHENetwork& net, int numWorkers,
                      std::shared_ptr<ProgressGraphMaker> graph = nullptr);
 #endif
