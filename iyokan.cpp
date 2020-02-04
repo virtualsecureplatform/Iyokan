@@ -9,24 +9,11 @@
 #include "iyokan_cufhe.hpp"
 #endif
 
-// Thanks to: https://faithandbrave.hateblo.jp/entry/2014/05/01/171631
-std::vector<std::string> split(const std::string &input, char delimiter)
-{
-    std::istringstream stream(input);
-
-    std::string field;
-    std::vector<std::string> result;
-    while (std::getline(stream, field, delimiter))
-        result.push_back(field);
-    return result;
-}
-
 int main(int argc, char **argv)
 {
     CLI::App app{"Prallel FHE circuit evaluation engine."};
 
     Options opt;
-    std::string enableROM;
     bool enableGPU = false;
 
     app.require_subcommand();
@@ -35,7 +22,7 @@ int main(int argc, char **argv)
         ->required()
         ->check(CLI::ExistingFile);
     app.add_option("-t", opt.numWorkers, "")->check(CLI::PositiveNumber);
-    app.add_option("--enable-rom", enableROM, "");
+    app.add_option("--enable-rom", opt.romPorts, "")->delimiter(':');
     app.add_option("-i", opt.inputFile, "")
         ->required()
         ->check(CLI::ExistingFile);
@@ -61,8 +48,6 @@ int main(int argc, char **argv)
 
     CLI11_PARSE(app, argc, argv);
 
-    if (!enableROM.empty())
-        opt.romPorts = split(enableROM, ':');
     assert(opt.romPorts.empty() || opt.romPorts.size() == 4);
 
     AsyncThread::setNumThreads(opt.numWorkers);
