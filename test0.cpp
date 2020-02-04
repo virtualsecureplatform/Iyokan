@@ -994,8 +994,6 @@ private:
         gk_ = std::make_shared<cufhe::PubKey>();
         cufhe::KeyGen(*gk_, *sk_);
 
-        cufhe::Initialize(*gk_);
-
         cufhe::Ptxt p;
         p = 0;
         cufhe::Encrypt(zero_, p, *sk_);
@@ -1003,10 +1001,19 @@ private:
         cufhe::Encrypt(one_, p, *sk_);
     }
 
-    ~CUFHETestHelper()
-    {
-        cufhe::CleanUp();
-    }
+public:
+    class CUFHEManager {
+    public:
+        CUFHEManager()
+        {
+            cufhe::Initialize(*CUFHETestHelper::instance().gk_);
+        }
+
+        ~CUFHEManager()
+        {
+            cufhe::CleanUp();
+        }
+    };
 
 public:
     static CUFHETestHelper& instance()
@@ -1105,17 +1112,21 @@ int main(int argc, char** argv)
     testTFHEppSerialization();
 
 #ifdef IYOKAN_CUDA_ENABLED
-    testNOT<CUFHENetworkBuilder>();
-    testMUX<CUFHENetworkBuilder>();
-    testBinopGates<CUFHENetworkBuilder>();
-    testFromJSONtest_pass_4bit<CUFHENetworkBuilder>();
-    testFromJSONtest_and_4bit<CUFHENetworkBuilder>();
-    testFromJSONtest_and_4_2bit<CUFHENetworkBuilder>();
-    testFromJSONtest_mux_4bit<CUFHENetworkBuilder>();
-    testFromJSONtest_addr_4bit<CUFHENetworkBuilder>();
-    testFromJSONtest_register_4bit<CUFHENetworkBuilder>();
-    testSequentialCircuit<CUFHENetworkBuilder>();
-    testFromJSONtest_counter_4bit<CUFHENetworkBuilder>();
+    {
+        CUFHETestHelper::CUFHEManager man;
+
+        testNOT<CUFHENetworkBuilder>();
+        testMUX<CUFHENetworkBuilder>();
+        testBinopGates<CUFHENetworkBuilder>();
+        testFromJSONtest_pass_4bit<CUFHENetworkBuilder>();
+        testFromJSONtest_and_4bit<CUFHENetworkBuilder>();
+        testFromJSONtest_and_4_2bit<CUFHENetworkBuilder>();
+        testFromJSONtest_mux_4bit<CUFHENetworkBuilder>();
+        testFromJSONtest_addr_4bit<CUFHENetworkBuilder>();
+        testFromJSONtest_register_4bit<CUFHENetworkBuilder>();
+        testSequentialCircuit<CUFHENetworkBuilder>();
+        testFromJSONtest_counter_4bit<CUFHENetworkBuilder>();
+    }
 #endif
 
     testProgressGraphMaker();
@@ -1130,7 +1141,11 @@ int main(int argc, char** argv)
         testKVSPPacket();
 
 #ifdef IYOKAN_CUDA_ENABLED
-        testFromJSONdiamond_core<CUFHENetworkBuilder>();
+        {
+            CUFHETestHelper::CUFHEManager man;
+
+            testFromJSONdiamond_core<CUFHENetworkBuilder>();
+        }
         testDoCUFHE();
 #endif
     }
