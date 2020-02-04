@@ -13,17 +13,17 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-project(iyokan LANGUAGES CXX CUDA)
+project(iyokan LANGUAGES CXX)
 
 find_package(Threads REQUIRED)
 find_package(OpenMP REQUIRED)
 find_package(Sanitizers)
-find_package(CUDA)
 
 add_subdirectory(TFHEpp)
-if (CUDA_FOUND)
+if (IYOKAN_ENABLE_CUDA)
+    enable_language(CUDA)
     add_subdirectory(cuFHE/cufhe)
-endif(CUDA_FOUND)
+endif(IYOKAN_ENABLE_CUDA)
 
 set(IYOKAN_CXXFLAGS -Wall -Wextra -pedantic -g3)
 set(IYOKAN_CXXFLAGS_DEBUG   ${IYOKAN_CXXFLAGS} -O0)
@@ -51,11 +51,11 @@ target_compile_options(iyokan PUBLIC "$<$<CONFIG:DEBUG>:${IYOKAN_CXXFLAGS_DEBUG}
 target_compile_options(iyokan PUBLIC "$<$<CONFIG:RELEASE>:${IYOKAN_CXXFLAGS_RELEASE}>")
 target_link_libraries(iyokan ${IYOKAN_LIBS})
 target_include_directories(iyokan PRIVATE ${IYOKAN_INCLUDE_DIRS})
-if (CUDA_FOUND)
+if (IYOKAN_ENABLE_CUDA)
     target_sources(iyokan PRIVATE iyokan_cufhe.cpp)
     target_link_libraries(iyokan cufhe_gpu ${CUDA_LIBRARIES})
     target_compile_definitions(iyokan PRIVATE IYOKAN_CUDA_ENABLED)
-endif(CUDA_FOUND)
+endif(IYOKAN_ENABLE_CUDA)
 
 ##### test0
 add_executable(test0 test0.cpp iyokan_plain.cpp iyokan_tfhepp.cpp)
@@ -64,11 +64,11 @@ target_compile_options(test0 PUBLIC "$<$<CONFIG:DEBUG>:${IYOKAN_CXXFLAGS_DEBUG}>
 target_compile_options(test0 PUBLIC "$<$<CONFIG:RELEASE>:${IYOKAN_CXXFLAGS_RELEASE}>")
 target_link_libraries(test0 ${IYOKAN_LIBS})
 target_include_directories(test0 PRIVATE ${IYOKAN_INCLUDE_DIRS})
-if (CUDA_FOUND)
+if (IYOKAN_ENABLE_CUDA)
     target_sources(test0 PRIVATE iyokan_cufhe.cpp)
     target_link_libraries(test0 cufhe_gpu ${CUDA_LIBRARIES})
     target_compile_definitions(test0 PRIVATE IYOKAN_CUDA_ENABLED)
-endif(CUDA_FOUND)
+endif(IYOKAN_ENABLE_CUDA)
 
 ##### kvsp-packet
 add_executable(kvsp-packet kvsp-packet.cpp)
