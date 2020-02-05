@@ -704,26 +704,30 @@ void testKVSPPlainPacket()
     }
 
     // Assert
-    auto assertOutput = [&](int bit, int expected) {
-        assert(getOutput(net.get<TaskPlainGateMem>("output", "io_regOut_x0",
-                                                   bit)) == expected);
+    auto assertOutput = [&](const std::string& portName, int bit,
+                            int expected) {
+        assert(getOutput(net.get<TaskPlainGateMem>("output", portName, bit)) ==
+               expected);
     };
-    assertOutput(0x00, 0);
-    assertOutput(0x01, 1);
-    assertOutput(0x02, 0);
-    assertOutput(0x03, 1);
-    assertOutput(0x04, 0);
-    assertOutput(0x05, 1);
-    assertOutput(0x06, 0);
-    assertOutput(0x07, 0);
-    assertOutput(0x08, 0);
-    assertOutput(0x09, 0);
-    assertOutput(0x0a, 0);
-    assertOutput(0x0b, 0);
-    assertOutput(0x0c, 0);
-    assertOutput(0x0d, 0);
-    assertOutput(0x0e, 0);
-    assertOutput(0x0f, 0);
+
+    assertOutput("io_finishFlag", 0, 1);
+
+    assertOutput("io_regOut_x0", 0x00, 0);
+    assertOutput("io_regOut_x0", 0x01, 1);
+    assertOutput("io_regOut_x0", 0x02, 0);
+    assertOutput("io_regOut_x0", 0x03, 1);
+    assertOutput("io_regOut_x0", 0x04, 0);
+    assertOutput("io_regOut_x0", 0x05, 1);
+    assertOutput("io_regOut_x0", 0x06, 0);
+    assertOutput("io_regOut_x0", 0x07, 0);
+    assertOutput("io_regOut_x0", 0x08, 0);
+    assertOutput("io_regOut_x0", 0x09, 0);
+    assertOutput("io_regOut_x0", 0x0a, 0);
+    assertOutput("io_regOut_x0", 0x0b, 0);
+    assertOutput("io_regOut_x0", 0x0c, 0);
+    assertOutput("io_regOut_x0", 0x0d, 0);
+    assertOutput("io_regOut_x0", 0x0e, 0);
+    assertOutput("io_regOut_x0", 0x0f, 0);
 }
 
 #include "iyokan_tfhepp.hpp"
@@ -1004,6 +1008,7 @@ void testDoCUFHE()
     writeToArchive("_test_sk", *h.sk());
     auto resPacket = readFromArchive<KVSPResPacket>("_test_res_packet00");
     auto plainResPacket = decrypt(*h.sk(), resPacket);
+    assert(plainResPacket.flags.at(0) == 1);
     assert(plainResPacket.regs.at(0) == 42);
 }
 #endif
