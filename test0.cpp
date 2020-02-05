@@ -888,92 +888,23 @@ void testTFHEppSerialization()
     }
 }
 
-void testKVSPPacket()
+void testDoTFHE()
 {
-    // Read packet
-    const auto reqPacket = KVSPReqPacket::make(
-        *TFHEppTestHelper::instance().sk(), parseELF("test/test00.elf"));
+    auto& h = TFHEppTestHelper::instance();
 
-    // Load network
-    auto net = []() {
-        const std::string fileName = "test/diamond-core.json";
-        std::ifstream ifs{fileName};
-        assert(ifs);
-        return readNetworkFromJSON<TFHEppNetworkBuilder>(ifs);
-    }();
-    assert(net.isValid());
+    Options opt;
+    opt.logicFile = "test/diamond-core.json";
+    opt.inputFile = h.getELFAsPacketFile("test/test00.elf");
+    opt.outputFile = "_test_res_packet00";
+    opt.numCycles = 8;
 
-    // Set ROM
-    for (int addr = 0; addr < 128; addr++)
-        for (int bit = 0; bit < 32; bit++)
-            net.get<TaskTFHEppGateMem>("rom", std::to_string(addr), bit)
-                ->set(reqPacket.rom.at(addr * 32 + bit));
-    // Set RAM
-    for (int addr = 0; addr < 512; addr++)
-        for (int bit = 0; bit < 8; bit++)
-            net.get<TaskTFHEppGateMem>("ram", std::to_string(addr), bit)
-                ->set(reqPacket.ram.at(addr * 8 + bit));
+    doTFHE(opt);
 
-    // Reset
-    setInput(net.get<TaskTFHEppGateMem>("input", "reset", 0), 1);
-    processAllGates(net);
-
-    // Run
-    setInput(net.get<TaskTFHEppGateMem>("input", "reset", 0), 0);
-    for (int i = 0; i < 8; i++) {
-        net.tick();
-        processAllGates(net);
-    }
-
-    KVSPResPacket resPacket;
-    // Get flags
-    resPacket.flags.push_back(
-        net.get<TaskTFHEppGateMem>("output", "io_finishFlag", 0)->get());
-    // Get regs
-    for (int regi = 0; regi < 16; regi++) {
-        std::vector<TFHEpp::TLWElvl0> reg;
-        for (int bit = 0; bit < 16; bit++)
-            reg.push_back(
-                net.get<TaskTFHEppGateMem>(
-                       "output", detail::fok("io_regOut_x", regi), bit)
-                    ->get());
-        resPacket.regs.emplace_back(std::move(reg));
-    }
-    // Get RAM
-    for (int addr = 0; addr < 512; addr++)
-        for (int bit = 0; bit < 8; bit++)
-            resPacket.ram.push_back(
-                net.get<TaskTFHEppGateMem>("ram", std::to_string(addr), bit)
-                    ->get());
-
-    // Assert
-    auto assertOutput = [&](int bit, int expected) {
-        assert(getOutput(net.get<TaskTFHEppGateMem>("output", "io_regOut_x0",
-                                                    bit)) == expected);
-    };
-    assertOutput(0x00, 0);
-    assertOutput(0x01, 1);
-    assertOutput(0x02, 0);
-    assertOutput(0x03, 1);
-    assertOutput(0x04, 0);
-    assertOutput(0x05, 1);
-    assertOutput(0x06, 0);
-    assertOutput(0x07, 0);
-    assertOutput(0x08, 0);
-    assertOutput(0x09, 0);
-    assertOutput(0x0a, 0);
-    assertOutput(0x0b, 0);
-    assertOutput(0x0c, 0);
-    assertOutput(0x0d, 0);
-    assertOutput(0x0e, 0);
-    assertOutput(0x0f, 0);
-
-    {
-        KVSPPlainResPacket plain =
-            decrypt(*TFHEppTestHelper::instance().sk(), resPacket);
-        assert(plain.flags.at(0) == 1);
-        assert(plain.regs.at(0) == 42);
-    }
+    writeToArchive("_test_sk", *h.sk());
+    auto resPacket = readFromArchive<KVSPResPacket>("_test_res_packet00");
+    auto plainResPacket = decrypt(*h.sk(), resPacket);
+    assert(plainResPacket.flags.at(0) == 1);
+    assert(plainResPacket.regs.at(0) == 42);
 }
 
 #ifdef IYOKAN_CUDA_ENABLED
@@ -1138,7 +1069,7 @@ int main(int argc, char** argv)
         testFromJSONdiamond_core_wo_rom<TFHEppNetworkBuilder, TaskTFHEppROMUX,
                                         TFHEpp::TLWElvl0>(
             makeTFHEppROMNetwork());
-        testKVSPPacket();
+        testDoTFHE();
 
 #ifdef IYOKAN_CUDA_ENABLED
         {
