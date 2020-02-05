@@ -578,6 +578,14 @@ protected:
     }
 
 public:
+    template <class T>
+    std::shared_ptr<T> getTask(const std::string &kind,
+                               const std::string &portName, int portBit)
+    {
+        return std::dynamic_pointer_cast<T>(
+            namedMems_.at(std::make_tuple(kind, portName, portBit)));
+    }
+
     void addTask(NodeLabel label, int priority,
                  std::shared_ptr<TaskBase<WorkerInfo>> task)
     {

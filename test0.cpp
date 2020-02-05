@@ -1000,6 +1000,25 @@ void setROM(TaskTFHEppROMUX& rom, const std::vector<uint8_t>& src)
     }
 }
 
+void setRAM(TFHEppNetwork& net, const std::vector<uint8_t>& src)
+{
+    auto& h = TFHEppTestHelper::instance();
+    auto params = h.wi().params;
+
+    for (size_t i = 0; i < src.size(); i++) {
+        for (int bit = 0; bit < 8; bit++) {
+            TFHEpp::Polynomiallvl1 pmu = {};
+            uint8_t val = i < src.size() ? (src[i] >> bit) & 1u : 0;
+            pmu[0] = val ? params.μ : -params.μ;
+            TFHEpp::TRLWElvl1 trlwe =
+                TFHEpp::trlweSymEncryptlvl1(pmu, params.α, h.sk()->key.lvl1);
+
+            net.get<TaskTFHEppRAMUX>("ram", (i % 2 == 1 ? "A" : "B"), bit)
+                ->set(i / 2, trlwe);
+        }
+    }
+}
+
 int getOutput(std::shared_ptr<TaskTFHEppGateMem> task)
 {
     return TFHEpp::bootsSymDecrypt({task->get()},
@@ -1251,6 +1270,10 @@ int main(int argc, char** argv)
         testFromJSONdiamond_core<TFHEppNetworkBuilder>();
         testFromJSONdiamond_core_wo_rom<TFHEppNetworkBuilder, TaskTFHEppROMUX,
                                         TFHEpp::TLWElvl0>(
+            makeTFHEppROMNetwork());
+        testFromJSONdiamond_core_wo_ram_rom<TFHEppNetworkBuilder,
+                                            TaskTFHEppROMUX, TFHEpp::TLWElvl0>(
+            makeTFHEppRAMNetwork("A"), makeTFHEppRAMNetwork("B"),
             makeTFHEppROMNetwork());
         testDoTFHE();
 
