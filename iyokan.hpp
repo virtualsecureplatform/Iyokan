@@ -600,7 +600,9 @@ public:
                       int portBit,
                       const std::shared_ptr<TaskBase<WorkerInfo>> &task)
     {
-        namedMems_.emplace(std::make_tuple(kind, portName, portBit), task);
+        auto [item, inserted] =
+            namedMems_.emplace(std::make_tuple(kind, portName, portBit), task);
+        assert(inserted);
     }
 
     template <class T, class... Args>
