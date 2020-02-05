@@ -162,6 +162,93 @@ public:
     }
 };
 
+class TaskPlainRAM
+    : public Task<uint8_t /* only 1 bit used */, uint32_t /* only 8 bit used */,
+                  uint8_t /* dummy */> {
+public:
+    const static size_t ADDRESS_BIT = 8;
+
+private:
+    std::vector<uint8_t> data_;
+
+private:
+    void startAsyncImpl(uint8_t) override
+    {
+        size_t addr = 0;
+        for (size_t i = 0; i < ADDRESS_BIT; i++)
+            addr |= (input(i) & 1u) << i;
+        output() = data_.at(addr);
+
+        if (input(ADDRESS_BIT)) {
+            uint8_t val = 0;
+            for (int i = 0; i < 8; i++)
+                val |= (input(ADDRESS_BIT + 1 + i) & 1u) << i;
+            data_.at(addr) = val;
+        }
+    }
+
+public:
+    TaskPlainRAM()
+        : Task<uint8_t, uint32_t, uint8_t>(ADDRESS_BIT /* addr */ +
+                                           1 /* wren */ + 8 /* wdata */),
+          data_(1 << ADDRESS_BIT)
+    {
+    }
+
+    void set(size_t addr, uint8_t val)
+    {
+        data_.at(addr) = val;
+    }
+
+    uint8_t get(size_t addr)
+    {
+        return data_.at(addr);
+    }
+
+    bool hasFinished() const override
+    {
+        return true;
+    }
+};
+
+inline TaskNetwork<uint8_t> makePlainRAMNetwork(const std::string &ramPortName)
+{
+    NetworkBuilderBase<uint8_t> builder;
+
+    // Create RAM
+    auto taskRAM = std::make_shared<TaskPlainRAM>();
+    builder.addTask(NodeLabel{builder.genid(), "RAM", "body"}, 0, taskRAM);
+    builder.registerTask("ram", ramPortName, 0, taskRAM);
+
+    // Create inputs and outputs, and connect to RAM
+    for (size_t i = 0; i < TaskPlainRAM::ADDRESS_BIT; i++) {
+        auto taskINPUT = builder.addINPUT<TaskPlainGateWIRE>(builder.genid(), 0,
+                                                             "addr", i, false);
+        builder.connectTasks(taskINPUT, taskRAM);
+    }
+    auto taskWriteEnabled = builder.addINPUT<TaskPlainGateWIRE>(
+        builder.genid(), 0, "wren", 0, false);
+    builder.connectTasks(taskWriteEnabled, taskRAM);
+    for (size_t i = 0; i < 8; i++) {
+        auto taskINPUT = builder.addINPUT<TaskPlainGateWIRE>(builder.genid(), 0,
+                                                             "wdata", i, false);
+        builder.connectTasks(taskINPUT, taskRAM);
+    }
+    for (size_t i = 0; i < 8; i++) {
+        auto taskSplitter = std::make_shared<TaskPlainSplitter>(i);
+        builder.addTask(
+            NodeLabel{builder.genid(), "SPLITTER", detail::fok("RAM[", i, "]")},
+            0, taskSplitter);
+        builder.connectTasks(taskRAM, taskSplitter);
+
+        auto taskOUTPUT = builder.addOUTPUT<TaskPlainGateWIRE>(
+            builder.genid(), 0, "rdata", i, true);
+        builder.connectTasks(taskSplitter, taskOUTPUT);
+    }
+
+    return TaskNetwork<uint8_t>(std::move(builder));
+}
+
 inline TaskNetwork<uint8_t> makePlainROMNetwork()
 {
     /*
