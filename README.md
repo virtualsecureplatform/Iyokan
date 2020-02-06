@@ -1,4 +1,4 @@
-![Iyokan logo](https://user-images.githubusercontent.com/33079554/72664788-73500580-3a45-11ea-882a-27b6db96e7a1.png)
+![伊予柑ロゴ](https://user-images.githubusercontent.com/33079554/73909483-1af77f80-48f0-11ea-880b-55039781cca2.png)
 
 # Iyokan
 
