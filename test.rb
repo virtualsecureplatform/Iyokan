@@ -119,6 +119,20 @@ if $SLOW_MODE_ENABLED
     assert_regex r, /f0\t1/
     assert_regex r, /x0\t42/
   end
+
+  test_iyokan [
+    "tfhe",
+    "-l", "test/diamond-core-wo-ram-rom.json",
+    "-i", "_test_req_packet00",
+    "-o", "_test_res_packet00",
+    "-c", "8",
+    "--enable-rom", "io_romAddr:7:io_romData:32",
+    "--enable-ram",
+  ] do |_|
+    r = check_code "./kvsp-packet", ["dec", "_test_sk", "_test_res_packet00"]
+    assert_regex r, /f0\t1/
+    assert_regex r, /x0\t42/
+  end
 end
 
 exit 1 if $has_any_error

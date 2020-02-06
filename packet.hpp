@@ -181,12 +181,12 @@ struct KVSPReqPacket {
     std::vector<TFHEpp::TLWElvl0> rom, ram;
 
     std::shared_ptr<TFHEpp::CircuitKey> circuitKey;
-    std::vector<TFHEpp::TRLWElvl1> romCk;
+    std::vector<TFHEpp::TRLWElvl1> romCk, ramCk;
 
     template <class Archive>
     void serialize(Archive& ar)
     {
-        ar(gateKey, rom, ram, circuitKey, romCk);
+        ar(gateKey, rom, ram, circuitKey, romCk, ramCk);
     }
 
     KVSPReqPacket()
@@ -222,7 +222,28 @@ struct KVSPReqPacket {
         auto packet = make(key, plain);
         packet.circuitKey = std::make_shared<TFHEpp::CircuitKey>(key);
         packet.romCk = encryptTRLWElvl1(key, plain.rom);
+        packet.ramCk = encryptRAMCk(key, plain.ram);
         return packet;
+    }
+
+private:
+    static std::vector<TFHEpp::TRLWElvl1> encryptRAMCk(
+        const TFHEpp::SecretKey& key, const std::vector<uint8_t>& src)
+    {
+        const TFHEpp::lweParams& params = key.params;
+        std::vector<TFHEpp::TRLWElvl1> ret;
+
+        for (size_t i = 0; i < src.size(); i++) {
+            for (size_t bit = 0; bit < 8; bit++) {
+                TFHEpp::Polynomiallvl1 pmu = {};
+                uint8_t val = (src[i] >> bit) & 1u;
+                pmu[0] = val ? params.μ : -params.μ;
+                ret.push_back(
+                    TFHEpp::trlweSymEncryptlvl1(pmu, params.α, key.key.lvl1));
+            }
+        }
+
+        return ret;
     }
 };
 
@@ -230,12 +251,13 @@ struct KVSPResPacket {
     std::vector<TFHEpp::TLWElvl0> flags;
     std::vector<std::vector<TFHEpp::TLWElvl0>> regs;
     std::vector<TFHEpp::TLWElvl0> ram;
+    std::vector<TFHEpp::TRLWElvl1> ramCk;
     int numCycles = -1;
 
     template <class Archive>
     void serialize(Archive& ar)
     {
-        ar(flags, regs, ram, numCycles);
+        ar(flags, regs, ram, numCycles, ramCk);
     }
 };
 
@@ -248,6 +270,22 @@ inline std::vector<uint8_t> decrypt(const TFHEpp::SecretKey& key,
         for (uint32_t i = 0; i < 8; i++, ++it) {
             assert(it != src.end());
             uint8_t val = TFHEpp::bootsSymDecrypt(std::vector{*it}, key).at(0);
+            byte |= (val & 1u) << i;
+        }
+        ret.push_back(byte);
+    }
+    return ret;
+}
+
+inline std::vector<uint8_t> decrypt(const TFHEpp::SecretKey& key,
+                                    const std::vector<TFHEpp::TRLWElvl1>& src)
+{
+    std::vector<uint8_t> ret;
+    for (auto it = src.begin(); it != src.end();) {
+        uint8_t byte = 0;
+        for (uint32_t i = 0; i < 8; i++, ++it) {
+            assert(it != src.end());
+            uint8_t val = TFHEpp::trlweSymDecryptlvl1(*it, key.key.lvl1).at(0);
             byte |= (val & 1u) << i;
         }
         ret.push_back(byte);
@@ -270,7 +308,8 @@ inline KVSPPlainResPacket decrypt(const TFHEpp::SecretKey& key,
         regs.push_back(bytes[0] | (bytes[1] << 8u));
     }
 
-    std::vector<uint8_t> ram = decrypt(key, src.ram);
+    std::vector<uint8_t> ram =
+        src.ramCk.empty() ? decrypt(key, src.ram) : decrypt(key, src.ramCk);
 
     return KVSPPlainResPacket{flags, regs, ram, src.numCycles};
 }
