@@ -1028,6 +1028,7 @@ struct Options {
     // Misc.
     std::string inputFile, outputFile;
     int numWorkers = std::thread::hardware_concurrency(), numCycles = 0;
+    bool ramEnabled = false;
 };
 
 template <class Func>

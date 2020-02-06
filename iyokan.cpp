@@ -23,6 +23,7 @@ int main(int argc, char **argv)
         ->check(CLI::ExistingFile);
     app.add_option("-t", opt.numWorkers, "")->check(CLI::PositiveNumber);
     app.add_option("--enable-rom", opt.romPorts, "")->delimiter(':');
+    app.add_flag("--enable-ram", opt.ramEnabled, "");
     app.add_option("-i", opt.inputFile, "")
         ->required()
         ->check(CLI::ExistingFile);
