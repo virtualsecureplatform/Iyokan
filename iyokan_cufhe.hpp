@@ -6,14 +6,35 @@
 
 #include "iyokan.hpp"
 
+class CUFHEStream {
+private:
+    cufhe::Stream st_;
+
+public:
+    CUFHEStream()
+    {
+        st_.Create();
+    }
+
+    ~CUFHEStream()
+    {
+        st_.Destroy();
+    }
+
+    operator cufhe::Stream() const
+    {
+        return st_;
+    }
+};
+
 struct CUFHEWorkerInfo {
-    std::shared_ptr<cufhe::Stream> stream;
+    std::shared_ptr<CUFHEStream> stream;
 };
 
 using TaskCUFHEGate = Task<cufhe::Ctxt, cufhe::Ctxt, CUFHEWorkerInfo>;
 
 inline void copyCtxt(cufhe::Ctxt& dst, const cufhe::Ctxt& src,
-                     std::shared_ptr<cufhe::Stream> stream = nullptr)
+                     std::shared_ptr<CUFHEStream> stream = nullptr)
 {
     if (stream)
         cufhe::Copy(dst, src, *stream);
@@ -178,8 +199,7 @@ public:
                 std::shared_ptr<ProgressGraphMaker> graph)
         : Worker(readyQueue, numFinishedTargets, graph)
     {
-        wi_.stream = std::make_shared<cufhe::Stream>();
-        wi_.stream->Create();
+        wi_.stream = std::make_shared<CUFHEStream>();
     }
 };
 
