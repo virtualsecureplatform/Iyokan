@@ -1027,7 +1027,7 @@ struct Options {
     std::vector<std::string> romPorts;
     // Misc.
     std::string inputFile, outputFile;
-    int numWorkers = std::thread::hardware_concurrency(), numCycles = 0;
+    int numWorkers = -1, numCycles = 0;
     bool ramEnabled = false;
 };
 

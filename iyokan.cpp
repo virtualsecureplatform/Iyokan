@@ -42,7 +42,6 @@ int main(int argc, char **argv)
         tfhe->add_option("-o", opt.outputFile, "")->required();
 #ifdef IYOKAN_CUDA_ENABLED
         tfhe->add_flag("--enable-gpu", enableGPU, "");
-        opt.numWorkers = 240;
 #endif
         tfhe->parse_complete_callback([&] { type = TYPE::TFHE; });
     }
@@ -50,6 +49,13 @@ int main(int argc, char **argv)
     CLI11_PARSE(app, argc, argv);
 
     assert(opt.romPorts.empty() || opt.romPorts.size() == 4);
+
+    if (opt.numWorkers < 0) {
+        if (enableGPU)
+            opt.numWorkers = 240;
+        else
+            opt.numWorkers = std::thread::hardware_concurrency();
+    }
 
     AsyncThread::setNumThreads(opt.numWorkers);
 
