@@ -8,22 +8,22 @@
 
 class CUFHEStream {
 private:
-    cufhe::Stream st_;
+    std::unique_ptr<cufhe::Stream> st_;
 
 public:
-    CUFHEStream()
+    CUFHEStream() : st_(std::make_unique<cufhe::Stream>())
     {
-        st_.Create();
+        st_->Create();
     }
 
     ~CUFHEStream()
     {
-        st_.Destroy();
+        st_->Destroy();
     }
 
     operator cufhe::Stream() const
     {
-        return st_;
+        return *st_;
     }
 };
 
