@@ -50,7 +50,8 @@ raise "ruby test.rb PATH [slow]" unless ARGV.size >= 1
 $path = ARGV.shift
 $path ||= ""
 
-$SLOW_MODE_ENABLED = ARGV[0].nil? ? false : ARGV[0] == "slow"
+$SLOW_MODE_ENABLED = ARGV.include?("slow")
+$CUDA_MODE_ENABLED = ARGV.include?("cuda")
 
 ##### test0 #####
 
@@ -132,6 +133,21 @@ if $SLOW_MODE_ENABLED
     r = check_code "./kvsp-packet", ["dec", "_test_sk", "_test_res_packet00"]
     assert_regex r, /f0\t1/
     assert_regex r, /x0\t42/
+  end
+
+  if $CUDA_MODE_ENABLED
+    test_iyokan [
+      "tfhe",
+      "-l", "test/diamond-core.json",
+      "-i", "_test_req_packet00",
+      "-o", "_test_res_packet00",
+      "-c", "8",
+      "--enable-gpu",
+    ] do |_|
+      r = check_code "./kvsp-packet", ["dec", "_test_sk", "_test_res_packet00"]
+      assert_regex r, /f0\t1/
+      assert_regex r, /x0\t42/
+    end
   end
 end
 
