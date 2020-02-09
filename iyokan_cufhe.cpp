@@ -175,6 +175,7 @@ void doCUFHE(const Options& opt)
     const auto reqPacket = readFromArchive<KVSPReqPacket>(opt.inputFile);
 
     // Prepare cuFHE
+    cufhe::SetGPUNum(1);
     cufhe::SetSeed();
     cufhe::Initialize(*tfhepp2cufhe(*reqPacket.gateKey));
 

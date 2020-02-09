@@ -7,6 +7,6 @@ IndentCaseLabels: false
 AccessModifierOffset: -4
 AllowShortCaseLabelsOnASingleLine: false
 AllowShortFunctionsOnASingleLine: None
-AllowShortIfStatementsOnASingleLine: Never
+AllowShortIfStatementsOnASingleLine: false
 AllowShortLoopsOnASingleLine: false
 IncludeBlocks: Preserve
