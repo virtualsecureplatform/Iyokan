@@ -12,7 +12,8 @@ auto get(CUFHENetwork& net, const std::string& kind,
 void processAllGates(CUFHENetwork& net, int numWorkers,
                      std::shared_ptr<ProgressGraphMaker> graph)
 {
-    auto readyQueue = net.getReadyQueue();
+    ReadyQueue<CUFHEWorkerInfo> readyQueue;
+    net.pushReadyTasks(readyQueue);
 
     // Create workers.
     size_t numFinishedTargets = 0;
@@ -32,30 +33,6 @@ void processAllGates(CUFHENetwork& net, int numWorkers,
     }
 
     assert(readyQueue.empty());
-}
-
-TFHEpp::TLWElvl0 cufhe2tfhepp(const cufhe::Ctxt& src)
-{
-    // FIXME: Check if TFHEpp's parameters are the same as cuFHE's.
-    const int32_t n = cufhe::GetDefaultParam()->lwe_n_;
-
-    TFHEpp::TLWElvl0 tlwe;
-    for (int i = 0; i < n + 1; i++)
-        tlwe[i] = src.lwe_sample_->data()[i];
-
-    return tlwe;
-}
-
-std::shared_ptr<cufhe::Ctxt> tfhepp2cufhe(const TFHEpp::TLWElvl0& src)
-{
-    // FIXME: Check if TFHEpp's parameters are the same as cuFHE's.
-    const int32_t n = cufhe::GetDefaultParam()->lwe_n_;
-
-    auto ctxt = std::make_shared<cufhe::Ctxt>();
-    for (int i = 0; i < n + 1; i++)
-        ctxt->lwe_sample_->data()[i] = src[i];
-
-    return ctxt;
 }
 
 std::shared_ptr<cufhe::PubKey> tfhepp2cufhe(const TFHEpp::GateKey& src)

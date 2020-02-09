@@ -119,8 +119,8 @@ private:
     }
 
 public:
-    TFHEppWorker(TFHEppWorkerInfo wi, ReadyQueue<TFHEppWorkerInfo> &readyQueue,
-                 size_t &numFinishedTargets,
+    TFHEppWorker(ReadyQueue<TFHEppWorkerInfo> &readyQueue,
+                 size_t &numFinishedTargets, TFHEppWorkerInfo wi,
                  std::shared_ptr<ProgressGraphMaker> graph)
         : Worker(readyQueue, numFinishedTargets, graph), wi_(std::move(wi))
     {

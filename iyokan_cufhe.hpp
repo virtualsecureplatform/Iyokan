@@ -5,6 +5,7 @@
 #include <cufhe_gpu.cuh>
 
 #include "iyokan.hpp"
+#include "iyokan_tfhepp.hpp"
 
 class CUFHEStream {
 private:
@@ -200,6 +201,178 @@ public:
         : Worker(readyQueue, numFinishedTargets, graph)
     {
         wi_.stream = std::make_shared<CUFHEStream>();
+    }
+};
+
+inline TFHEpp::TLWElvl0 cufhe2tfhepp(const cufhe::Ctxt& src)
+{
+    // FIXME: Check if TFHEpp's parameters are the same as cuFHE's.
+    const int32_t n = cufhe::GetDefaultParam()->lwe_n_;
+
+    TFHEpp::TLWElvl0 tlwe;
+    for (int i = 0; i < n + 1; i++)
+        tlwe[i] = src.lwe_sample_->data()[i];
+
+    return tlwe;
+}
+
+inline std::shared_ptr<cufhe::Ctxt> tfhepp2cufhe(const TFHEpp::TLWElvl0& src)
+{
+    // FIXME: Check if TFHEpp's parameters are the same as cuFHE's.
+    const int32_t n = cufhe::GetDefaultParam()->lwe_n_;
+
+    auto ctxt = std::make_shared<cufhe::Ctxt>();
+    for (int i = 0; i < n + 1; i++)
+        ctxt->lwe_sample_->data()[i] = src[i];
+
+    return ctxt;
+}
+
+class TaskCUFHE2TFHEpp
+    : public TaskAsync<cufhe::Ctxt, TFHEpp::TLWElvl0, TFHEppWorkerInfo> {
+private:
+    void startSync(TFHEppWorkerInfo) override
+    {
+        output() = cufhe2tfhepp(input(0));
+    }
+
+public:
+    TaskCUFHE2TFHEpp()
+        : TaskAsync<cufhe::Ctxt, TFHEpp::TLWElvl0, TFHEppWorkerInfo>(1)
+    {
+    }
+};
+
+class TaskTFHEpp2CUFHE
+    : public TaskAsync<TFHEpp::TLWElvl0, cufhe::Ctxt, TFHEppWorkerInfo> {
+private:
+    void startSync(TFHEppWorkerInfo) override
+    {
+        copyCtxt(output(), *tfhepp2cufhe(input(0)));
+    }
+
+public:
+    TaskTFHEpp2CUFHE()
+        : TaskAsync<TFHEpp::TLWElvl0, cufhe::Ctxt, TFHEppWorkerInfo>(1)
+    {
+    }
+};
+
+class CUFHENetworkRunner {
+private:
+    template <class WorkerInfo, class WorkerType>
+    struct Runner {
+        std::shared_ptr<ReadyQueue<WorkerInfo>> readyQueue;
+        size_t numFinishedTargets;
+        std::vector<WorkerType> workers;
+        std::vector<std::shared_ptr<TaskNetwork<WorkerInfo>>> nets;
+
+        Runner()
+            : readyQueue(std::make_shared<ReadyQueue<WorkerInfo>>()),
+              numFinishedTargets(0)
+        {
+        }
+
+        template <class... Args>
+        void addWorker(Args... args)
+        {
+            workers.emplace_back(*readyQueue, numFinishedTargets,
+                                 std::forward<Args>(args)...);
+        }
+
+        void prepareToRun()
+        {
+            assert(readyQueue->empty());
+            assert(nets.empty() || workers.size() > 0);
+
+            numFinishedTargets = 0;
+            for (auto&& net : nets)
+                net->pushReadyTasks(*readyQueue);
+        }
+
+        size_t numNodes() const
+        {
+            size_t ret = 0;
+            for (auto&& net : nets)
+                ret += net->numNodes();
+            return ret;
+        }
+
+        bool isRunning() const
+        {
+            return std::any_of(workers.begin(), workers.end(),
+                               [](auto&& w) { return w.isWorking(); }) ||
+                   !readyQueue->empty();
+        }
+
+        void update()
+        {
+            for (auto&& w : workers)
+                w.update();
+        }
+
+        void tick()
+        {
+            for (auto&& net : nets)
+                net->tick();
+        }
+    };
+
+    Runner<CUFHEWorkerInfo, CUFHEWorker> cufhe_;
+    Runner<TFHEppWorkerInfo, TFHEppWorker> tfhepp_;
+    size_t numBridges_;
+
+public:
+    CUFHENetworkRunner(int numCUFHEWorkers, int numTFHEppWorkers,
+                       TFHEppWorkerInfo wi)
+        : numBridges_(0)
+    {
+        for (int i = 0; i < numCUFHEWorkers; i++)
+            cufhe_.addWorker(nullptr);
+        for (int i = 0; i < numTFHEppWorkers; i++)
+            tfhepp_.addWorker(wi, nullptr);
+    }
+
+    void addNetwork(std::shared_ptr<CUFHENetwork> net)
+    {
+        cufhe_.nets.push_back(net);
+    }
+
+    void addNetwork(std::shared_ptr<TFHEppNetwork> net)
+    {
+        tfhepp_.nets.push_back(net);
+    }
+
+    void addBridge(
+        std::shared_ptr<BridgeDepNode<CUFHEWorkerInfo, TFHEppWorkerInfo>>
+            bridge)
+    {
+        bridge->setReadyQueue(tfhepp_.readyQueue);
+        numBridges_++;
+    }
+
+    void addBridge(
+        std::shared_ptr<BridgeDepNode<TFHEppWorkerInfo, CUFHEWorkerInfo>>
+            bridge)
+    {
+        bridge->setReadyQueue(cufhe_.readyQueue);
+        numBridges_++;
+    }
+
+    void run()
+    {
+        cufhe_.prepareToRun();
+        tfhepp_.prepareToRun();
+
+        size_t numNodes = cufhe_.numNodes() + tfhepp_.numNodes() + numBridges_;
+
+        while (cufhe_.numFinishedTargets + tfhepp_.numFinishedTargets <
+               numNodes) {
+            assert((cufhe_.isRunning() || tfhepp_.isRunning()) &&
+                   "Detected infinite loop");
+            cufhe_.update();
+            tfhepp_.update();
+        }
     }
 };
 

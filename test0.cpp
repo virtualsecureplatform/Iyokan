@@ -1204,6 +1204,45 @@ void testDoCUFHE()
     assert(plainResPacket.flags.at(0) == 1);
     assert(plainResPacket.regs.at(0) == 42);
 }
+
+void testBridgeBetweenCUFHEAndTFHEpp()
+{
+    auto& ht = TFHEppTestHelper::instance();
+
+    NetworkBuilderBase<CUFHEWorkerInfo> b0;
+    NetworkBuilderBase<TFHEppWorkerInfo> b1;
+    auto t0 = b0.addINPUT<TaskCUFHEGateWIRE>(b0.genid(), 0, "in", 0, false);
+    auto t1 = std::make_shared<TaskCUFHE2TFHEpp>();
+    b1.addTask(NodeLabel{b1.genid(), "cufhe2tfhepp", ""}, 0, t1);
+    auto t2 = std::make_shared<TaskTFHEpp2CUFHE>();
+    b1.addTask(NodeLabel{b1.genid(), "tfhepp2cufhe", ""}, 0, t2);
+    auto t3 = b0.addOUTPUT<TaskCUFHEGateWIRE>(b0.genid(), 0, "out", 0, true);
+    b0.connectTasks(t1, t2);
+
+    auto net0 = std::make_shared<TaskNetwork<CUFHEWorkerInfo>>(std::move(b0));
+    auto net1 = std::make_shared<TaskNetwork<TFHEppWorkerInfo>>(std::move(b1));
+    auto bridge0 = connectWithBridge(t0, t1);
+    auto bridge1 = connectWithBridge(t2, t3);
+
+    CUFHENetworkRunner runner{1, 1, ht.wi()};
+    runner.addNetwork(net0);
+    runner.addNetwork(net1);
+    runner.addBridge(bridge0);
+    runner.addBridge(bridge1);
+
+    t0->set(*tfhepp2cufhe(ht.one()));
+    runner.run();
+    assert(cufhe2tfhepp(t3->get()) == ht.one());
+
+    net0->tick();
+    net1->tick();
+    bridge0->tick();
+    bridge1->tick();
+
+    t0->set(*tfhepp2cufhe(ht.zero()));
+    runner.run();
+    assert(cufhe2tfhepp(t3->get()) == ht.zero());
+}
 #endif
 
 int main(int argc, char** argv)
@@ -1259,6 +1298,7 @@ int main(int argc, char** argv)
         testFromJSONtest_register_4bit<CUFHENetworkBuilder>();
         testSequentialCircuit<CUFHENetworkBuilder>();
         testFromJSONtest_counter_4bit<CUFHENetworkBuilder>();
+        testBridgeBetweenCUFHEAndTFHEpp();
     }
 #endif
 

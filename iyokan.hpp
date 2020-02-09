@@ -40,6 +40,8 @@ class ReadyQueue;
 template <class WorkerInfo>
 class TaskNetwork;
 class ProgressGraphMaker;
+template <class InWorkerInfo, class OutWorkerInfo>
+class BridgeDepNode;
 
 namespace detail {
 template <class... Args>
@@ -55,11 +57,20 @@ template <class WorkerInfo>
 class TaskBase {
     friend void NetworkBuilderBase<WorkerInfo>::addTask(
         NodeLabel, int, std::shared_ptr<TaskBase<WorkerInfo>>);
+    template <class InWorkerInfo, class OutWorkerInfo>
+    friend class BridgeDepNode;
+
+public:
+    using ParamWorkerInfo = WorkerInfo;
 
 private:
     std::weak_ptr<DepNode<WorkerInfo>> depnode_;
 
 public:
+    virtual ~TaskBase()
+    {
+    }
+
     std::shared_ptr<DepNode<WorkerInfo>> depnode() const
     {
         return depnode_.lock();
@@ -173,7 +184,7 @@ struct NodeLabel {
 };
 
 template <class WorkerInfo>
-class DepNode : public std::enable_shared_from_this<DepNode<WorkerInfo>> {
+class DepNode {
     friend TaskNetwork<WorkerInfo>;
     friend void ReadyQueue<WorkerInfo>::push(
         const std::shared_ptr<DepNode<WorkerInfo>> &);
@@ -195,6 +206,10 @@ public:
           priority_(priority),
           task_(std::move(task)),
           label_(std::move(label))
+    {
+    }
+
+    virtual ~DepNode()
     {
     }
 
@@ -230,7 +245,7 @@ public:
         return task_->hasFinished();
     }
 
-    void propagate(ReadyQueue<WorkerInfo> &readyQueue);
+    virtual void propagate(ReadyQueue<WorkerInfo> &readyQueue);
     void propagate(ReadyQueue<WorkerInfo> &readyQueue,
                    ProgressGraphMaker &graph);
 
@@ -457,13 +472,11 @@ public:
         return id2node_.size();
     }
 
-    ReadyQueue<WorkerInfo> getReadyQueue() const
+    void pushReadyTasks(ReadyQueue<WorkerInfo> &queue) const
     {
-        ReadyQueue<WorkerInfo> queue;
         for (auto &&[id, node] : id2node_)
             if (node->task()->areInputsReady())
                 queue.push(node);
-        return queue;
     }
 
     std::shared_ptr<DepNode<WorkerInfo>> &node(int id)
@@ -1019,6 +1032,121 @@ public:
         return thr_.hasFinished();
     }
 };
+
+template <class WorkerInfo>
+class TaskBlackHole : public TaskBase<WorkerInfo> {
+private:
+    int numInputs_, numReadyInputs_;
+
+public:
+    TaskBlackHole(int numInputs) : numInputs_(numInputs), numReadyInputs_(0)
+    {
+    }
+
+    size_t getInputSize() const override
+    {
+        return numInputs_;
+    }
+
+    bool isValid() override
+    {
+        return true;
+    }
+
+    void notifyOneInputReady() override
+    {
+        numReadyInputs_++;
+        assert(numReadyInputs_ <= numInputs_);
+    }
+
+    bool areInputsReady() const override
+    {
+        return numReadyInputs_ == numInputs_;
+    }
+
+    void startAsync(WorkerInfo) override
+    {
+        // Nothing to do!
+    }
+
+    bool hasFinished() const override
+    {
+        return true;
+    }
+
+    void tick() override
+    {
+        numReadyInputs_ = 0;
+    }
+};
+
+/*
+                                    BridgeDepNode::propagate(ReadyQueue&):
+                                             notify and push
+                                         ++====================++
+                                         ||                    ||
+                    dependents_    (BridgeDepNode)             vv
+    DepNode<WI0> ------------------> DepNode<WI0>         DepNode<WI1>
+       |                                |                     |
+       | task_                          | task_               | task_
+       v                                v                     v
+    Task<T0, T1, WI0>               TaskBlackHole      Task<T1, T2, WI1>
+           ^                        <T1, T1, WI0>              |
+           |                                                   |
+           +---------------------------------------------------+
+                                  inputs_
+*/
+
+template <class InWorkerInfo, class OutWorkerInfo>
+class BridgeDepNode : public DepNode<InWorkerInfo>,
+                      public std::enable_shared_from_this<
+                          BridgeDepNode<InWorkerInfo, OutWorkerInfo>> {
+private:
+    std::shared_ptr<DepNode<OutWorkerInfo>> src_;
+    std::weak_ptr<ReadyQueue<OutWorkerInfo>> outReadyQueue_;
+
+public:
+    BridgeDepNode(std::shared_ptr<DepNode<OutWorkerInfo>> src)
+        : DepNode<InWorkerInfo>(
+              0, std::make_shared<TaskBlackHole<InWorkerInfo>>(1),
+              NodeLabel{NetworkBuilderBase<InWorkerInfo>::genid(), "bridge",
+                        ""}),
+          src_(src)
+    {
+        this->task()->depnode_ = this->weak_from_this();
+    }
+
+    void setReadyQueue(std::shared_ptr<ReadyQueue<OutWorkerInfo>> readyQueue)
+    {
+        outReadyQueue_ = readyQueue;
+    }
+
+    void propagate(ReadyQueue<InWorkerInfo> &) override
+    {
+        assert(src_);
+        assert(!outReadyQueue_.expired());
+
+        src_->task()->notifyOneInputReady();
+        if (!src_->hasQueued() && src_->task()->areInputsReady()) {
+            auto que = outReadyQueue_.lock();
+            assert(que);
+            que->push(src_);
+        }
+    }
+};
+
+template <class T0, class T1>
+std::shared_ptr<
+    BridgeDepNode<typename T0::ParamWorkerInfo, typename T1::ParamWorkerInfo>>
+connectWithBridge(std::shared_ptr<T0> lhs, std::shared_ptr<T1> rhs)
+{
+    rhs->addInputPtr(lhs->getOutputPtr());
+    auto newrhs = std::make_shared<BridgeDepNode<typename T0::ParamWorkerInfo,
+                                                 typename T1::ParamWorkerInfo>>(
+        rhs->depnode());
+    lhs->depnode()->addDependent(newrhs);
+    return newrhs;
+}
 
 struct Options {
     // Processor's logic file.

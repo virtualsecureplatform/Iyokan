@@ -12,7 +12,8 @@ auto get(PlainNetwork &net, const std::string &kind,
 void processAllGates(PlainNetwork &net, int numWorkers,
                      std::shared_ptr<ProgressGraphMaker> graph)
 {
-    auto readyQueue = net.getReadyQueue();
+    ReadyQueue<uint8_t> readyQueue;
+    net.pushReadyTasks(readyQueue);
 
     // Create workers.
     size_t numFinishedTargets = 0;

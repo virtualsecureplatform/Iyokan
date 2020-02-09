@@ -12,13 +12,14 @@ auto get(TFHEppNetwork &net, const std::string &kind,
 void processAllGates(TFHEppNetwork &net, int numWorkers, TFHEppWorkerInfo wi,
                      std::shared_ptr<ProgressGraphMaker> graph)
 {
-    auto readyQueue = net.getReadyQueue();
+    ReadyQueue<TFHEppWorkerInfo> readyQueue;
+    net.pushReadyTasks(readyQueue);
 
     // Create workers.
     size_t numFinishedTargets = 0;
     std::vector<TFHEppWorker> workers;
     for (int i = 0; i < numWorkers; i++)
-        workers.emplace_back(wi, readyQueue, numFinishedTargets, graph);
+        workers.emplace_back(readyQueue, numFinishedTargets, wi, graph);
 
     // Process all targets.
     while (numFinishedTargets < net.numNodes()) {
