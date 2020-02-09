@@ -40,8 +40,6 @@ class ReadyQueue;
 template <class WorkerInfo>
 class TaskNetwork;
 class ProgressGraphMaker;
-template <class InWorkerInfo, class OutWorkerInfo>
-class BridgeDepNode;
 
 namespace detail {
 template <class... Args>
@@ -55,10 +53,7 @@ std::string fok(Args... args)
 
 template <class WorkerInfo>
 class TaskBase {
-    friend void NetworkBuilderBase<WorkerInfo>::addTask(
-        NodeLabel, int, std::shared_ptr<TaskBase<WorkerInfo>>);
-    template <class InWorkerInfo, class OutWorkerInfo>
-    friend class BridgeDepNode;
+    friend void DepNode<WorkerInfo>::prepareTaskBase();
 
 public:
     using ParamWorkerInfo = WorkerInfo;
@@ -211,6 +206,13 @@ public:
 
     virtual ~DepNode()
     {
+    }
+
+    void prepareTaskBase()
+    {
+        assert(task_);
+        // weak_from_this() must not be called in the constructor.
+        task_->depnode_ = this->weak_from_this();
     }
 
     bool hasQueued() const
@@ -611,7 +613,7 @@ public:
     {
         auto depnode =
             std::make_shared<DepNode<WorkerInfo>>(priority, task, label);
-        task->depnode_ = depnode;
+        depnode->prepareTaskBase();
         auto [it, inserted] = id2node_.emplace(label.id, depnode);
         assert(inserted);
     }
@@ -1118,7 +1120,6 @@ public:
                         ""}),
           src_(src)
     {
-        this->task()->depnode_ = this->weak_from_this();
     }
 
     void setReadyQueue(std::shared_ptr<ReadyQueue<OutWorkerInfo>> readyQueue)
@@ -1149,6 +1150,7 @@ connectWithBridge(std::shared_ptr<T0> lhs, std::shared_ptr<T1> rhs)
     auto newrhs = std::make_shared<BridgeDepNode<typename T0::ParamWorkerInfo,
                                                  typename T1::ParamWorkerInfo>>(
         rhs->depnode());
+    newrhs->prepareTaskBase();
     lhs->depnode()->addDependent(newrhs);
     return newrhs;
 }
