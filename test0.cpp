@@ -1238,6 +1238,29 @@ void testDoCUFHEWithROM()
     assert(plainResPacket.regs.at(0) == 42);
 }
 
+void testDoCUFHEWithRAMROM()
+{
+    auto& h = TFHEppTestHelper::instance();
+
+    Options opt;
+    opt.logicFile = "test/diamond-core-wo-ram-rom.json";
+    // opt.inputFile = h.getELFAsPacketFileWithCk("test/test00.elf");
+    opt.inputFile = "_test_req_packet00";
+    opt.outputFile = "_test_res_packet00";
+    opt.numWorkers = 240;
+    opt.numCycles = 8;
+    opt.romPorts = {"io_romAddr", "7", "io_romData", "32"};
+    opt.ramEnabled = true;
+
+    doCUFHE(opt);
+
+    writeToArchive("_test_sk", *h.sk());
+    auto resPacket = readFromArchive<KVSPResPacket>("_test_res_packet00");
+    auto plainResPacket = decrypt(*h.sk(), resPacket);
+    assert(plainResPacket.flags.at(0) == 1);
+    assert(plainResPacket.regs.at(0) == 42);
+}
+
 void testBridgeBetweenCUFHEAndTFHEpp()
 {
     auto& ht = TFHEppTestHelper::instance();
@@ -1358,6 +1381,7 @@ int main(int argc, char** argv)
         }
         testDoCUFHE();
         testDoCUFHEWithROM();
+        testDoCUFHEWithRAMROM();
 #endif
     }
 }

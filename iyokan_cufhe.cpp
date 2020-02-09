@@ -98,12 +98,15 @@ std::shared_ptr<cufhe::PubKey> tfhepp2cufhe(const TFHEpp::GateKey& src)
 
 auto connectCUFHENetWithTFHEppNet(
     CUFHENetwork& cufhe, TFHEppNetwork& tfhepp,
+    std::vector<
+        std::shared_ptr<BridgeDepNode<CUFHEWorkerInfo, TFHEppWorkerInfo>>>&
+        brCUFHE2TFHEpp,
+    std::vector<
+        std::shared_ptr<BridgeDepNode<TFHEppWorkerInfo, CUFHEWorkerInfo>>>&
+        brTFHEpp2CUFHE,
     const std::vector<std::tuple<std::string, int, std::string, int>>& lhs2rhs,
     const std::vector<std::tuple<std::string, int, std::string, int>>& rhs2lhs)
 {
-    std::vector<
-        std::shared_ptr<BridgeDepNode<CUFHEWorkerInfo, TFHEppWorkerInfo>>>
-        brCUFHE2TFHEpp;
     for (auto&& [lPortName, lPortBit, rPortName, rPortBit] : lhs2rhs) {
         /*
            CUFHE OUTPUT --> Bridge --> CUFHE2TFHEpp --> TFHEpp INPUT
@@ -128,9 +131,6 @@ auto connectCUFHENetWithTFHEppNet(
         NetworkBuilderBase<TFHEppWorkerInfo>::connectTasks(cufhe2tfhepp, out);
     }
 
-    std::vector<
-        std::shared_ptr<BridgeDepNode<TFHEppWorkerInfo, CUFHEWorkerInfo>>>
-        brTFHEpp2CUFHE;
     for (auto&& [rPortName, rPortBit, lPortName, lPortBit] : rhs2lhs) {
         /*
            TFHEpp OUTPUT --> TFHEpp2CUFHE --> Bridge --> CUFHE INPUT
@@ -160,7 +160,7 @@ auto connectCUFHENetWithTFHEppNet(
 
 struct CUFHENetworkManager {
     std::shared_ptr<CUFHENetwork> core;
-    std::shared_ptr<TFHEppNetwork> rom, ram;
+    std::shared_ptr<TFHEppNetwork> rom, ramA, ramB;
     std::vector<
         std::shared_ptr<BridgeDepNode<CUFHEWorkerInfo, TFHEppWorkerInfo>>>
         bridge0;
@@ -190,11 +190,92 @@ void doCUFHE(const Options& opt)
         assert(net.core->isValid());
     }
 
-    // Set RAM
-    for (int addr = 0; addr < 512; addr++)
-        for (int bit = 0; bit < 8; bit++)
-            get(*net.core, "ram", std::to_string(addr), bit)
-                ->set(*tfhepp2cufhe(reqPacket.ram.at(addr * 8 + bit)));
+    if (opt.ramEnabled) {
+        assert(reqPacket.circuitKey);
+
+        // Create RAM
+        net.ramA = std::make_shared<TFHEppNetwork>(makeTFHEppRAMNetwork("A"));
+        net.ramB = std::make_shared<TFHEppNetwork>(makeTFHEppRAMNetwork("B"));
+
+        // Set initial RAM data
+        for (int addr = 0; addr < 512; addr++)
+            for (int bit = 0; bit < 8; bit++)
+                (addr % 2 == 1 ? net.ramA : net.ramB)
+                    ->get<TaskTFHEppRAMUX>("ram", addr % 2 == 1 ? "A" : "B",
+                                           bit)
+                    ->set(addr / 2, reqPacket.ramCk.at(addr * 8 + bit));
+
+        // Connect RAM
+        connectCUFHENetWithTFHEppNet(*net.core, *net.ramA, net.bridge0,
+                                     net.bridge1,
+                                     {
+                                         {"io_memA_writeEnable", 0, "wren", 0},
+                                         {"io_memA_address", 0, "addr", 0},
+                                         {"io_memA_address", 1, "addr", 1},
+                                         {"io_memA_address", 2, "addr", 2},
+                                         {"io_memA_address", 3, "addr", 3},
+                                         {"io_memA_address", 4, "addr", 4},
+                                         {"io_memA_address", 5, "addr", 5},
+                                         {"io_memA_address", 6, "addr", 6},
+                                         {"io_memA_address", 7, "addr", 7},
+                                         {"io_memA_in", 0, "wdata", 0},
+                                         {"io_memA_in", 1, "wdata", 1},
+                                         {"io_memA_in", 2, "wdata", 2},
+                                         {"io_memA_in", 3, "wdata", 3},
+                                         {"io_memA_in", 4, "wdata", 4},
+                                         {"io_memA_in", 5, "wdata", 5},
+                                         {"io_memA_in", 6, "wdata", 6},
+                                         {"io_memA_in", 7, "wdata", 7},
+                                     },
+                                     {
+                                         {"rdata", 0, "io_memA_out", 0},
+                                         {"rdata", 1, "io_memA_out", 1},
+                                         {"rdata", 2, "io_memA_out", 2},
+                                         {"rdata", 3, "io_memA_out", 3},
+                                         {"rdata", 4, "io_memA_out", 4},
+                                         {"rdata", 5, "io_memA_out", 5},
+                                         {"rdata", 6, "io_memA_out", 6},
+                                         {"rdata", 7, "io_memA_out", 7},
+                                     });
+        connectCUFHENetWithTFHEppNet(*net.core, *net.ramB, net.bridge0,
+                                     net.bridge1,
+                                     {
+                                         {"io_memB_writeEnable", 0, "wren", 0},
+                                         {"io_memB_address", 0, "addr", 0},
+                                         {"io_memB_address", 1, "addr", 1},
+                                         {"io_memB_address", 2, "addr", 2},
+                                         {"io_memB_address", 3, "addr", 3},
+                                         {"io_memB_address", 4, "addr", 4},
+                                         {"io_memB_address", 5, "addr", 5},
+                                         {"io_memB_address", 6, "addr", 6},
+                                         {"io_memB_address", 7, "addr", 7},
+                                         {"io_memB_in", 0, "wdata", 0},
+                                         {"io_memB_in", 1, "wdata", 1},
+                                         {"io_memB_in", 2, "wdata", 2},
+                                         {"io_memB_in", 3, "wdata", 3},
+                                         {"io_memB_in", 4, "wdata", 4},
+                                         {"io_memB_in", 5, "wdata", 5},
+                                         {"io_memB_in", 6, "wdata", 6},
+                                         {"io_memB_in", 7, "wdata", 7},
+                                     },
+                                     {
+                                         {"rdata", 0, "io_memB_out", 0},
+                                         {"rdata", 1, "io_memB_out", 1},
+                                         {"rdata", 2, "io_memB_out", 2},
+                                         {"rdata", 3, "io_memB_out", 3},
+                                         {"rdata", 4, "io_memB_out", 4},
+                                         {"rdata", 5, "io_memB_out", 5},
+                                         {"rdata", 6, "io_memB_out", 6},
+                                         {"rdata", 7, "io_memB_out", 7},
+                                     });
+    }
+    else {
+        // Set RAM
+        for (int addr = 0; addr < 512; addr++)
+            for (int bit = 0; bit < 8; bit++)
+                get(*net.core, "ram", std::to_string(addr), bit)
+                    ->set(*tfhepp2cufhe(reqPacket.ram.at(addr * 8 + bit)));
+    }
 
     if (opt.romPorts.empty()) {
         // Set ROM
@@ -228,8 +309,8 @@ void doCUFHE(const Options& opt)
         for (int i = 0; i < numRHS2LHS; i++)
             rhs2lhs.emplace_back("ROM", i, opt.romPorts[2], i);
 
-        std::tie(net.bridge0, net.bridge1) =
-            connectCUFHENetWithTFHEppNet(*net.core, *net.rom, lhs2rhs, rhs2lhs);
+        connectCUFHENetWithTFHEppNet(*net.core, *net.rom, net.bridge0,
+                                     net.bridge1, lhs2rhs, rhs2lhs);
     }
 
     // Make runner
@@ -240,8 +321,10 @@ void doCUFHE(const Options& opt)
     runner.addNetwork(net.core);
     if (net.rom)
         runner.addNetwork(net.rom);
-    if (net.ram)
-        runner.addNetwork(net.ram);
+    if (net.ramA)
+        runner.addNetwork(net.ramA);
+    if (net.ramB)
+        runner.addNetwork(net.ramB);
     for (auto&& br : net.bridge0)
         runner.addBridge(br);
     for (auto&& br : net.bridge1)
@@ -275,8 +358,10 @@ void doCUFHE(const Options& opt)
         net.core->tick();
         if (net.rom)
             net.rom->tick();
-        if (net.ram)
-            net.ram->tick();
+        if (net.ramA)
+            net.ramA->tick();
+        if (net.ramB)
+            net.ramB->tick();
         for (auto&& br : net.bridge0)
             br->tick();
         for (auto&& br : net.bridge1)
@@ -302,10 +387,23 @@ void doCUFHE(const Options& opt)
                     ->get()));
     }
     // Get values of RAM
-    for (int addr = 0; addr < 512; addr++)
-        for (int bit = 0; bit < 8; bit++)
-            resPacket.ram.push_back(cufhe2tfhepp(
-                get(*net.core, "ram", std::to_string(addr), bit)->get()));
+    if (opt.ramEnabled) {
+        for (int addr = 0; addr < 512; addr++) {
+            for (int bit = 0; bit < 8; bit++) {
+                auto ram = (addr % 2 == 1 ? net.ramA : net.ramB)
+                               ->get<TaskTFHEppRAMUX>(
+                                   "ram", (addr % 2 == 1 ? "A" : "B"), bit);
+                assert(ram);
+                resPacket.ramCk.push_back(ram->get(addr / 2));
+            }
+        }
+    }
+    else {
+        for (int addr = 0; addr < 512; addr++)
+            for (int bit = 0; bit < 8; bit++)
+                resPacket.ram.push_back(cufhe2tfhepp(
+                    get(*net.core, "ram", std::to_string(addr), bit)->get()));
+    }
 
     // Dump result packet
     writeToArchive(opt.outputFile, resPacket);
