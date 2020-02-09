@@ -1104,6 +1104,7 @@ void testDoTFHE()
     opt.logicFile = "test/diamond-core.json";
     opt.inputFile = h.getELFAsPacketFile("test/test00.elf");
     opt.outputFile = "_test_res_packet00";
+    opt.numWorkers = std::thread::hardware_concurrency();
     opt.numCycles = 8;
 
     doTFHE(opt);
