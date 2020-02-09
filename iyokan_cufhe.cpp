@@ -96,6 +96,79 @@ std::shared_ptr<cufhe::PubKey> tfhepp2cufhe(const TFHEpp::GateKey& src)
     return pubkey;
 }
 
+auto connectCUFHENetWithTFHEppNet(
+    CUFHENetwork& cufhe, TFHEppNetwork& tfhepp,
+    const std::vector<std::tuple<std::string, int, std::string, int>>& lhs2rhs,
+    const std::vector<std::tuple<std::string, int, std::string, int>>& rhs2lhs)
+{
+    std::vector<
+        std::shared_ptr<BridgeDepNode<CUFHEWorkerInfo, TFHEppWorkerInfo>>>
+        brCUFHE2TFHEpp;
+    for (auto&& [lPortName, lPortBit, rPortName, rPortBit] : lhs2rhs) {
+        /*
+           CUFHE OUTPUT --> Bridge --> CUFHE2TFHEpp --> TFHEpp INPUT
+        */
+        auto in = cufhe.get<TaskCUFHEGate>("output", lPortName, lPortBit);
+        auto out = tfhepp.get<TaskTFHEppGate>("input", rPortName, rPortBit);
+        assert(in);
+        assert(out);
+
+        // Add the task cufhe2tfhepp to the network tfhepp.
+        NetworkBuilderBase<TFHEppWorkerInfo> b;
+        auto cufhe2tfhepp = std::make_shared<TaskCUFHE2TFHEpp>();
+        b.addTask(NodeLabel{b.genid(), "cufhe2tfhepp", ""}, 0, cufhe2tfhepp);
+        TFHEppNetwork net = std::move(b);
+        tfhepp = tfhepp.merge(net);
+
+        // CUFHE OUTPUT --> Bridge --> CUFHE2TFHEpp
+        brCUFHE2TFHEpp.push_back(connectWithBridge(in, cufhe2tfhepp));
+
+        // CUFHE2TFHEpp --> TFHEpp INPUT
+        out->acceptOneMoreInput();
+        NetworkBuilderBase<TFHEppWorkerInfo>::connectTasks(cufhe2tfhepp, out);
+    }
+
+    std::vector<
+        std::shared_ptr<BridgeDepNode<TFHEppWorkerInfo, CUFHEWorkerInfo>>>
+        brTFHEpp2CUFHE;
+    for (auto&& [rPortName, rPortBit, lPortName, lPortBit] : rhs2lhs) {
+        /*
+           TFHEpp OUTPUT --> TFHEpp2CUFHE --> Bridge --> CUFHE INPUT
+        */
+        auto in = tfhepp.get<TaskTFHEppGate>("output", rPortName, rPortBit);
+        auto out = cufhe.get<TaskCUFHEGate>("input", lPortName, lPortBit);
+        assert(in);
+        assert(out);
+
+        // Add the task tfhepp2cufhe to the network tfhepp.
+        NetworkBuilderBase<TFHEppWorkerInfo> b;
+        auto tfhepp2cufhe = std::make_shared<TaskTFHEpp2CUFHE>();
+        b.addTask(NodeLabel{b.genid(), "tfhepp2cufhe", ""}, 0, tfhepp2cufhe);
+        TFHEppNetwork net = std::move(b);
+        tfhepp = tfhepp.merge(net);
+
+        // TFHEpp OUTPUT --> TFHEpp2CUFHE
+        NetworkBuilderBase<TFHEppWorkerInfo>::connectTasks(in, tfhepp2cufhe);
+
+        // TFHEpp2CUFHE --> Bridge --> CUFHE INPUT
+        out->acceptOneMoreInput();
+        brTFHEpp2CUFHE.push_back(connectWithBridge(tfhepp2cufhe, out));
+    }
+
+    return std::make_pair(brCUFHE2TFHEpp, brTFHEpp2CUFHE);
+}
+
+struct CUFHENetworkManager {
+    std::shared_ptr<CUFHENetwork> core;
+    std::shared_ptr<TFHEppNetwork> rom, ram;
+    std::vector<
+        std::shared_ptr<BridgeDepNode<CUFHEWorkerInfo, TFHEppWorkerInfo>>>
+        bridge0;
+    std::vector<
+        std::shared_ptr<BridgeDepNode<TFHEppWorkerInfo, CUFHEWorkerInfo>>>
+        bridge1;
+};
+
 void doCUFHE(const Options& opt)
 {
     // Read packet
@@ -105,29 +178,73 @@ void doCUFHE(const Options& opt)
     cufhe::SetSeed();
     cufhe::Initialize(*tfhepp2cufhe(*reqPacket.gateKey));
 
-    // Read network
-    CUFHENetworkBuilder::NetworkType net = [&opt, &reqPacket] {
+    // Read network core
+    CUFHENetworkManager net;
+    {
         std::ifstream ifs{opt.logicFile};
         assert(ifs);
-        auto core = readNetworkFromJSON<CUFHENetworkBuilder>(ifs);
-        assert(core.isValid());
+        net.core = std::make_shared<CUFHENetwork>(
+            readNetworkFromJSON<CUFHENetworkBuilder>(ifs));
+        assert(net.core);
+        assert(net.core->isValid());
+    }
 
-        // Set RAM
-        for (int addr = 0; addr < 512; addr++)
-            for (int bit = 0; bit < 8; bit++)
-                get(core, "ram", std::to_string(addr), bit)
-                    ->set(*tfhepp2cufhe(reqPacket.ram.at(addr * 8 + bit)));
+    // Set RAM
+    for (int addr = 0; addr < 512; addr++)
+        for (int bit = 0; bit < 8; bit++)
+            get(*net.core, "ram", std::to_string(addr), bit)
+                ->set(*tfhepp2cufhe(reqPacket.ram.at(addr * 8 + bit)));
 
-        // FIXME: Allow to use ROM with CB
-        assert(opt.romPorts.empty());
-
+    if (opt.romPorts.empty()) {
         // Set ROM
         for (int addr = 0; addr < 128; addr++)
             for (int bit = 0; bit < 32; bit++)
-                get(core, "rom", std::to_string(addr), bit)
+                get(*net.core, "rom", std::to_string(addr), bit)
                     ->set(*tfhepp2cufhe((reqPacket.rom.at(addr * 32 + bit))));
-        return core;
-    }();
+    }
+    else {
+        assert(reqPacket.circuitKey);
+
+        // Create ROM as external module and set data
+        net.rom = std::make_shared<TFHEppNetwork>(makeTFHEppROMNetwork());
+        const int ROM_UNIT = 1024 / 8;
+        assert(reqPacket.romCk.size() == 512 / ROM_UNIT);
+        for (int i = 0; i < 512 / ROM_UNIT; i++) {
+            int offset = ROM_UNIT * i;
+            net.rom->get<TaskTFHEppROMUX>("rom", "all", 0)
+                ->set128le(offset, reqPacket.romCk[i]);
+        }
+
+        // Connect ROM
+        std::vector<std::tuple<std::string, int, std::string, int>> lhs2rhs,
+            rhs2lhs;
+        assert(opt.romPorts.size() == 4);
+        int numLHS2RHS = std::stoi(opt.romPorts[1]),
+            numRHS2LHS = std::stoi(opt.romPorts[3]);
+        assert(0 <= numLHS2RHS && 0 <= numRHS2LHS);
+        for (int i = 0; i < numLHS2RHS; i++)
+            lhs2rhs.emplace_back(opt.romPorts[0], i, "ROM", i);
+        for (int i = 0; i < numRHS2LHS; i++)
+            rhs2lhs.emplace_back("ROM", i, opt.romPorts[2], i);
+
+        std::tie(net.bridge0, net.bridge1) =
+            connectCUFHENetWithTFHEppNet(*net.core, *net.rom, lhs2rhs, rhs2lhs);
+    }
+
+    // Make runner
+    CUFHENetworkRunner runner{
+        opt.numWorkers, static_cast<int>(std::thread::hardware_concurrency()),
+        TFHEppWorkerInfo{TFHEpp::lweParams{}, reqPacket.gateKey,
+                         reqPacket.circuitKey}};
+    runner.addNetwork(net.core);
+    if (net.rom)
+        runner.addNetwork(net.rom);
+    if (net.ram)
+        runner.addNetwork(net.ram);
+    for (auto&& br : net.bridge0)
+        runner.addBridge(br);
+    for (auto&& br : net.bridge1)
+        runner.addBridge(br);
 
     // Get #cycles
     int numCycles = std::numeric_limits<int>::max();
@@ -139,22 +256,34 @@ void doCUFHE(const Options& opt)
         cufhe::Ctxt one;
         cufhe::ConstantOne(one);
         cufhe::Synchronize();
-        get(net, "input", "reset", 0)->set(one);
+        get(*net.core, "input", "reset", 0)->set(one);
     }
     // Reset
-    processAllGates(net, opt.numWorkers);
+    runner.run();
 
     // Turn reset off
     {
         cufhe::Ctxt zero;
         cufhe::ConstantZero(zero);
         cufhe::Synchronize();
-        get(net, "input", "reset", 0)->set(zero);
+        get(*net.core, "input", "reset", 0)->set(zero);
     }
     // Go computing
     processCycles(numCycles, [&] {
-        net.tick();
-        processAllGates(net, opt.numWorkers);
+        // Tick
+        net.core->tick();
+        if (net.rom)
+            net.rom->tick();
+        if (net.ram)
+            net.ram->tick();
+        for (auto&& br : net.bridge0)
+            br->tick();
+        for (auto&& br : net.bridge1)
+            br->tick();
+
+        // Run
+        runner.run();
+
         return false;
     });
 
@@ -162,20 +291,20 @@ void doCUFHE(const Options& opt)
     resPacket.numCycles = numCycles;
     // Get values of flags
     resPacket.flags.push_back(
-        cufhe2tfhepp(get(net, "output", "io_finishFlag", 0)->get()));
+        cufhe2tfhepp(get(*net.core, "output", "io_finishFlag", 0)->get()));
     // Get values of registers
     for (int reg = 0; reg < 16; reg++) {
         resPacket.regs.emplace_back();
         for (int bit = 0; bit < 16; bit++)
             resPacket.regs[reg].push_back(cufhe2tfhepp(
-                get(net, "output", detail::fok("io_regOut_x", reg), bit)
+                get(*net.core, "output", detail::fok("io_regOut_x", reg), bit)
                     ->get()));
     }
     // Get values of RAM
     for (int addr = 0; addr < 512; addr++)
         for (int bit = 0; bit < 8; bit++)
             resPacket.ram.push_back(cufhe2tfhepp(
-                get(net, "ram", std::to_string(addr), bit)->get()));
+                get(*net.core, "ram", std::to_string(addr), bit)->get()));
 
     // Dump result packet
     writeToArchive(opt.outputFile, resPacket);

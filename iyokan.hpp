@@ -184,7 +184,7 @@ struct NodeLabel {
 };
 
 template <class WorkerInfo>
-class DepNode {
+class DepNode : public std::enable_shared_from_this<DepNode<WorkerInfo>> {
     friend TaskNetwork<WorkerInfo>;
     friend void ReadyQueue<WorkerInfo>::push(
         const std::shared_ptr<DepNode<WorkerInfo>> &);
@@ -481,7 +481,7 @@ public:
 
     std::shared_ptr<DepNode<WorkerInfo>> &node(int id)
     {
-        return id2node_[id];
+        return id2node_.at(id);
     }
 
     template <class T>
@@ -511,6 +511,18 @@ public:
         return true;
     }
 
+    TaskNetwork<WorkerInfo> merge(const TaskNetwork<WorkerInfo> &rhs)
+    {
+        TaskNetwork<WorkerInfo> ret{*this};
+
+        for (auto &&item : rhs.id2node_)
+            ret.id2node_.insert(item);
+        for (auto &&item : rhs.namedMems_)
+            ret.namedMems_.insert(item);
+
+        return ret;
+    }
+
     template <class T>
     TaskNetwork<WorkerInfo> merge(
         const TaskNetwork<WorkerInfo> &rhs,
@@ -519,12 +531,7 @@ public:
         const std::vector<std::tuple<std::string, int, std::string, int>>
             &rhs2lhs)
     {
-        TaskNetwork<WorkerInfo> ret{*this};
-
-        for (auto &&item : rhs.id2node_)
-            ret.id2node_.insert(item);
-        for (auto &&item : rhs.namedMems_)
-            ret.namedMems_.insert(item);
+        TaskNetwork<WorkerInfo> ret = merge(rhs);
 
         for (auto &&[lPortName, lPortBit, rPortName, rPortBit] : lhs2rhs) {
             /*
@@ -1098,9 +1105,7 @@ public:
 */
 
 template <class InWorkerInfo, class OutWorkerInfo>
-class BridgeDepNode : public DepNode<InWorkerInfo>,
-                      public std::enable_shared_from_this<
-                          BridgeDepNode<InWorkerInfo, OutWorkerInfo>> {
+class BridgeDepNode : public DepNode<InWorkerInfo> {
 private:
     std::shared_ptr<DepNode<OutWorkerInfo>> src_;
     std::weak_ptr<ReadyQueue<OutWorkerInfo>> outReadyQueue_;

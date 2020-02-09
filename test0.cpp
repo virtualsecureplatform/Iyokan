@@ -964,6 +964,17 @@ public:
         writeToArchive(outFilePath, reqPacket);
         return outFilePath;
     }
+
+    std::string getELFAsPacketFileWithCk(const std::string& elfFilePath) const
+    {
+        // Read packet
+        const auto reqPacket =
+            KVSPReqPacket::makeWithCk(*sk(), parseELF(elfFilePath));
+        // Write packet into temporary file
+        static const std::string outFilePath = "_test_req_packet00";
+        writeToArchive(outFilePath, reqPacket);
+        return outFilePath;
+    }
 };
 
 void processAllGates(TFHEppNetwork& net,
@@ -1205,6 +1216,27 @@ void testDoCUFHE()
     assert(plainResPacket.regs.at(0) == 42);
 }
 
+void testDoCUFHEWithROM()
+{
+    auto& h = TFHEppTestHelper::instance();
+
+    Options opt;
+    opt.logicFile = "test/diamond-core-wo-rom.json";
+    opt.inputFile = h.getELFAsPacketFileWithCk("test/test00.elf");
+    opt.outputFile = "_test_res_packet00";
+    opt.numWorkers = 240;
+    opt.numCycles = 8;
+    opt.romPorts = {"io_romAddr", "7", "io_romData", "32"};
+
+    doCUFHE(opt);
+
+    writeToArchive("_test_sk", *h.sk());
+    auto resPacket = readFromArchive<KVSPResPacket>("_test_res_packet00");
+    auto plainResPacket = decrypt(*h.sk(), resPacket);
+    assert(plainResPacket.flags.at(0) == 1);
+    assert(plainResPacket.regs.at(0) == 42);
+}
+
 void testBridgeBetweenCUFHEAndTFHEpp()
 {
     auto& ht = TFHEppTestHelper::instance();
@@ -1324,6 +1356,7 @@ int main(int argc, char** argv)
             testFromJSONdiamond_core<CUFHENetworkBuilder>();
         }
         testDoCUFHE();
+        testDoCUFHEWithROM();
 #endif
     }
 }
