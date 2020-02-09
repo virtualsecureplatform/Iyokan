@@ -36,11 +36,14 @@ using TaskCUFHEGate = Task<cufhe::Ctxt, cufhe::Ctxt, CUFHEWorkerInfo>;
 inline void copyCtxt(cufhe::Ctxt& dst, const cufhe::Ctxt& src,
                      std::shared_ptr<CUFHEStream> stream = nullptr)
 {
-    if (stream)
+    if (stream){
         cufhe::Copy(dst, src, *stream);
+        cufhe::Synchronize();
+    }
     else
-        cufhe::Copy(dst, src);
-    cufhe::Synchronize();
+    {
+        cufhe::CopyOnHost(dst, src);
+    }
 }
 
 class TaskCUFHEGateMem : public TaskCUFHEGate {
