@@ -358,6 +358,7 @@ void doCUFHE(const Options& opt)
 
     // Add core to runner
     runner.addNetwork(net.core);
+    assert(runner.isValid());
 
     // Get #cycles
     int numCycles = std::numeric_limits<int>::max();

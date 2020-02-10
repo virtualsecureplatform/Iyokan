@@ -278,6 +278,14 @@ private:
         {
         }
 
+        bool isValid()
+        {
+            for (auto&& net : nets)
+                if (!net->isValid())
+                    return false;
+            return true;
+        }
+
         template <class... Args>
         void addWorker(Args&&... args)
         {
@@ -336,6 +344,21 @@ public:
             cufhe_.addWorker(nullptr);
         for (int i = 0; i < numTFHEppWorkers; i++)
             tfhepp_.addWorker(wi, nullptr);
+    }
+
+    bool isValid()
+    {
+        if (!cufhe_.isValid())
+            return false;
+        if (!tfhepp_.isValid())
+            return false;
+        for (auto&& b : bridges0_)
+            if (!b->task()->isValid())
+                return false;
+        for (auto&& b : bridges1_)
+            if (!b->task()->isValid())
+                return false;
+        return true;
     }
 
     void addNetwork(std::shared_ptr<CUFHENetwork> net)
