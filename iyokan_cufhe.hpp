@@ -276,7 +276,7 @@ private:
         }
 
         template <class... Args>
-        void addWorker(Args... args)
+        void addWorker(Args&&... args)
         {
             workers.emplace_back(*readyQueue, numFinishedTargets,
                                  std::forward<Args>(args)...);
