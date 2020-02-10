@@ -1244,8 +1244,7 @@ void testDoCUFHEWithRAMROM()
 
     Options opt;
     opt.logicFile = "test/diamond-core-wo-ram-rom.json";
-    // opt.inputFile = h.getELFAsPacketFileWithCk("test/test00.elf");
-    opt.inputFile = "_test_req_packet00";
+    opt.inputFile = h.getELFAsPacketFileWithCk("test/test00.elf");
     opt.outputFile = "_test_res_packet00";
     opt.numWorkers = 240;
     opt.numCycles = 8;
