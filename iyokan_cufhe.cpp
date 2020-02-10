@@ -96,7 +96,26 @@ std::shared_ptr<cufhe::PubKey> tfhepp2cufhe(const TFHEpp::GateKey& src)
     return pubkey;
 }
 
-auto connectCUFHENetWithTFHEppNet(
+struct CUFHENetworkWithTFHEpp {
+    std::shared_ptr<CUFHENetwork> cufheNet;
+    std::shared_ptr<TFHEppNetwork> tfheppNet;
+    std::vector<std::shared_ptr<CUFHE2TFHEppBridge>> bridges0;
+    std::vector<std::shared_ptr<TFHEpp2CUFHEBridge>> bridges1;
+
+    void addToRunner(CUFHENetworkRunner& runner)
+    {
+        if (cufheNet)
+            runner.addNetwork(cufheNet);
+        if (tfheppNet)
+            runner.addNetwork(tfheppNet);
+        for (auto&& bridge0 : bridges0)
+            runner.addBridge(bridge0);
+        for (auto&& bridge1 : bridges1)
+            runner.addBridge(bridge1);
+    }
+};
+
+void connectCUFHENetWithTFHEppNet(
     CUFHENetwork& cufhe, TFHEppNetwork& tfhepp,
     std::vector<
         std::shared_ptr<BridgeDepNode<CUFHEWorkerInfo, TFHEppWorkerInfo>>>&
@@ -154,19 +173,26 @@ auto connectCUFHENetWithTFHEppNet(
         out->acceptOneMoreInput();
         brTFHEpp2CUFHE.push_back(connectWithBridge(tfhepp2cufhe, out));
     }
+}
 
-    return std::make_pair(brCUFHE2TFHEpp, brTFHEpp2CUFHE);
+
+CUFHENetworkWithTFHEpp makeTFHEppRAMNetworkForCUFHE(
+    const std::string& romPortName)
+{
+    auto tfheppNet =
+        std::make_shared<TFHEppNetwork>(makeTFHEppRAMNetwork(romPortName));
+    return CUFHENetworkWithTFHEpp{nullptr, tfheppNet, {}, {}};
+}
+
+CUFHENetworkWithTFHEpp makeTFHEppROMNetworkForCUFHE()
+{
+    auto tfheppNet = std::make_shared<TFHEppNetwork>(makeTFHEppROMNetwork());
+    return CUFHENetworkWithTFHEpp{nullptr, tfheppNet, {}, {}};
 }
 
 struct CUFHENetworkManager {
     std::shared_ptr<CUFHENetwork> core;
-    std::shared_ptr<TFHEppNetwork> rom, ramA, ramB;
-    std::vector<
-        std::shared_ptr<BridgeDepNode<CUFHEWorkerInfo, TFHEppWorkerInfo>>>
-        bridge0;
-    std::vector<
-        std::shared_ptr<BridgeDepNode<TFHEppWorkerInfo, CUFHEWorkerInfo>>>
-        bridge1;
+    std::shared_ptr<TFHEppNetwork> ramA, ramB;
 };
 
 void doCUFHE(const Options& opt)
@@ -178,6 +204,12 @@ void doCUFHE(const Options& opt)
     cufhe::SetGPUNum(1);
     cufhe::SetSeed();
     cufhe::Initialize(*tfhepp2cufhe(*reqPacket.gateKey));
+
+    // Make runner
+    CUFHENetworkRunner runner{
+        opt.numWorkers, static_cast<int>(std::thread::hardware_concurrency()),
+        TFHEppWorkerInfo{TFHEpp::lweParams{}, reqPacket.gateKey,
+                         reqPacket.circuitKey}};
 
     // Read network core
     CUFHENetworkManager net;
@@ -194,8 +226,10 @@ void doCUFHE(const Options& opt)
         assert(reqPacket.circuitKey);
 
         // Create RAM
-        net.ramA = std::make_shared<TFHEppNetwork>(makeTFHEppRAMNetwork("A"));
-        net.ramB = std::make_shared<TFHEppNetwork>(makeTFHEppRAMNetwork("B"));
+        auto ramA = makeTFHEppRAMNetworkForCUFHE("A");
+        auto ramB = makeTFHEppRAMNetworkForCUFHE("B");
+        net.ramA = ramA.tfheppNet;
+        net.ramB = ramB.tfheppNet;
 
         // Set initial RAM data
         for (int addr = 0; addr < 512; addr++)
@@ -205,9 +239,9 @@ void doCUFHE(const Options& opt)
                                            bit)
                     ->set(addr / 2, reqPacket.ramCk.at(addr * 8 + bit));
 
-        // Connect RAM
-        connectCUFHENetWithTFHEppNet(*net.core, *net.ramA, net.bridge0,
-                                     net.bridge1,
+        // Connect RAM to core
+        connectCUFHENetWithTFHEppNet(*net.core, *net.ramA, ramA.bridges0,
+                                     ramA.bridges1,
                                      {
                                          {"io_memA_writeEnable", 0, "wren", 0},
                                          {"io_memA_address", 0, "addr", 0},
@@ -237,8 +271,8 @@ void doCUFHE(const Options& opt)
                                          {"rdata", 6, "io_memA_out", 6},
                                          {"rdata", 7, "io_memA_out", 7},
                                      });
-        connectCUFHENetWithTFHEppNet(*net.core, *net.ramB, net.bridge0,
-                                     net.bridge1,
+        connectCUFHENetWithTFHEppNet(*net.core, *net.ramB, ramB.bridges0,
+                                     ramB.bridges1,
                                      {
                                          {"io_memB_writeEnable", 0, "wren", 0},
                                          {"io_memB_address", 0, "addr", 0},
@@ -268,6 +302,10 @@ void doCUFHE(const Options& opt)
                                          {"rdata", 6, "io_memB_out", 6},
                                          {"rdata", 7, "io_memB_out", 7},
                                      });
+
+        // Add RAMs to runner
+        ramA.addToRunner(runner);
+        ramB.addToRunner(runner);
     }
     else {
         // Set RAM
@@ -287,17 +325,19 @@ void doCUFHE(const Options& opt)
     else {
         assert(reqPacket.circuitKey);
 
-        // Create ROM as external module and set data
-        net.rom = std::make_shared<TFHEppNetwork>(makeTFHEppROMNetwork());
+        // Create ROM as external module
+        auto rom = makeTFHEppROMNetworkForCUFHE();
+
+        // Set data
         const int ROM_UNIT = 1024 / 8;
         assert(reqPacket.romCk.size() == 512 / ROM_UNIT);
         for (int i = 0; i < 512 / ROM_UNIT; i++) {
             int offset = ROM_UNIT * i;
-            net.rom->get<TaskTFHEppROMUX>("rom", "all", 0)
+            rom.tfheppNet->get<TaskTFHEppROMUX>("rom", "all", 0)
                 ->set128le(offset, reqPacket.romCk[i]);
         }
 
-        // Connect ROM
+        // Connect ROM to core
         std::vector<std::tuple<std::string, int, std::string, int>> lhs2rhs,
             rhs2lhs;
         assert(opt.romPorts.size() == 4);
@@ -309,26 +349,15 @@ void doCUFHE(const Options& opt)
         for (int i = 0; i < numRHS2LHS; i++)
             rhs2lhs.emplace_back("ROM", i, opt.romPorts[2], i);
 
-        connectCUFHENetWithTFHEppNet(*net.core, *net.rom, net.bridge0,
-                                     net.bridge1, lhs2rhs, rhs2lhs);
+        connectCUFHENetWithTFHEppNet(*net.core, *rom.tfheppNet, rom.bridges0,
+                                     rom.bridges1, lhs2rhs, rhs2lhs);
+
+        // Add ROM to runner
+        rom.addToRunner(runner);
     }
 
-    // Make runner
-    CUFHENetworkRunner runner{
-        opt.numWorkers, static_cast<int>(std::thread::hardware_concurrency()),
-        TFHEppWorkerInfo{TFHEpp::lweParams{}, reqPacket.gateKey,
-                         reqPacket.circuitKey}};
+    // Add core to runner
     runner.addNetwork(net.core);
-    if (net.rom)
-        runner.addNetwork(net.rom);
-    if (net.ramA)
-        runner.addNetwork(net.ramA);
-    if (net.ramB)
-        runner.addNetwork(net.ramB);
-    for (auto&& br : net.bridge0)
-        runner.addBridge(br);
-    for (auto&& br : net.bridge1)
-        runner.addBridge(br);
 
     // Get #cycles
     int numCycles = std::numeric_limits<int>::max();
@@ -354,20 +383,7 @@ void doCUFHE(const Options& opt)
     }
     // Go computing
     processCycles(numCycles, [&] {
-        // Tick
-        net.core->tick();
-        if (net.rom)
-            net.rom->tick();
-        if (net.ramA)
-            net.ramA->tick();
-        if (net.ramB)
-            net.ramB->tick();
-        for (auto&& br : net.bridge0)
-            br->tick();
-        for (auto&& br : net.bridge1)
-            br->tick();
-
-        // Run
+        runner.tick();
         runner.run();
 
         return false;

@@ -260,6 +260,9 @@ public:
     }
 };
 
+using CUFHE2TFHEppBridge = BridgeDepNode<CUFHEWorkerInfo, TFHEppWorkerInfo>;
+using TFHEpp2CUFHEBridge = BridgeDepNode<TFHEppWorkerInfo, CUFHEWorkerInfo>;
+
 class CUFHENetworkRunner {
 private:
     template <class WorkerInfo, class WorkerType>
@@ -322,12 +325,12 @@ private:
 
     Runner<CUFHEWorkerInfo, CUFHEWorker> cufhe_;
     Runner<TFHEppWorkerInfo, TFHEppWorker> tfhepp_;
-    size_t numBridges_;
+    std::vector<std::shared_ptr<CUFHE2TFHEppBridge>> bridges0_;
+    std::vector<std::shared_ptr<TFHEpp2CUFHEBridge>> bridges1_;
 
 public:
     CUFHENetworkRunner(int numCUFHEWorkers, int numTFHEppWorkers,
                        TFHEppWorkerInfo wi)
-        : numBridges_(0)
     {
         for (int i = 0; i < numCUFHEWorkers; i++)
             cufhe_.addWorker(nullptr);
@@ -350,7 +353,7 @@ public:
             bridge)
     {
         bridge->setReadyQueue(tfhepp_.readyQueue);
-        numBridges_++;
+        bridges0_.push_back(bridge);
     }
 
     void addBridge(
@@ -358,7 +361,7 @@ public:
             bridge)
     {
         bridge->setReadyQueue(cufhe_.readyQueue);
-        numBridges_++;
+        bridges1_.push_back(bridge);
     }
 
     void run()
@@ -366,7 +369,8 @@ public:
         cufhe_.prepareToRun();
         tfhepp_.prepareToRun();
 
-        size_t numNodes = cufhe_.numNodes() + tfhepp_.numNodes() + numBridges_;
+        size_t numNodes = cufhe_.numNodes() + tfhepp_.numNodes() +
+                          bridges0_.size() + bridges1_.size();
 
         while (cufhe_.numFinishedTargets + tfhepp_.numFinishedTargets <
                numNodes) {
@@ -375,6 +379,16 @@ public:
             cufhe_.update();
             tfhepp_.update();
         }
+    }
+
+    void tick()
+    {
+        cufhe_.tick();
+        tfhepp_.tick();
+        for (auto&& bridge : bridges0_)
+            bridge->tick();
+        for (auto&& bridge : bridges1_)
+            bridge->tick();
     }
 };
 
