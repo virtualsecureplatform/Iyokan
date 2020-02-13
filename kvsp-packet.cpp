@@ -42,12 +42,21 @@ void doDec(std::string keyFileName, std::string inputFileName)
     decrypt(*sk, resPacket).print(std::cout);
 }
 
+void doDecJSON(std::string keyFileName, std::string inputFileName)
+{
+    std::shared_ptr<TFHEpp::SecretKey> sk = import_secret_key(keyFileName);
+
+    auto resPacket = readFromArchive<KVSPResPacket>(inputFileName);
+    decrypt(*sk, resPacket).printAsJSON(std::cout);
+}
+
 int main(int argc, char** argv)
 {
     /*
        kvsp-packet genkey KEY-FILE
        kvsp-packet enc KEY-FILE INPUT-FILE OUTPUT-FILE
        kvsp-packet dec KEY-FILE INPUT-FILE
+       kvsp-packet dec-json KEY-FILE INPUT-FILE
        kvsp-packet plain INPUT-FILE OUTPUT-FILE
     */
 
@@ -65,6 +74,10 @@ int main(int argc, char** argv)
     else if (subcommand == "dec") {
         assert(argc == 4 && "Invalid command-line arguments");
         doDec(argv[2], argv[3]);
+    }
+    else if (subcommand == "dec-json") {
+        assert(argc == 4 && "Invalid command-line arguments");
+        doDecJSON(argv[2], argv[3]);
     }
     else if (subcommand == "plain") {
         assert(argc == 4 && "Invalid command-line arguments");

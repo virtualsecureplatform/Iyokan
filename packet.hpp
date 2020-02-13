@@ -15,6 +15,8 @@
 
 #include <tfhe++.hpp>
 
+#include <picojson.h>
+
 namespace TFHEpp {
 template <class Archive>
 void serialize(Archive& ar, lweParams& src)
@@ -65,6 +67,40 @@ struct KVSPPlainResPacket {
     std::vector<uint16_t> regs;
     std::vector<uint8_t> ram;
     int numCycles = -1;
+
+    void printAsJSON(std::ostream& os)
+    {
+        picojson::array root;
+
+        // Print flags.
+        for (int i = 0; i < flags.size(); i++) {
+            picojson::object item;
+            item["type"] = picojson::value("flag");
+            item["addr"] = picojson::value(static_cast<double>(i));
+            item["byte"] = picojson::value(static_cast<bool>(flags.at(i)));
+            root.emplace_back(item);
+        }
+
+        // Print regs.
+        for (int i = 0; i < regs.size(); i++) {
+            picojson::object item;
+            item["type"] = picojson::value("reg");
+            item["addr"] = picojson::value(static_cast<double>(i));
+            item["byte"] = picojson::value(static_cast<double>(regs.at(i)));
+            root.emplace_back(item);
+        }
+
+        // Print ram.
+        for (int i = 0; i < ram.size(); i++) {
+            picojson::object item;
+            item["type"] = picojson::value("ram");
+            item["addr"] = picojson::value(static_cast<double>(i));
+            item["byte"] = picojson::value(static_cast<double>(ram.at(i)));
+            root.emplace_back(item);
+        }
+
+        os << picojson::value(root);
+    }
 
     void print(std::ostream& os)
     {
