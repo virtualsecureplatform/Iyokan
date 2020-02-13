@@ -1,6 +1,7 @@
 #include "iyokan_tfhepp.hpp"
 #include "packet.hpp"
 
+namespace {
 auto get(TFHEppNetwork &net, const std::string &kind,
          const std::string &portName, int portBit)
 {
@@ -8,6 +9,42 @@ auto get(TFHEppNetwork &net, const std::string &kind,
     assert(ret && "Possibly invalid port name or port bit");
     return ret;
 }
+
+KVSPResPacket makeResPacket(TFHEppNetwork &net, int numCycles, bool ramEnabled)
+{
+    KVSPResPacket resPacket;
+    resPacket.numCycles = numCycles;
+    // Get values of flags
+    resPacket.flags.push_back(get(net, "output", "io_finishFlag", 0)->get());
+    // Get values of registers
+    for (int reg = 0; reg < 16; reg++) {
+        resPacket.regs.emplace_back();
+        for (int bit = 0; bit < 16; bit++)
+            resPacket.regs[reg].push_back(
+                get(net, "output", detail::fok("io_regOut_x", reg), bit)
+                    ->get());
+    }
+    // Get values of RAM
+    if (ramEnabled) {
+        for (int addr = 0; addr < 512; addr++) {
+            for (int bit = 0; bit < 8; bit++) {
+                auto ram = net.get<TaskTFHEppRAMUX>(
+                    "ram", (addr % 2 == 1 ? "A" : "B"), bit);
+                assert(ram);
+                resPacket.ramCk.push_back(ram->get(addr / 2));
+            }
+        }
+    }
+    else {
+        for (int addr = 0; addr < 512; addr++)
+            for (int bit = 0; bit < 8; bit++)
+                resPacket.ram.push_back(
+                    get(net, "ram", std::to_string(addr), bit)->get());
+    }
+
+    return resPacket;
+}
+}  // namespace
 
 void processAllGates(TFHEppNetwork &net, int numWorkers, TFHEppWorkerInfo wi,
                      std::shared_ptr<ProgressGraphMaker> graph)
@@ -196,36 +233,19 @@ void doTFHE(const Options &opt)
         return false;
     });
 
-    KVSPResPacket resPacket;
-    resPacket.numCycles = numCycles;
-    // Get values of flags
-    resPacket.flags.push_back(get(net, "output", "io_finishFlag", 0)->get());
-    // Get values of registers
-    for (int reg = 0; reg < 16; reg++) {
-        resPacket.regs.emplace_back();
-        for (int bit = 0; bit < 16; bit++)
-            resPacket.regs[reg].push_back(
-                get(net, "output", detail::fok("io_regOut_x", reg), bit)
-                    ->get());
-    }
-    // Get values of RAM
-    if (opt.ramEnabled) {
-        for (int addr = 0; addr < 512; addr++) {
-            for (int bit = 0; bit < 8; bit++) {
-                auto ram = net.get<TaskTFHEppRAMUX>(
-                    "ram", (addr % 2 == 1 ? "A" : "B"), bit);
-                assert(ram);
-                resPacket.ramCk.push_back(ram->get(addr / 2));
-            }
+    // Dump result packet...
+    KVSPResPacket resPacket = makeResPacket(net, numCycles, opt.ramEnabled);
+    if (opt.secretKey) {  // ...as plain
+        auto sk = std::make_shared<TFHEpp::SecretKey>();
+        readFromArchive(*sk, *opt.secretKey);
+        if (opt.enableJSONPrint) {
+            decrypt(*sk, resPacket).printAsJSON(std::cout);
+        }
+        else {
+            decrypt(*sk, resPacket).print(std::cout);
         }
     }
-    else {
-        for (int addr = 0; addr < 512; addr++)
-            for (int bit = 0; bit < 8; bit++)
-                resPacket.ram.push_back(
-                    get(net, "ram", std::to_string(addr), bit)->get());
+    else {  // ...as encrypted
+        writeToArchive(opt.outputFile, resPacket);
     }
-
-    // Dump result packet
-    writeToArchive(opt.outputFile, resPacket);
 }

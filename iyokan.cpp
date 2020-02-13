@@ -27,6 +27,7 @@ int main(int argc, char **argv)
     app.add_option("-i", opt.inputFile, "")
         ->required()
         ->check(CLI::ExistingFile);
+    app.add_flag("--enable-json-print", opt.enableJSONPrint, "");
 
     {
         CLI::App *plain = app.add_subcommand("plain", "");
@@ -40,6 +41,7 @@ int main(int argc, char **argv)
         tfhe->fallthrough();
         tfhe->add_option("-c", opt.numCycles, "")->required();
         tfhe->add_option("-o", opt.outputFile, "")->required();
+        tfhe->add_option("--secret-key", opt.secretKey, "");
 #ifdef IYOKAN_CUDA_ENABLED
         tfhe->add_flag("--enable-gpu", enableGPU, "");
 #endif

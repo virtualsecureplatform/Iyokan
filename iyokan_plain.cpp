@@ -1,6 +1,8 @@
 #include "iyokan_plain.hpp"
 #include "packet.hpp"
 
+namespace {
+
 auto get(PlainNetwork &net, const std::string &kind,
          const std::string &portName, int portBit)
 {
@@ -8,6 +10,45 @@ auto get(PlainNetwork &net, const std::string &kind,
     assert(ret && "Possibly invalid port name or portBit");
     return ret;
 }
+
+KVSPPlainResPacket makeResPacket(PlainNetwork &net, int numCycles,
+                                 bool ramEnabled)
+{
+    KVSPPlainResPacket resPacket;
+    resPacket.numCycles = numCycles;
+    // Get values of flags
+    resPacket.flags.emplace_back(get(net, "output", "io_finishFlag", 0)->get());
+    // Get values of registers
+    for (int reg = 0; reg < 16; reg++) {
+        uint16_t &val = resPacket.regs.emplace_back(0);
+        for (int bit = 0; bit < 16; bit++) {
+            int n =
+                get(net, "output", detail::fok("io_regOut_x", reg), bit)->get();
+            val |= (n & 1u) << bit;
+        }
+    }
+    // Get values of RAM
+    if (ramEnabled) {
+        auto ramA = net.get<TaskPlainRAM>("ram", "A", 0),
+             ramB = net.get<TaskPlainRAM>("ram", "B", 0);
+        assert(ramA && ramB);
+        for (int addr = 0; addr < 512; addr++) {
+            resPacket.ram.push_back(
+                (addr % 2 == 1 ? ramA : ramB)->get(addr / 2));
+        }
+    }
+    else {
+        for (int addr = 0; addr < 512; addr++) {
+            uint8_t &val = resPacket.ram.emplace_back(0);
+            for (int bit = 0; bit < 8; bit++)
+                val |= get(net, "ram", std::to_string(addr), bit)->get() << bit;
+        }
+    }
+
+    return resPacket;
+}
+
+}  // namespace
 
 void processAllGates(PlainNetwork &net, int numWorkers,
                      std::shared_ptr<ProgressGraphMaker> graph)
@@ -189,37 +230,13 @@ void doPlain(const Options &opt)
         return hasFinished;
     });
 
-    KVSPPlainResPacket resPacket;
-    resPacket.numCycles = numCycles;
-    // Get values of flags
-    resPacket.flags.emplace_back(get(net, "output", "io_finishFlag", 0)->get());
-    // Get values of registers
-    for (int reg = 0; reg < 16; reg++) {
-        uint16_t &val = resPacket.regs.emplace_back(0);
-        for (int bit = 0; bit < 16; bit++) {
-            int n =
-                get(net, "output", detail::fok("io_regOut_x", reg), bit)->get();
-            val |= (n & 1u) << bit;
-        }
-    }
-    // Get values of RAM
-    if (opt.ramEnabled) {
-        auto ramA = net.get<TaskPlainRAM>("ram", "A", 0),
-             ramB = net.get<TaskPlainRAM>("ram", "B", 0);
-        assert(ramA && ramB);
-        for (int addr = 0; addr < 512; addr++) {
-            resPacket.ram.push_back(
-                (addr % 2 == 1 ? ramA : ramB)->get(addr / 2));
-        }
+    // Print the results
+    KVSPPlainResPacket resPacket =
+        makeResPacket(net, numCycles, opt.ramEnabled);
+    if (opt.enableJSONPrint) {
+        resPacket.printAsJSON(std::cout);
     }
     else {
-        for (int addr = 0; addr < 512; addr++) {
-            uint8_t &val = resPacket.ram.emplace_back(0);
-            for (int bit = 0; bit < 8; bit++)
-                val |= get(net, "ram", std::to_string(addr), bit)->get() << bit;
-        }
+        resPacket.print(std::cout);
     }
-
-    // Print the results
-    resPacket.print(std::cout);
 }

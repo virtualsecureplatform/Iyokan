@@ -1164,6 +1164,8 @@ struct Options {
     std::string inputFile, outputFile;
     int numWorkers = -1, numCycles = 0;
     bool ramEnabled = false;
+    std::optional<std::string> secretKey;
+    bool enableJSONPrint = false;
 };
 
 template <class Func>

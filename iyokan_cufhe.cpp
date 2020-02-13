@@ -1,6 +1,12 @@
 #include "iyokan_cufhe.hpp"
 #include "packet.hpp"
 
+struct CUFHENetworkManager {
+    std::shared_ptr<CUFHENetwork> core;
+    std::shared_ptr<TFHEppNetwork> ramA, ramB;
+};
+
+namespace {
 auto get(CUFHENetwork& net, const std::string& kind,
          const std::string& portName, int portBit)
 {
@@ -8,6 +14,45 @@ auto get(CUFHENetwork& net, const std::string& kind,
     assert(ret && "Possibly invalid port name or port bit");
     return ret;
 }
+
+KVSPResPacket makeResPacket(CUFHENetworkManager& net, int numCycles,
+                            bool ramEnabled)
+{
+    KVSPResPacket resPacket;
+    resPacket.numCycles = numCycles;
+    // Get values of flags
+    resPacket.flags.push_back(
+        cufhe2tfhepp(get(*net.core, "output", "io_finishFlag", 0)->get()));
+    // Get values of registers
+    for (int reg = 0; reg < 16; reg++) {
+        resPacket.regs.emplace_back();
+        for (int bit = 0; bit < 16; bit++)
+            resPacket.regs[reg].push_back(cufhe2tfhepp(
+                get(*net.core, "output", detail::fok("io_regOut_x", reg), bit)
+                    ->get()));
+    }
+    // Get values of RAM
+    if (ramEnabled) {
+        for (int addr = 0; addr < 512; addr++) {
+            for (int bit = 0; bit < 8; bit++) {
+                auto ram = (addr % 2 == 1 ? net.ramA : net.ramB)
+                               ->get<TaskTFHEppRAMUX>(
+                                   "ram", (addr % 2 == 1 ? "A" : "B"), bit);
+                assert(ram);
+                resPacket.ramCk.push_back(ram->get(addr / 2));
+            }
+        }
+    }
+    else {
+        for (int addr = 0; addr < 512; addr++)
+            for (int bit = 0; bit < 8; bit++)
+                resPacket.ram.push_back(cufhe2tfhepp(
+                    get(*net.core, "ram", std::to_string(addr), bit)->get()));
+    }
+
+    return resPacket;
+}
+}  // namespace
 
 void processAllGates(CUFHENetwork& net, int numWorkers,
                      std::shared_ptr<ProgressGraphMaker> graph)
@@ -175,7 +220,6 @@ void connectCUFHENetWithTFHEppNet(
     }
 }
 
-
 CUFHENetworkWithTFHEpp makeTFHEppRAMNetworkForCUFHE(
     const std::string& romPortName)
 {
@@ -189,11 +233,6 @@ CUFHENetworkWithTFHEpp makeTFHEppROMNetworkForCUFHE()
     auto tfheppNet = std::make_shared<TFHEppNetwork>(makeTFHEppROMNetwork());
     return CUFHENetworkWithTFHEpp{nullptr, tfheppNet, {}, {}};
 }
-
-struct CUFHENetworkManager {
-    std::shared_ptr<CUFHENetwork> core;
-    std::shared_ptr<TFHEppNetwork> ramA, ramB;
-};
 
 void doCUFHE(const Options& opt)
 {
@@ -390,40 +429,21 @@ void doCUFHE(const Options& opt)
         return false;
     });
 
-    KVSPResPacket resPacket;
-    resPacket.numCycles = numCycles;
-    // Get values of flags
-    resPacket.flags.push_back(
-        cufhe2tfhepp(get(*net.core, "output", "io_finishFlag", 0)->get()));
-    // Get values of registers
-    for (int reg = 0; reg < 16; reg++) {
-        resPacket.regs.emplace_back();
-        for (int bit = 0; bit < 16; bit++)
-            resPacket.regs[reg].push_back(cufhe2tfhepp(
-                get(*net.core, "output", detail::fok("io_regOut_x", reg), bit)
-                    ->get()));
-    }
-    // Get values of RAM
-    if (opt.ramEnabled) {
-        for (int addr = 0; addr < 512; addr++) {
-            for (int bit = 0; bit < 8; bit++) {
-                auto ram = (addr % 2 == 1 ? net.ramA : net.ramB)
-                               ->get<TaskTFHEppRAMUX>(
-                                   "ram", (addr % 2 == 1 ? "A" : "B"), bit);
-                assert(ram);
-                resPacket.ramCk.push_back(ram->get(addr / 2));
-            }
+    // Dump result packet
+    KVSPResPacket resPacket = makeResPacket(net, numCycles, opt.ramEnabled);
+    if (opt.secretKey) {  // ...as plain
+        auto sk = std::make_shared<TFHEpp::SecretKey>();
+        readFromArchive(*sk, *opt.secretKey);
+        if (opt.enableJSONPrint) {
+            decrypt(*sk, resPacket).printAsJSON(std::cout);
+        }
+        else {
+            decrypt(*sk, resPacket).print(std::cout);
         }
     }
-    else {
-        for (int addr = 0; addr < 512; addr++)
-            for (int bit = 0; bit < 8; bit++)
-                resPacket.ram.push_back(cufhe2tfhepp(
-                    get(*net.core, "ram", std::to_string(addr), bit)->get()));
+    else {  // ...as encrypted
+        writeToArchive(opt.outputFile, resPacket);
     }
-
-    // Dump result packet
-    writeToArchive(opt.outputFile, resPacket);
 
     // Clean cuFHE up
     cufhe::CleanUp();
