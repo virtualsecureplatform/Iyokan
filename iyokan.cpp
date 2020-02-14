@@ -43,7 +43,8 @@ int main(int argc, char **argv)
         tfhe->fallthrough();
         tfhe->add_option("-c", opt.numCycles, "")->required();
         tfhe->add_option("-o", opt.outputFile, "")->required();
-        tfhe->add_option("--secret-key", opt.secretKey, "");
+        tfhe->add_option("--secret-key", opt.secretKey, "")
+            ->check(CLI::ExistingFile);
         tfhe->add_flag("--enable-dump-every-clock", opt.dumpEveryClock, "")
             ->needs("--secret-key");
 #ifdef IYOKAN_CUDA_ENABLED
