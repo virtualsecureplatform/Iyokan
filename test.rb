@@ -103,10 +103,9 @@ test_iyokan [
   "-i", "_test_plain_req_packet00",
   "--enable-rom", "io_romAddr:7:io_romData:32",
   "--enable-ram",
-  "--enable-json-print",
-  "--quiet",
+  "--enable-dump-every-clock", "_test_dump",
 ] do |r|
-  json = JSON.parse(r)
+  json = JSON.parse(open("_test_dump").read.lines[-1])
   assert_include json, { "type" => "flag", "addr" => 0, "byte" => true }
   assert_include json, { "type" => "reg", "addr" => 0, "byte" => 42 }
 end

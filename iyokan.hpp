@@ -1165,9 +1165,8 @@ struct Options {
     int numWorkers = -1, numCycles = 0;
     bool ramEnabled = false;
     std::optional<std::string> secretKey;
-    bool enableJSONPrint = false;
     bool quiet = false;
-    bool dumpEveryClock = false;
+    std::optional<std::string> dumpEveryClock;
 };
 
 template <class Func>

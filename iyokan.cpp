@@ -27,7 +27,6 @@ int main(int argc, char **argv)
     app.add_option("-i", opt.inputFile, "")
         ->required()
         ->check(CLI::ExistingFile);
-    app.add_flag("--enable-json-print", opt.enableJSONPrint, "");
     app.add_flag("--quiet", opt.quiet, "");
 
     {
@@ -35,7 +34,7 @@ int main(int argc, char **argv)
         plain->fallthrough();
         plain->parse_complete_callback([&] { type = TYPE::PLAIN; });
         plain->add_option("-c", opt.numCycles, "");
-        plain->add_flag("--enable-dump-every-clock", opt.dumpEveryClock, "");
+        plain->add_option("--enable-dump-every-clock", opt.dumpEveryClock, "");
     }
 
     {
@@ -45,7 +44,7 @@ int main(int argc, char **argv)
         tfhe->add_option("-o", opt.outputFile, "")->required();
         tfhe->add_option("--secret-key", opt.secretKey, "")
             ->check(CLI::ExistingFile);
-        tfhe->add_flag("--enable-dump-every-clock", opt.dumpEveryClock, "")
+        tfhe->add_option("--enable-dump-every-clock", opt.dumpEveryClock, "")
             ->needs("--secret-key");
 #ifdef IYOKAN_CUDA_ENABLED
         tfhe->add_flag("--enable-gpu", enableGPU, "");

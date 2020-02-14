@@ -53,20 +53,12 @@ KVSPResPacket makeResPacket(CUFHENetworkManager& net, int numCycles,
     return resPacket;
 }
 
-void dumpResult(CUFHENetworkManager& net, const Options& opt)
+void dumpResultAsJSON(std::ostream& os, const KVSPResPacket& resPacket,
+                      const std::string& fileSecretKey)
 {
-    KVSPResPacket resPacket = makeResPacket(net, opt.numCycles, opt.ramEnabled);
-    if (opt.secretKey) {  // as plain
-        auto sk = std::make_shared<TFHEpp::SecretKey>();
-        readFromArchive(*sk, *opt.secretKey);
-        if (opt.enableJSONPrint)
-            decrypt(*sk, resPacket).printAsJSON(std::cout);
-        else
-            decrypt(*sk, resPacket).print(std::cout);
-    }
-    else {  // as encrypted
-        writeToArchive(opt.outputFile, resPacket);
-    }
+    auto sk = std::make_shared<TFHEpp::SecretKey>();
+    readFromArchive(*sk, fileSecretKey);
+    decrypt(*sk, resPacket).printAsJSON(os);
 }
 
 void setInitialRAM(CUFHENetworkManager& net, const KVSPReqPacket& reqPacket,
@@ -438,12 +430,22 @@ void doCUFHE(const Options& opt)
         get(*net.core, "input", "reset", 0)->set(zero);
     }
     // Go computing
+    std::optional<std::ofstream> dumpOS;
+    if (opt.dumpEveryClock) {
+        dumpOS = std::ofstream{*opt.dumpEveryClock};
+        assert(*dumpOS);
+    }
+
     {
         std::stringstream devnull;
         std::ostream& os = opt.quiet ? devnull : std::cout;
+
         processCycles(opt.numCycles, os, [&](bool first) {
-            if (opt.dumpEveryClock)
-                dumpResult(net, opt);
+            if (dumpOS) {
+                KVSPResPacket resPacket =
+                    makeResPacket(net, opt.numCycles, opt.ramEnabled);
+                dumpResultAsJSON(*dumpOS, resPacket, opt.secretKey.value());
+            }
 
             runner.tick();
 
@@ -456,7 +458,10 @@ void doCUFHE(const Options& opt)
     }
 
     // Dump result packet
-    dumpResult(net, opt);
+    KVSPResPacket resPacket = makeResPacket(net, opt.numCycles, opt.ramEnabled);
+    if (dumpOS)
+        dumpResultAsJSON(*dumpOS, resPacket, opt.secretKey.value());
+    writeToArchive(opt.outputFile, resPacket);
 
     // Clean cuFHE up
     cufhe::CleanUp();

@@ -48,16 +48,6 @@ KVSPPlainResPacket makeResPacket(PlainNetwork &net, int numCycles,
     return resPacket;
 }
 
-void dumpResult(PlainNetwork &net, const Options &opt, int numCycles)
-{
-    KVSPPlainResPacket resPacket =
-        makeResPacket(net, numCycles, opt.ramEnabled);
-    if (opt.enableJSONPrint)
-        resPacket.printAsJSON(std::cout);
-    else
-        resPacket.print(std::cout);
-}
-
 void setInitialRAM(PlainNetwork &net, const KVSPPlainReqPacket &reqPacket,
                    bool ramEnabled)
 {
@@ -236,12 +226,20 @@ void doPlain(const Options &opt)
 
     // Go computing
     get(net, "input", "reset", 0)->set(0);
+    std::optional<std::ofstream> dumpOS;
+    if (opt.dumpEveryClock) {
+        dumpOS = std::ofstream{*opt.dumpEveryClock};
+        assert(*dumpOS);
+    }
+
     {
         std::stringstream devnull;
         std::ostream &os = opt.quiet ? devnull : std::cout;
+
         numCycles = processCycles(numCycles, os, [&](bool first) {
-            if (opt.dumpEveryClock)
-                dumpResult(net, opt, numCycles);
+            if (dumpOS)
+                makeResPacket(net, opt.numCycles, opt.ramEnabled)
+                    .printAsJSON(*dumpOS);
 
             net.tick();
 
@@ -256,5 +254,9 @@ void doPlain(const Options &opt)
     }
 
     // Print the results
-    dumpResult(net, opt, numCycles);
+    KVSPPlainResPacket resPacket =
+        makeResPacket(net, opt.numCycles, opt.ramEnabled);
+    if (dumpOS)
+        resPacket.printAsJSON(*dumpOS);
+    resPacket.print(std::cout);
 }
