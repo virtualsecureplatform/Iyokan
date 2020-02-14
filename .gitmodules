@@ -22,3 +22,6 @@
 [submodule "cuFHE"]
 	path = cuFHE
 	url = https://github.com/virtualsecureplatform/cuFHE.git
+[submodule "backward-cpp"]
+	path = backward-cpp
+	url = https://github.com/bombela/backward-cpp.git
