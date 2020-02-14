@@ -25,6 +25,8 @@ if (IYOKAN_ENABLE_CUDA)
     add_subdirectory(cuFHE/cufhe)
 endif(IYOKAN_ENABLE_CUDA)
 
+add_subdirectory(${CMAKE_SOURCE_DIR}/backward-cpp)
+
 set(IYOKAN_CXXFLAGS -Wall -Wextra -pedantic -g3)
 set(IYOKAN_CXXFLAGS_DEBUG   ${IYOKAN_CXXFLAGS} -O0)
 set(IYOKAN_CXXFLAGS_RELEASE ${IYOKAN_CXXFLAGS} -O3 -march=native)
@@ -48,8 +50,9 @@ set(CMAKE_CXX_FLAGS_DEBUG "")
 set(CMAKE_CXX_FLAGS_RELEASE "")
 
 ##### iyokan
-add_executable(iyokan iyokan.cpp iyokan_plain.cpp iyokan_tfhepp.cpp)
+add_executable(iyokan iyokan.cpp iyokan_plain.cpp iyokan_tfhepp.cpp ${BACKWARD_ENABLE})
 add_sanitizers(iyokan)
+add_backward(iyokan)
 target_compile_options(iyokan PUBLIC "$<$<CONFIG:DEBUG>:${IYOKAN_CXXFLAGS_DEBUG}>")
 target_compile_options(iyokan PUBLIC "$<$<CONFIG:RELEASE>:${IYOKAN_CXXFLAGS_RELEASE}>")
 target_link_libraries(iyokan ${IYOKAN_LIBS})
