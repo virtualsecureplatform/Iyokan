@@ -422,12 +422,15 @@ void doCUFHE(const Options& opt)
         get(*net.core, "input", "reset", 0)->set(zero);
     }
     // Go computing
-    processCycles(numCycles, [&] {
-        runner.tick();
-        runner.run();
-
-        return false;
-    });
+    {
+        std::stringstream devnull;
+        std::ostream& os = opt.quiet ? devnull : std::cout;
+        processCycles(numCycles, os, [&] {
+            runner.tick();
+            runner.run();
+            return false;
+        });
+    }
 
     // Dump result packet
     KVSPResPacket resPacket = makeResPacket(net, numCycles, opt.ramEnabled);

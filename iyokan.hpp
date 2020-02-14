@@ -1166,26 +1166,26 @@ struct Options {
     bool ramEnabled = false;
     std::optional<std::string> secretKey;
     bool enableJSONPrint = false;
+    bool quiet = false;
 };
 
 template <class Func>
-int processCycles(int numCycles, Func func)
+int processCycles(int numCycles, std::ostream &os, Func func)
 {
     for (int i = 0; i < numCycles; i++) {
-        std::cout << "#" << (i + 1) << std::flush;
+        os << "#" << (i + 1) << std::flush;
 
         auto begin = std::chrono::high_resolution_clock::now();
         bool shouldBreak = func();
         auto end = std::chrono::high_resolution_clock::now();
 
-        std::cout << "\tdone. ("
-                  << std::chrono::duration_cast<std::chrono::microseconds>(
-                         end - begin)
-                         .count()
-                  << " us)" << std::endl;
+        os << "\tdone. ("
+           << std::chrono::duration_cast<std::chrono::microseconds>(end - begin)
+                  .count()
+           << " us)" << std::endl;
 
         if (shouldBreak) {
-            std::cout << "break." << std::endl;
+            os << "break." << std::endl;
             return i + 1;
         }
     }

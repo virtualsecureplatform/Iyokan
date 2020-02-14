@@ -222,13 +222,17 @@ void doPlain(const Options &opt)
 
     // Go computing
     get(net, "input", "reset", 0)->set(0);
-    numCycles = processCycles(numCycles, [&] {
-        net.tick();
-        processAllGates(net, opt.numWorkers);
+    {
+        std::stringstream devnull;
+        std::ostream &os = opt.quiet ? devnull : std::cout;
+        numCycles = processCycles(numCycles, os, [&] {
+            net.tick();
+            processAllGates(net, opt.numWorkers);
 
-        bool hasFinished = get(net, "output", "io_finishFlag", 0)->get();
-        return hasFinished;
-    });
+            bool hasFinished = get(net, "output", "io_finishFlag", 0)->get();
+            return hasFinished;
+        });
+    }
 
     // Print the results
     KVSPPlainResPacket resPacket =

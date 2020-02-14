@@ -3,6 +3,7 @@
 require "shellwords"
 require "open3"
 require "pathname"
+require "json"
 
 $has_any_error = false
 
@@ -13,6 +14,10 @@ def quote(str, prefix = "> ")
 end
 
 ##### assert #####
+
+def assert_include(src, val)
+  raise "Assert failed: assert_include #{val.inspect}\n#{quote(src.to_s)}" unless src.include?(val)
+end
 
 def assert_regex(str, reg)
   raise "Assert failed: assert_regex #{reg.inspect}\n#{quote(str)}" unless str =~ reg
@@ -90,6 +95,20 @@ test_iyokan [
 ] do |r|
   assert_regex r, /f0\t1/
   assert_regex r, /x0\t42/
+end
+
+test_iyokan [
+  "plain",
+  "-l", "test/diamond-core-wo-ram-rom.json",
+  "-i", "_test_plain_req_packet00",
+  "--enable-rom", "io_romAddr:7:io_romData:32",
+  "--enable-ram",
+  "--enable-json-print",
+  "--quiet",
+] do |r|
+  json = JSON.parse(r)
+  assert_include json, { "type" => "flag", "addr" => 0, "byte" => true }
+  assert_include json, { "type" => "reg", "addr" => 0, "byte" => 42 }
 end
 
 if $SLOW_MODE_ENABLED

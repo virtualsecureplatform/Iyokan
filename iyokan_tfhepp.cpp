@@ -227,11 +227,15 @@ void doTFHE(const Options &opt)
         return zero;
     }());
     // Go computing
-    processCycles(numCycles, [&] {
-        net.tick();
-        processAllGates(net, opt.numWorkers, wi);
-        return false;
-    });
+    {
+        std::stringstream devnull;
+        std::ostream &os = opt.quiet ? devnull : std::cout;
+        processCycles(numCycles, os, [&] {
+            net.tick();
+            processAllGates(net, opt.numWorkers, wi);
+            return false;
+        });
+    }
 
     // Dump result packet...
     KVSPResPacket resPacket = makeResPacket(net, numCycles, opt.ramEnabled);

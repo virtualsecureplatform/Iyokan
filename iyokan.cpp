@@ -28,6 +28,7 @@ int main(int argc, char **argv)
         ->required()
         ->check(CLI::ExistingFile);
     app.add_flag("--enable-json-print", opt.enableJSONPrint, "");
+    app.add_flag("--quiet", opt.quiet, "");
 
     {
         CLI::App *plain = app.add_subcommand("plain", "");
