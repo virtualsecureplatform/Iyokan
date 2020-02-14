@@ -1177,7 +1177,7 @@ int processCycles(int numCycles, std::ostream &os, Func func)
         os << "#" << (i + 1) << std::flush;
 
         auto begin = std::chrono::high_resolution_clock::now();
-        bool shouldBreak = func();
+        bool shouldBreak = func(i == 0);
         auto end = std::chrono::high_resolution_clock::now();
 
         os << "\tdone. ("

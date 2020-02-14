@@ -60,6 +60,25 @@ void dumpResult(TFHEppNetwork &net, const Options &opt)
         writeToArchive(opt.outputFile, resPacket);
     }
 }
+
+void setInitialRAM(TFHEppNetwork &net, const KVSPReqPacket &reqPacket,
+                   bool ramEnabled)
+{
+    if (ramEnabled) {
+        for (int addr = 0; addr < 512; addr++)
+            for (int bit = 0; bit < 8; bit++)
+                net.get<TaskTFHEppRAMUX>("ram", addr % 2 == 1 ? "A" : "B", bit)
+                    ->set(addr / 2, reqPacket.ramCk.at(addr * 8 + bit));
+    }
+    else {
+        // Set RAM
+        for (int addr = 0; addr < 512; addr++)
+            for (int bit = 0; bit < 8; bit++)
+                get(net, "ram", std::to_string(addr), bit)
+                    ->set(reqPacket.ram.at(addr * 8 + bit));
+    }
+}
+
 }  // namespace
 
 void processAllGates(TFHEppNetwork &net, int numWorkers, TFHEppWorkerInfo wi,
@@ -168,20 +187,6 @@ void doTFHE(const Options &opt)
                               {"rdata", 6, "io_memB_out", 6},
                               {"rdata", 7, "io_memB_out", 7},
                           });
-
-            // Set initial RAM data
-            for (int addr = 0; addr < 512; addr++)
-                for (int bit = 0; bit < 8; bit++)
-                    net.get<TaskTFHEppRAMUX>("ram", addr % 2 == 1 ? "A" : "B",
-                                             bit)
-                        ->set(addr / 2, reqPacket.ramCk.at(addr * 8 + bit));
-        }
-        else {
-            // Set RAM
-            for (int addr = 0; addr < 512; addr++)
-                for (int bit = 0; bit < 8; bit++)
-                    get(net, "ram", std::to_string(addr), bit)
-                        ->set(reqPacket.ram.at(addr * 8 + bit));
         }
 
         if (opt.romPorts.empty()) {
@@ -241,11 +246,15 @@ void doTFHE(const Options &opt)
     {
         std::stringstream devnull;
         std::ostream &os = opt.quiet ? devnull : std::cout;
-        processCycles(opt.numCycles, os, [&] {
+        processCycles(opt.numCycles, os, [&](bool first) {
             if (opt.dumpEveryClock)
                 dumpResult(net, opt);
 
             net.tick();
+
+            if (first)
+                setInitialRAM(net, reqPacket, opt.ramEnabled);
+
             processAllGates(net, opt.numWorkers, wi);
             return false;
         });

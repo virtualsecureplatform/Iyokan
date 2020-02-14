@@ -58,6 +58,26 @@ void dumpResult(PlainNetwork &net, const Options &opt, int numCycles)
         resPacket.print(std::cout);
 }
 
+void setInitialRAM(PlainNetwork &net, const KVSPPlainReqPacket &reqPacket,
+                   bool ramEnabled)
+{
+    if (ramEnabled) {
+        auto ramA = net.get<TaskPlainRAM>("ram", "A", 0),
+             ramB = net.get<TaskPlainRAM>("ram", "B", 0);
+        assert(ramA && ramB);
+        for (int addr = 0; addr < 512; addr++) {
+            (addr % 2 == 1 ? ramA : ramB)
+                ->set(addr / 2, reqPacket.ram.at(addr));
+        }
+    }
+    else {
+        for (int addr = 0; addr < 512; addr++)
+            for (int bit = 0; bit < 8; bit++)
+                get(net, "ram", std::to_string(addr), bit)
+                    ->set((reqPacket.ram.at(addr) >> bit) & 1);
+    }
+}
+
 }  // namespace
 
 void processAllGates(PlainNetwork &net, int numWorkers,
@@ -164,22 +184,6 @@ void doPlain(const Options &opt)
                                           {"rdata", 6, "io_memB_out", 6},
                                           {"rdata", 7, "io_memB_out", 7},
                                       });
-
-            // Set initial RAM data
-            auto ramA = net.get<TaskPlainRAM>("ram", "A", 0),
-                 ramB = net.get<TaskPlainRAM>("ram", "B", 0);
-            assert(ramA && ramB);
-            for (int addr = 0; addr < 512; addr++) {
-                (addr % 2 == 1 ? ramA : ramB)
-                    ->set(addr / 2, reqPacket.ram.at(addr));
-            }
-        }
-        else {
-            // Set RAM
-            for (int addr = 0; addr < 512; addr++)
-                for (int bit = 0; bit < 8; bit++)
-                    get(net, "ram", std::to_string(addr), bit)
-                        ->set((reqPacket.ram.at(addr) >> bit) & 1);
         }
 
         if (opt.romPorts.empty()) {
@@ -235,11 +239,15 @@ void doPlain(const Options &opt)
     {
         std::stringstream devnull;
         std::ostream &os = opt.quiet ? devnull : std::cout;
-        numCycles = processCycles(numCycles, os, [&] {
+        numCycles = processCycles(numCycles, os, [&](bool first) {
             if (opt.dumpEveryClock)
                 dumpResult(net, opt, numCycles);
 
             net.tick();
+
+            if (first)
+                setInitialRAM(net, reqPacket, opt.ramEnabled);
+
             processAllGates(net, opt.numWorkers);
 
             bool hasFinished = get(net, "output", "io_finishFlag", 0)->get();

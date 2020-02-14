@@ -69,6 +69,25 @@ void dumpResult(CUFHENetworkManager& net, const Options& opt)
     }
 }
 
+void setInitialRAM(CUFHENetworkManager& net, const KVSPReqPacket& reqPacket,
+                   bool ramEnabled)
+{
+    if (ramEnabled) {
+        for (int addr = 0; addr < 512; addr++)
+            for (int bit = 0; bit < 8; bit++)
+                (addr % 2 == 1 ? net.ramA : net.ramB)
+                    ->get<TaskTFHEppRAMUX>("ram", addr % 2 == 1 ? "A" : "B",
+                                           bit)
+                    ->set(addr / 2, reqPacket.ramCk.at(addr * 8 + bit));
+    }
+    else {
+        for (int addr = 0; addr < 512; addr++)
+            for (int bit = 0; bit < 8; bit++)
+                get(*net.core, "ram", std::to_string(addr), bit)
+                    ->set(*tfhepp2cufhe(reqPacket.ram.at(addr * 8 + bit)));
+    }
+}
+
 }  // namespace
 
 void processAllGates(CUFHENetwork& net, int numWorkers,
@@ -287,14 +306,6 @@ void doCUFHE(const Options& opt)
         net.ramA = ramA.tfheppNet;
         net.ramB = ramB.tfheppNet;
 
-        // Set initial RAM data
-        for (int addr = 0; addr < 512; addr++)
-            for (int bit = 0; bit < 8; bit++)
-                (addr % 2 == 1 ? net.ramA : net.ramB)
-                    ->get<TaskTFHEppRAMUX>("ram", addr % 2 == 1 ? "A" : "B",
-                                           bit)
-                    ->set(addr / 2, reqPacket.ramCk.at(addr * 8 + bit));
-
         // Connect RAM to core
         connectCUFHENetWithTFHEppNet(*net.core, *net.ramA, ramA.bridges0,
                                      ramA.bridges1,
@@ -363,13 +374,6 @@ void doCUFHE(const Options& opt)
         ramA.addToRunner(runner);
         ramB.addToRunner(runner);
     }
-    else {
-        // Set RAM
-        for (int addr = 0; addr < 512; addr++)
-            for (int bit = 0; bit < 8; bit++)
-                get(*net.core, "ram", std::to_string(addr), bit)
-                    ->set(*tfhepp2cufhe(reqPacket.ram.at(addr * 8 + bit)));
-    }
 
     if (opt.romPorts.empty()) {
         // Set ROM
@@ -437,11 +441,15 @@ void doCUFHE(const Options& opt)
     {
         std::stringstream devnull;
         std::ostream& os = opt.quiet ? devnull : std::cout;
-        processCycles(opt.numCycles, os, [&] {
+        processCycles(opt.numCycles, os, [&](bool first) {
             if (opt.dumpEveryClock)
                 dumpResult(net, opt);
 
             runner.tick();
+
+            if (first)
+                setInitialRAM(net, reqPacket, opt.ramEnabled);
+
             runner.run();
             return false;
         });
