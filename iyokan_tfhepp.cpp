@@ -44,6 +44,22 @@ KVSPResPacket makeResPacket(TFHEppNetwork &net, int numCycles, bool ramEnabled)
 
     return resPacket;
 }
+
+void dumpResult(TFHEppNetwork &net, const Options &opt)
+{
+    KVSPResPacket resPacket = makeResPacket(net, opt.numCycles, opt.ramEnabled);
+    if (opt.secretKey) {  // as plain
+        auto sk = std::make_shared<TFHEpp::SecretKey>();
+        readFromArchive(*sk, *opt.secretKey);
+        if (opt.enableJSONPrint)
+            decrypt(*sk, resPacket).printAsJSON(std::cout);
+        else
+            decrypt(*sk, resPacket).print(std::cout);
+    }
+    else {  // as encrypted
+        writeToArchive(opt.outputFile, resPacket);
+    }
+}
 }  // namespace
 
 void processAllGates(TFHEppNetwork &net, int numWorkers, TFHEppWorkerInfo wi,
@@ -204,11 +220,6 @@ void doTFHE(const Options &opt)
         return net.merge<TFHEpp::TLWElvl0>(rom, lhs2rhs, rhs2lhs);
     }();
 
-    // Get #cycles
-    int numCycles = std::numeric_limits<int>::max();
-    if (opt.numCycles > 0)
-        numCycles = opt.numCycles;
-
     // Turn reset on
     get(net, "input", "reset", 0)->set([] {
         TFHEpp::TLWElvl0 one;
@@ -230,26 +241,16 @@ void doTFHE(const Options &opt)
     {
         std::stringstream devnull;
         std::ostream &os = opt.quiet ? devnull : std::cout;
-        processCycles(numCycles, os, [&] {
+        processCycles(opt.numCycles, os, [&] {
+            if (opt.dumpEveryClock)
+                dumpResult(net, opt);
+
             net.tick();
             processAllGates(net, opt.numWorkers, wi);
             return false;
         });
     }
 
-    // Dump result packet...
-    KVSPResPacket resPacket = makeResPacket(net, numCycles, opt.ramEnabled);
-    if (opt.secretKey) {  // ...as plain
-        auto sk = std::make_shared<TFHEpp::SecretKey>();
-        readFromArchive(*sk, *opt.secretKey);
-        if (opt.enableJSONPrint) {
-            decrypt(*sk, resPacket).printAsJSON(std::cout);
-        }
-        else {
-            decrypt(*sk, resPacket).print(std::cout);
-        }
-    }
-    else {  // ...as encrypted
-        writeToArchive(opt.outputFile, resPacket);
-    }
+    // Dump result packet
+    dumpResult(net, opt);
 }

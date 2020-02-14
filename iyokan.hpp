@@ -1167,6 +1167,7 @@ struct Options {
     std::optional<std::string> secretKey;
     bool enableJSONPrint = false;
     bool quiet = false;
+    bool dumpEveryClock = false;
 };
 
 template <class Func>

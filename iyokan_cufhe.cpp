@@ -52,6 +52,23 @@ KVSPResPacket makeResPacket(CUFHENetworkManager& net, int numCycles,
 
     return resPacket;
 }
+
+void dumpResult(CUFHENetworkManager& net, const Options& opt)
+{
+    KVSPResPacket resPacket = makeResPacket(net, opt.numCycles, opt.ramEnabled);
+    if (opt.secretKey) {  // as plain
+        auto sk = std::make_shared<TFHEpp::SecretKey>();
+        readFromArchive(*sk, *opt.secretKey);
+        if (opt.enableJSONPrint)
+            decrypt(*sk, resPacket).printAsJSON(std::cout);
+        else
+            decrypt(*sk, resPacket).print(std::cout);
+    }
+    else {  // as encrypted
+        writeToArchive(opt.outputFile, resPacket);
+    }
+}
+
 }  // namespace
 
 void processAllGates(CUFHENetwork& net, int numWorkers,
@@ -399,11 +416,6 @@ void doCUFHE(const Options& opt)
     runner.addNetwork(net.core);
     assert(runner.isValid());
 
-    // Get #cycles
-    int numCycles = std::numeric_limits<int>::max();
-    if (opt.numCycles > 0)
-        numCycles = opt.numCycles;
-
     // Turn reset on
     {
         cufhe::Ctxt one;
@@ -425,7 +437,10 @@ void doCUFHE(const Options& opt)
     {
         std::stringstream devnull;
         std::ostream& os = opt.quiet ? devnull : std::cout;
-        processCycles(numCycles, os, [&] {
+        processCycles(opt.numCycles, os, [&] {
+            if (opt.dumpEveryClock)
+                dumpResult(net, opt);
+
             runner.tick();
             runner.run();
             return false;
@@ -433,20 +448,7 @@ void doCUFHE(const Options& opt)
     }
 
     // Dump result packet
-    KVSPResPacket resPacket = makeResPacket(net, numCycles, opt.ramEnabled);
-    if (opt.secretKey) {  // ...as plain
-        auto sk = std::make_shared<TFHEpp::SecretKey>();
-        readFromArchive(*sk, *opt.secretKey);
-        if (opt.enableJSONPrint) {
-            decrypt(*sk, resPacket).printAsJSON(std::cout);
-        }
-        else {
-            decrypt(*sk, resPacket).print(std::cout);
-        }
-    }
-    else {  // ...as encrypted
-        writeToArchive(opt.outputFile, resPacket);
-    }
+    dumpResult(net, opt);
 
     // Clean cuFHE up
     cufhe::CleanUp();

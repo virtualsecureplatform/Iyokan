@@ -35,6 +35,7 @@ int main(int argc, char **argv)
         plain->fallthrough();
         plain->parse_complete_callback([&] { type = TYPE::PLAIN; });
         plain->add_option("-c", opt.numCycles, "");
+        plain->add_flag("--enable-dump-every-clock", opt.dumpEveryClock, "");
     }
 
     {
@@ -43,6 +44,8 @@ int main(int argc, char **argv)
         tfhe->add_option("-c", opt.numCycles, "")->required();
         tfhe->add_option("-o", opt.outputFile, "")->required();
         tfhe->add_option("--secret-key", opt.secretKey, "");
+        tfhe->add_flag("--enable-dump-every-clock", opt.dumpEveryClock, "")
+            ->needs("--secret-key");
 #ifdef IYOKAN_CUDA_ENABLED
         tfhe->add_flag("--enable-gpu", enableGPU, "");
 #endif

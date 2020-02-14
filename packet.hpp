@@ -99,7 +99,7 @@ struct KVSPPlainResPacket {
             root.emplace_back(item);
         }
 
-        os << picojson::value(root);
+        os << picojson::value(root) << std::endl;
     }
 
     void print(std::ostream& os)
@@ -107,6 +107,9 @@ struct KVSPPlainResPacket {
         assert(flags.size() == 1);
         assert(regs.size() == 16);
         assert(ram.size() == 512);
+
+        std::ios fmt{nullptr};
+        fmt.copyfmt(os);
 
         // Print the number of cycles
         os << "#cycle\t";
@@ -141,6 +144,9 @@ struct KVSPPlainResPacket {
             if (addr % WIDTH == WIDTH - 1)
                 os << std::endl;
         }
+
+        os << std::endl;
+        os.copyfmt(fmt);
     }
 };
 

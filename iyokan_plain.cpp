@@ -48,6 +48,16 @@ KVSPPlainResPacket makeResPacket(PlainNetwork &net, int numCycles,
     return resPacket;
 }
 
+void dumpResult(PlainNetwork &net, const Options &opt, int numCycles)
+{
+    KVSPPlainResPacket resPacket =
+        makeResPacket(net, numCycles, opt.ramEnabled);
+    if (opt.enableJSONPrint)
+        resPacket.printAsJSON(std::cout);
+    else
+        resPacket.print(std::cout);
+}
+
 }  // namespace
 
 void processAllGates(PlainNetwork &net, int numWorkers,
@@ -226,6 +236,9 @@ void doPlain(const Options &opt)
         std::stringstream devnull;
         std::ostream &os = opt.quiet ? devnull : std::cout;
         numCycles = processCycles(numCycles, os, [&] {
+            if (opt.dumpEveryClock)
+                dumpResult(net, opt, numCycles);
+
             net.tick();
             processAllGates(net, opt.numWorkers);
 
@@ -235,12 +248,5 @@ void doPlain(const Options &opt)
     }
 
     // Print the results
-    KVSPPlainResPacket resPacket =
-        makeResPacket(net, numCycles, opt.ramEnabled);
-    if (opt.enableJSONPrint) {
-        resPacket.printAsJSON(std::cout);
-    }
-    else {
-        resPacket.print(std::cout);
-    }
+    dumpResult(net, opt, numCycles);
 }
