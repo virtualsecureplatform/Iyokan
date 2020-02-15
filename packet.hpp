@@ -192,7 +192,7 @@ inline KVSPPlainReqPacket parseELF(std::istream& is)
     reader.load(is);
     assert(reader.segments.size() != 0);
 
-    std::vector<uint8_t> rom(512), ram(512);
+    std::vector<uint8_t> rom(512, 0), ram(512, 0);
     for (ELFIO::segment* pseg : reader.segments) {
         ELFIO::segment& seg = *pseg;
         auto size = seg.get_file_size();
