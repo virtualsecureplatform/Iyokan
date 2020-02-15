@@ -72,6 +72,7 @@ protected:
 public:
     TaskCUFHEGateDFF() : TaskCUFHEGateMem(1)
     {
+        cufhe::ConstantZero(output());
     }
 
     bool areInputsReady() const override

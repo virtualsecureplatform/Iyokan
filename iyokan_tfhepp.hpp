@@ -20,8 +20,15 @@ using TaskTFHEppGate =
     Task<TFHEpp::TLWElvl0, TFHEpp::TLWElvl0, TFHEppWorkerInfo>;
 using TaskTFHEppGateMem =
     TaskMem<TFHEpp::TLWElvl0, TFHEpp::TLWElvl0, TFHEppWorkerInfo>;
-using TaskTFHEppGateDFF =
-    TaskDFF<TFHEpp::TLWElvl0, TFHEpp::TLWElvl0, TFHEppWorkerInfo>;
+
+class TaskTFHEppGateDFF
+    : public TaskDFF<TFHEpp::TLWElvl0, TFHEpp::TLWElvl0, TFHEppWorkerInfo> {
+public:
+    TaskTFHEppGateDFF()
+    {
+        TFHEpp::HomCONSTANTZERO(output());
+    }
+};
 
 class TaskTFHEppGateWIRE
     : public TaskMem<TFHEpp::TLWElvl0, TFHEpp::TLWElvl0, TFHEppWorkerInfo> {

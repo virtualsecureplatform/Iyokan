@@ -5,7 +5,14 @@
 
 using TaskPlainGate = Task<uint8_t, uint8_t, uint8_t /*dummy*/>;
 using TaskPlainGateMem = TaskMem<uint8_t, uint8_t, uint8_t /* dummy */>;
-using TaskPlainGateDFF = TaskDFF<uint8_t, uint8_t, uint8_t /* dummy */>;
+
+class TaskPlainGateDFF : public TaskDFF<uint8_t, uint8_t, uint8_t /* dummy */> {
+public:
+    TaskPlainGateDFF()
+    {
+        output() = 0;
+    }
+};
 
 class TaskPlainGateWIRE
     : public TaskMem<uint8_t, uint8_t, uint8_t /* dummy */> {
