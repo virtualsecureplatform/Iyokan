@@ -255,7 +255,7 @@ void doPlain(const Options &opt)
 
     // Print the results
     KVSPPlainResPacket resPacket =
-        makeResPacket(net, opt.numCycles, opt.ramEnabled);
+        makeResPacket(net, numCycles, opt.ramEnabled);
     if (dumpOS)
         resPacket.printAsJSON(*dumpOS);
     resPacket.print(std::cout);

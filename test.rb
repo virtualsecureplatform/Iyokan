@@ -72,6 +72,7 @@ test_iyokan [
   "-l", "test/diamond-core.json",
   "-i", "_test_plain_req_packet00",
 ] do |r|
+  assert_regex r, /#cycle\t8/
   assert_regex r, /f0\t1/
   assert_regex r, /x0\t42/
 end
@@ -82,6 +83,7 @@ test_iyokan [
   "-i", "_test_plain_req_packet00",
   "--enable-rom", "io_romAddr:7:io_romData:32",
 ] do |r|
+  assert_regex r, /#cycle\t8/
   assert_regex r, /f0\t1/
   assert_regex r, /x0\t42/
 end
@@ -93,6 +95,7 @@ test_iyokan [
   "--enable-rom", "io_romAddr:7:io_romData:32",
   "--enable-ram",
 ] do |r|
+  assert_regex r, /#cycle\t8/
   assert_regex r, /f0\t1/
   assert_regex r, /x0\t42/
 end
@@ -122,6 +125,7 @@ if $SLOW_MODE_ENABLED
     "-c", "8",
   ] do |_|
     r = check_code "./kvsp-packet", ["dec", "_test_sk", "_test_res_packet00"]
+    assert_regex r, /#cycle\t8/
     assert_regex r, /f0\t1/
     assert_regex r, /x0\t42/
   end
@@ -135,6 +139,7 @@ if $SLOW_MODE_ENABLED
     "--enable-rom", "io_romAddr:7:io_romData:32",
   ] do |_|
     r = check_code "./kvsp-packet", ["dec", "_test_sk", "_test_res_packet00"]
+    assert_regex r, /#cycle\t8/
     assert_regex r, /f0\t1/
     assert_regex r, /x0\t42/
   end
@@ -149,6 +154,7 @@ if $SLOW_MODE_ENABLED
     "--enable-ram",
   ] do |_|
     r = check_code "./kvsp-packet", ["dec", "_test_sk", "_test_res_packet00"]
+    assert_regex r, /#cycle\t8/
     assert_regex r, /f0\t1/
     assert_regex r, /x0\t42/
   end
@@ -163,6 +169,7 @@ if $SLOW_MODE_ENABLED
       "--enable-gpu",
     ] do |_|
       r = check_code "./kvsp-packet", ["dec", "_test_sk", "_test_res_packet00"]
+      assert_regex r, /#cycle\t8/
       assert_regex r, /f0\t1/
       assert_regex r, /x0\t42/
     end
@@ -177,6 +184,7 @@ if $SLOW_MODE_ENABLED
       "--enable-gpu",
     ] do |_|
       r = check_code "./kvsp-packet", ["dec", "_test_sk", "_test_res_packet00"]
+      assert_regex r, /#cycle\t8/
       assert_regex r, /f0\t1/
       assert_regex r, /x0\t42/
     end
