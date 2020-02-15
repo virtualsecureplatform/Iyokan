@@ -36,10 +36,10 @@ KVSPResPacket makeResPacket(CUFHENetworkManager& net, int numCycles,
         for (int addr = 0; addr < 512; addr++) {
             for (int bit = 0; bit < 8; bit++) {
                 auto ram = (addr % 2 == 1 ? net.ramA : net.ramB)
-                               ->get<TaskTFHEppRAMUX>(
+                               ->get<TaskCUFHERAMUX>(
                                    "ram", (addr % 2 == 1 ? "A" : "B"), bit);
                 assert(ram);
-                resPacket.ramCk.push_back(ram->get(addr / 2));
+                resPacket.ramCk.push_back(ram->get(addr / 2).trlwehost);
             }
         }
     }
@@ -68,8 +68,7 @@ void setInitialRAM(CUFHENetworkManager& net, const KVSPReqPacket& reqPacket,
         for (int addr = 0; addr < 512; addr++)
             for (int bit = 0; bit < 8; bit++)
                 (addr % 2 == 1 ? net.ramA : net.ramB)
-                    ->get<TaskTFHEppRAMUX>("ram", addr % 2 == 1 ? "A" : "B",
-                                           bit)
+                    ->get<TaskCUFHERAMUX>("ram", addr % 2 == 1 ? "A" : "B", bit)
                     ->set(addr / 2, reqPacket.ramCk.at(addr * 8 + bit));
     }
     else {
@@ -309,7 +308,7 @@ void makeTFHEppRAMNetworkForCUFHEImpl(
 
     // Create inputs and CBs.
     std::vector<std::shared_ptr<TaskTFHEppCBWithInv>> cbs;
-    for (size_t i = 0; i < TaskTFHEppRAMUX::ADDRESS_BIT; i++) {
+    for (size_t i = 0; i < TaskCUFHERAMUX::ADDRESS_BIT; i++) {
         auto taskINPUT = bt.getTask<TaskTFHEppGateWIRE>("input", "addr", i);
         auto taskCB = std::make_shared<TaskTFHEppCBWithInv>();
         bt.addTask(NodeLabel{bt.genid(), "CBWithInv", detail::fok("[", i, "]")},
@@ -319,8 +318,8 @@ void makeTFHEppRAMNetworkForCUFHEImpl(
     }
 
     // Create RAMUX.
-    auto taskRAMUX = std::make_shared<TaskTFHEppRAMUX>();
-    bt.addTask(NodeLabel{bt.genid(), "RAMUX", ""}, 0, taskRAMUX);
+    auto taskRAMUX =
+        bt.emplaceTask<TaskCUFHERAMUX>(NodeLabel{bt.genid(), "RAMUX", ""}, 0);
     bt.registerTask("ram", ramPortName, indexByte, taskRAMUX);
 
     // Connect CBs and RAMUX.
@@ -351,11 +350,11 @@ void makeTFHEppRAMNetworkForCUFHEImpl(
     bt.connectTasks(taskInputWriteEnabled, taskMUXWoSE);
 
     // Create links of CMUXs -> SEI -> GateBootstrapping.
-    for (int i = 0; i < (1 << TaskTFHEppRAMUX::ADDRESS_BIT); i++) {
+    for (int i = 0; i < (1 << TaskCUFHERAMUX::ADDRESS_BIT); i++) {
         // Create components...
         auto taskCMUXs = bt.emplaceTask<TaskTFHEppRAMCMUXs>(
             NodeLabel{bt.genid(), "CMUXs", detail::fok("[", i, "]")}, 0,
-            taskRAMUX->get(i), i);
+            taskRAMUX->get(i).trlwehost, i);
 
         auto tfhepp2cufhe = bt.emplaceTask<TaskTFHEpp2CUFHETRLWElvl1>(
             NodeLabel{bt.genid(), "tfhepp2cufhe", ""}, 0);
@@ -364,10 +363,7 @@ void makeTFHEppRAMNetworkForCUFHEImpl(
             NodeLabel{bc.genid(), "SEI&KS", detail::fok("[", i, "]")}, 0);
 
         auto taskGB = bc.emplaceTask<TaskCUFHERAMGateBootstrapping>(
-            NodeLabel{bc.genid(), "GB", detail::fok("[", i, "]")}, 0);
-
-        auto taskSetter = bt.emplaceTask<TaskCUFHERAMSetter>(
-            NodeLabel{bt.genid(), "RAMSetter", detail::fok("[", i, "]")}, 0,
+            NodeLabel{bc.genid(), "GB", detail::fok("[", i, "]")}, 0,
             taskRAMUX->get(i));
 
         // ... and connect them.
@@ -377,7 +373,6 @@ void makeTFHEppRAMNetworkForCUFHEImpl(
         bt.connectTasks(taskCMUXs, tfhepp2cufhe);
         bridge1.push_back(connectWithBridge(tfhepp2cufhe, taskSEIAndKS));
         bc.connectTasks(taskSEIAndKS, taskGB);
-        bridge0.push_back(connectWithBridge(taskGB, taskSetter));
     }
 }
 
@@ -390,7 +385,7 @@ CUFHENetworkWithTFHEpp makeTFHEppRAMNetworkForCUFHE(
     std::vector<std::shared_ptr<TFHEpp2CUFHEBridge>> bridge1;
 
     // Inputs for address.
-    for (size_t i = 0; i < TaskTFHEppRAMUX::ADDRESS_BIT; i++)
+    for (size_t i = 0; i < TaskCUFHERAMUX::ADDRESS_BIT; i++)
         bt.addINPUT<TaskTFHEppGateWIRE>(bt.genid(), 0, "addr", i, false);
 
     // Input for write-in flag.

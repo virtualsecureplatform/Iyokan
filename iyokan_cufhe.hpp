@@ -278,6 +278,73 @@ public:
     }
 };
 
+class TaskCUFHERAMUX
+    : public TaskAsync<TRGSWFFTlvl1Pair, TFHEpp::TRLWElvl1, TFHEppWorkerInfo> {
+public:
+    const static size_t ADDRESS_BIT = 8;
+
+private:
+    std::vector<cufhe::cuFHETRLWElvl1> data_;
+
+private:
+    void RAMUX()
+    {
+        const uint32_t num_trlwe = 1 << ADDRESS_BIT;
+        std::array<TFHEpp::TRLWElvl1, num_trlwe / 2> temp;
+        auto addr = [this](size_t i) -> const TFHEpp::TRGSWFFTlvl1& {
+            return input(i).inverted;
+        };
+
+        for (uint32_t index = 0; index < num_trlwe / 2; index++) {
+            TFHEpp::CMUXFFTlvl1(temp[index], addr(0),
+                                data_[2 * index].trlwehost,
+                                data_[2 * index + 1].trlwehost);
+        }
+
+        for (uint32_t bit = 0; bit < (ADDRESS_BIT - 2); bit++) {
+            const uint32_t stride = 1 << bit;
+            for (uint32_t index = 0; index < (num_trlwe >> (bit + 2));
+                 index++) {
+                TFHEpp::CMUXFFTlvl1(temp[(2 * index) * stride], addr(bit + 1),
+                                    temp[(2 * index) * stride],
+                                    temp[(2 * index + 1) * stride]);
+            }
+        }
+
+        const uint32_t stride = 1 << (ADDRESS_BIT - 2);
+        TFHEpp::CMUXFFTlvl1(output(), addr(ADDRESS_BIT - 1), temp[0],
+                            temp[stride]);
+    }
+
+    void startSync(TFHEppWorkerInfo) override
+    {
+        RAMUX();
+    }
+
+public:
+    TaskCUFHERAMUX()
+        : TaskAsync<TRGSWFFTlvl1Pair, TFHEpp::TRLWElvl1, TFHEppWorkerInfo>(
+              ADDRESS_BIT),
+          data_(1 << ADDRESS_BIT)
+    {
+    }
+
+    const cufhe::cuFHETRLWElvl1& get(size_t addr) const
+    {
+        return data_.at(addr);
+    }
+
+    cufhe::cuFHETRLWElvl1& get(size_t addr)
+    {
+        return data_.at(addr);
+    }
+
+    void set(size_t addr, TFHEpp::TRLWElvl1 val)
+    {
+        data_.at(addr).trlwehost = std::move(val);
+    }
+};
+
 class TaskCUFHERAMSEIAndKS
     : public Task<cufhe::cuFHETRLWElvl1, cufhe::Ctxt, CUFHEWorkerInfo> {
 private:
@@ -303,48 +370,27 @@ public:
 };
 
 class TaskCUFHERAMGateBootstrapping
-    : public Task<cufhe::Ctxt, cufhe::cuFHETRLWElvl1, CUFHEWorkerInfo> {
+    : public Task<cufhe::Ctxt, uint8_t /* dummy */, CUFHEWorkerInfo> {
 private:
     CUFHEWorkerInfo wi_;
+    cufhe::cuFHETRLWElvl1& mem_;
 
 private:
     void startAsyncImpl(CUFHEWorkerInfo wi) override
     {
         wi_ = std::move(wi);
-        cufhe::GateBootstrappingTLWE2TRLWElvl01NTT(output(), input(0),
-                                                   *wi_.stream);
+        cufhe::GateBootstrappingTLWE2TRLWElvl01NTT(mem_, input(0), *wi_.stream);
     }
 
 public:
-    TaskCUFHERAMGateBootstrapping()
-        : Task<cufhe::Ctxt, cufhe::cuFHETRLWElvl1, CUFHEWorkerInfo>(1)
+    TaskCUFHERAMGateBootstrapping(cufhe::cuFHETRLWElvl1& mem)
+        : Task<cufhe::Ctxt, uint8_t, CUFHEWorkerInfo>(1), mem_(mem)
     {
     }
 
     bool hasFinished() const override
     {
         return cufhe::StreamQuery(*wi_.stream);
-    }
-};
-
-class TaskCUFHERAMSetter
-    : public TaskAsync<cufhe::cuFHETRLWElvl1, uint8_t /* dummy */,
-                       TFHEppWorkerInfo> {
-private:
-    TFHEpp::TRLWElvl1& mem_;
-
-private:
-    void startSync(TFHEppWorkerInfo) override
-    {
-        mem_ = input(0).trlwehost;
-    }
-
-public:
-    TaskCUFHERAMSetter(TFHEpp::TRLWElvl1& mem)
-        : TaskAsync<cufhe::cuFHETRLWElvl1, uint8_t /* dummy */,
-                    TFHEppWorkerInfo>(1),
-          mem_(mem)
-    {
     }
 };
 
