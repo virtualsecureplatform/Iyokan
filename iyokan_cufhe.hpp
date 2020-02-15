@@ -261,6 +261,93 @@ public:
     }
 };
 
+class TaskTFHEpp2CUFHETRLWElvl1
+    : public TaskAsync<TFHEpp::TRLWElvl1, cufhe::cuFHETRLWElvl1,
+                       TFHEppWorkerInfo> {
+private:
+    void startSync(TFHEppWorkerInfo) override
+    {
+        output().trlwehost = input(0);
+    }
+
+public:
+    TaskTFHEpp2CUFHETRLWElvl1()
+        : TaskAsync<TFHEpp::TRLWElvl1, cufhe::cuFHETRLWElvl1, TFHEppWorkerInfo>(
+              1)
+    {
+    }
+};
+
+class TaskCUFHERAMSEIAndKS
+    : public Task<cufhe::cuFHETRLWElvl1, cufhe::Ctxt, CUFHEWorkerInfo> {
+private:
+    CUFHEWorkerInfo wi_;
+
+private:
+    void startAsyncImpl(CUFHEWorkerInfo wi) override
+    {
+        wi_ = std::move(wi);
+        cufhe::SampleExtractAndKeySwitch(output(), input(0), *wi_.stream);
+    }
+
+public:
+    TaskCUFHERAMSEIAndKS()
+        : Task<cufhe::cuFHETRLWElvl1, cufhe::Ctxt, CUFHEWorkerInfo>(1)
+    {
+    }
+
+    bool hasFinished() const override
+    {
+        return cufhe::StreamQuery(*wi_.stream);
+    }
+};
+
+class TaskCUFHERAMGateBootstrapping
+    : public Task<cufhe::Ctxt, cufhe::cuFHETRLWElvl1, CUFHEWorkerInfo> {
+private:
+    CUFHEWorkerInfo wi_;
+
+private:
+    void startAsyncImpl(CUFHEWorkerInfo wi) override
+    {
+        wi_ = std::move(wi);
+        cufhe::GateBootstrappingTLWE2TRLWElvl01NTT(output(), input(0),
+                                                   *wi_.stream);
+    }
+
+public:
+    TaskCUFHERAMGateBootstrapping()
+        : Task<cufhe::Ctxt, cufhe::cuFHETRLWElvl1, CUFHEWorkerInfo>(1)
+    {
+    }
+
+    bool hasFinished() const override
+    {
+        return cufhe::StreamQuery(*wi_.stream);
+    }
+};
+
+class TaskCUFHERAMSetter
+    : public TaskAsync<cufhe::cuFHETRLWElvl1, uint8_t /* dummy */,
+                       TFHEppWorkerInfo> {
+private:
+    TFHEpp::TRLWElvl1& mem_;
+
+private:
+    void startSync(TFHEppWorkerInfo) override
+    {
+        mem_ = input(0).trlwehost;
+    }
+
+public:
+    TaskCUFHERAMSetter(TFHEpp::TRLWElvl1& mem)
+        : TaskAsync<cufhe::cuFHETRLWElvl1, uint8_t /* dummy */,
+                    TFHEppWorkerInfo>(1),
+          mem_(mem)
+    {
+    }
+};
+
 using CUFHE2TFHEppBridge = BridgeDepNode<CUFHEWorkerInfo, TFHEppWorkerInfo>;
 using TFHEpp2CUFHEBridge = BridgeDepNode<TFHEppWorkerInfo, CUFHEWorkerInfo>;
 

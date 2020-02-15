@@ -618,6 +618,15 @@ public:
         assert(inserted);
     }
 
+    template <class T, class... Args>
+    std::shared_ptr<T> emplaceTask(NodeLabel label, int priority,
+                                   Args &&... args)
+    {
+        auto task = std::make_shared<T>(std::forward<Args>(args)...);
+        addTask(label, priority, task);
+        return task;
+    }
+
     void registerTask(const std::string &kind, const std::string &portName,
                       int portBit,
                       const std::shared_ptr<TaskBase<WorkerInfo>> &task)

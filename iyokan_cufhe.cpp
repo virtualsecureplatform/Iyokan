@@ -248,12 +248,169 @@ void connectCUFHENetWithTFHEppNet(
     }
 }
 
-CUFHENetworkWithTFHEpp makeTFHEppRAMNetworkForCUFHE(
-    const std::string& romPortName)
+void makeTFHEppRAMNetworkForCUFHEImpl(
+    NetworkBuilderBase<CUFHEWorkerInfo>& bc,
+    NetworkBuilderBase<TFHEppWorkerInfo>& bt,
+    std::vector<
+        std::shared_ptr<BridgeDepNode<CUFHEWorkerInfo, TFHEppWorkerInfo>>>&
+        bridge0,
+    std::vector<
+        std::shared_ptr<BridgeDepNode<TFHEppWorkerInfo, CUFHEWorkerInfo>>>&
+        bridge1,
+    const std::string& ramPortName, int indexByte)
 {
-    auto tfheppNet =
-        std::make_shared<TFHEppNetwork>(makeTFHEppRAMNetwork(romPortName));
-    return CUFHENetworkWithTFHEpp{nullptr, tfheppNet, {}, {}};
+    /*
+                   +------+
+                   | CB   |
+        ADDR[0] -- | with |---+
+                   | Inv  |   |
+                   +------+   |
+                              |   +-+
+                   +------+   +---| |
+                   | CB   |       | |
+        ADDR[1] -- | with |-------| |
+                   | Inv  |       | |
+                   +------+       | +-->B
+                                  | |
+            ...
+
+
+        ===========================================================================
+
+                                  +------+
+              +-----+   WDATA ->--+ MUX  |
+              | RAM |             | woSE |--->A
+        B-> --+ UX  +-- SEI --+---+      |
+              +-----+         |   +------+
+                              |      ^
+                              |      +--- Mem
+                              |          Write
+                              +--> RDATA
+
+        ===========================================================================
+
+               +-------+   +--------+    B          +-----------+   B
+        B-> ---+ CMUXs |   | TFHEpp |    r          | Gate      |   r
+               |  [0]  +---|   2    | -- i -- SEI --| Boot-     |-- i -- Setter
+        A-> ---+       |   | cuFHE  |    d          | strapping |   d
+               +-------+   +--------+    g          +-----------+   g
+                                         e                          e
+
+               +-------+   +--------+    B          +-----------+   B
+        B-> ---+ CMUXs |   | TFHEpp |    r          | Gate      |   r
+               |  [0]  +---|   2    | -- i -- SEI --| Boot-     |-- i -- Setter
+        A-> ---+       |   | cuFHE  |    d          | strapping |   d
+               +-------+   +--------+    g          +-----------+   g
+                                         e                          e
+
+                  ...
+
+    */
+
+    // Create inputs and CBs.
+    std::vector<std::shared_ptr<TaskTFHEppCBWithInv>> cbs;
+    for (size_t i = 0; i < TaskTFHEppRAMUX::ADDRESS_BIT; i++) {
+        auto taskINPUT = bt.getTask<TaskTFHEppGateWIRE>("input", "addr", i);
+        auto taskCB = std::make_shared<TaskTFHEppCBWithInv>();
+        bt.addTask(NodeLabel{bt.genid(), "CBWithInv", detail::fok("[", i, "]")},
+                   0, taskCB);
+        bt.connectTasks(taskINPUT, taskCB);
+        cbs.push_back(taskCB);
+    }
+
+    // Create RAMUX.
+    auto taskRAMUX = std::make_shared<TaskTFHEppRAMUX>();
+    bt.addTask(NodeLabel{bt.genid(), "RAMUX", ""}, 0, taskRAMUX);
+    bt.registerTask("ram", ramPortName, indexByte, taskRAMUX);
+
+    // Connect CBs and RAMUX.
+    for (auto&& cb : cbs)
+        bt.connectTasks(cb, taskRAMUX);
+
+    // Create SEIs and connect with CBs.
+    auto taskSEI0 = std::make_shared<TaskTFHEppSEI>(0);
+    bt.addTask(NodeLabel{bt.genid(), "SEI", "[0]"}, 0, taskSEI0);
+    bt.connectTasks(taskRAMUX, taskSEI0);
+
+    // Create output for read-out data and connect.
+    auto taskOutputReadData =
+        bt.getTask<TaskTFHEppGateWIRE>("output", "rdata", indexByte);
+    bt.connectTasks(taskSEI0, taskOutputReadData);
+
+    // Create input for write-in data.
+    auto taskInputWriteData =
+        bt.getTask<TaskTFHEppGateWIRE>("input", "wdata", indexByte);
+    auto taskInputWriteEnabled =
+        bt.getTask<TaskTFHEppGateWIRE>("input", "wren", 0);
+
+    // Create MUXWoSE and connect.
+    auto taskMUXWoSE = std::make_shared<TaskTFHEppGateMUXWoSE>();
+    bt.addTask(NodeLabel{bt.genid(), "MUXWoSE", ""}, 0, taskMUXWoSE);
+    bt.connectTasks(taskSEI0, taskMUXWoSE);
+    bt.connectTasks(taskInputWriteData, taskMUXWoSE);
+    bt.connectTasks(taskInputWriteEnabled, taskMUXWoSE);
+
+    // Create links of CMUXs -> SEI -> GateBootstrapping.
+    for (int i = 0; i < (1 << TaskTFHEppRAMUX::ADDRESS_BIT); i++) {
+        // Create components...
+        auto taskCMUXs = bt.emplaceTask<TaskTFHEppRAMCMUXs>(
+            NodeLabel{bt.genid(), "CMUXs", detail::fok("[", i, "]")}, 0,
+            taskRAMUX->get(i), i);
+
+        auto tfhepp2cufhe = bt.emplaceTask<TaskTFHEpp2CUFHETRLWElvl1>(
+            NodeLabel{bt.genid(), "tfhepp2cufhe", ""}, 0);
+
+        auto taskSEIAndKS = bc.emplaceTask<TaskCUFHERAMSEIAndKS>(
+            NodeLabel{bc.genid(), "SEI&KS", detail::fok("[", i, "]")}, 0);
+
+        auto taskGB = bc.emplaceTask<TaskCUFHERAMGateBootstrapping>(
+            NodeLabel{bc.genid(), "GB", detail::fok("[", i, "]")}, 0);
+
+        auto taskSetter = bt.emplaceTask<TaskCUFHERAMSetter>(
+            NodeLabel{bt.genid(), "RAMSetter", detail::fok("[", i, "]")}, 0,
+            taskRAMUX->get(i));
+
+        // ... and connect them.
+        bt.connectTasks(taskMUXWoSE, taskCMUXs);
+        for (auto&& cb : cbs)
+            bt.connectTasks(cb, taskCMUXs);
+        bt.connectTasks(taskCMUXs, tfhepp2cufhe);
+        bridge1.push_back(connectWithBridge(tfhepp2cufhe, taskSEIAndKS));
+        bc.connectTasks(taskSEIAndKS, taskGB);
+        bridge0.push_back(connectWithBridge(taskGB, taskSetter));
+    }
+}
+
+CUFHENetworkWithTFHEpp makeTFHEppRAMNetworkForCUFHE(
+    const std::string& ramPortName)
+{
+    NetworkBuilderBase<TFHEppWorkerInfo> bt;
+    NetworkBuilderBase<CUFHEWorkerInfo> bc;
+    std::vector<std::shared_ptr<CUFHE2TFHEppBridge>> bridge0;
+    std::vector<std::shared_ptr<TFHEpp2CUFHEBridge>> bridge1;
+
+    // Inputs for address.
+    for (size_t i = 0; i < TaskTFHEppRAMUX::ADDRESS_BIT; i++)
+        bt.addINPUT<TaskTFHEppGateWIRE>(bt.genid(), 0, "addr", i, false);
+
+    // Input for write-in flag.
+    bt.addINPUT<TaskTFHEppGateWIRE>(bt.genid(), 0, "wren", 0, false);
+
+    for (int indexByte = 0; indexByte < 8; indexByte++) {
+        // Input for data to write into RAM.
+        bt.addINPUT<TaskTFHEppGateWIRE>(bt.genid(), 0, "wdata", indexByte,
+                                        false);
+        // Output for data to be read from RAM.
+        bt.addOUTPUT<TaskTFHEppGateWIRE>(bt.genid(), 0, "rdata", indexByte,
+                                         true);
+
+        makeTFHEppRAMNetworkForCUFHEImpl(bc, bt, bridge0, bridge1, ramPortName,
+                                         indexByte);
+    }
+
+    return CUFHENetworkWithTFHEpp{
+        std::make_shared<CUFHENetwork>(std::move(bc)),
+        std::make_shared<TFHEppNetwork>(std::move(bt)), bridge0, bridge1};
 }
 
 CUFHENetworkWithTFHEpp makeTFHEppROMNetworkForCUFHE()
