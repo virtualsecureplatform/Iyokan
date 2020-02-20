@@ -316,6 +316,14 @@ public:
     {
     }
 
+    void reset()
+    {
+        nodes_.clear();
+        edges_.clear();
+        numStartedNodes_ = 0;
+        numNotifiedEdges_ = 0;
+    }
+
     void startNode(const NodeLabel &label)
     {
         auto &n = node(label);

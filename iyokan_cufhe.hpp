@@ -469,15 +469,18 @@ private:
     Runner<TFHEppWorkerInfo, TFHEppWorker> tfhepp_;
     std::vector<std::shared_ptr<CUFHE2TFHEppBridge>> bridges0_;
     std::vector<std::shared_ptr<TFHEpp2CUFHEBridge>> bridges1_;
+    std::shared_ptr<ProgressGraphMaker> graph_;
 
 public:
     CUFHENetworkRunner(int numCUFHEWorkers, int numTFHEppWorkers,
-                       TFHEppWorkerInfo wi)
+                       TFHEppWorkerInfo wi,
+                       std::shared_ptr<ProgressGraphMaker> graph = nullptr)
+        : graph_(std::move(graph))
     {
         for (int i = 0; i < numCUFHEWorkers; i++)
-            cufhe_.addWorker(nullptr);
+            cufhe_.addWorker(graph_);
         for (int i = 0; i < numTFHEppWorkers; i++)
-            tfhepp_.addWorker(wi, nullptr);
+            tfhepp_.addWorker(wi, graph_);
     }
 
     bool isValid()
@@ -523,6 +526,7 @@ public:
 
     void run()
     {
+        graph_->reset();
         cufhe_.prepareToRun();
         tfhepp_.prepareToRun();
 
