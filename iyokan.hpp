@@ -49,6 +49,13 @@ std::string fok(Args... args)
     (ss << ... << args);
     return ss.str();
 }
+
+inline int genid()
+{
+    // FIXME: Assume that ids over (1 << 16) will not be passed by the user.
+    static int id = (1 << 16);
+    return id++;
+}
 }  // namespace detail
 
 template <class WorkerInfo>
@@ -707,13 +714,6 @@ public:
         to->addInputPtr(from->getOutputPtr());
         from->depnode()->addDependent(to->depnode());
     }
-
-    static int genid()
-    {
-        // FIXME: Assume that ids over (1 << 16) will not be passed by the user.
-        static int id = (1 << 16);
-        return id++;
-    }
 };
 
 template <class TaskType, class TaskTypeMem, class TaskTypeDFF,
@@ -1165,8 +1165,7 @@ public:
     BridgeDepNode(std::shared_ptr<DepNode<OutWorkerInfo>> src)
         : DepNode<InWorkerInfo>(
               0, std::make_shared<TaskBlackHole<InWorkerInfo>>(1),
-              NodeLabel{NetworkBuilderBase<InWorkerInfo>::genid(), "bridge",
-                        ""}),
+              NodeLabel{detail::genid(), "bridge", ""}),
           src_(src)
     {
     }

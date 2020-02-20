@@ -1266,12 +1266,14 @@ void testBridgeBetweenCUFHEAndTFHEpp()
 
     NetworkBuilderBase<CUFHEWorkerInfo> b0;
     NetworkBuilderBase<TFHEppWorkerInfo> b1;
-    auto t0 = b0.addINPUT<TaskCUFHEGateWIRE>(b0.genid(), 0, "in", 0, false);
+    auto t0 =
+        b0.addINPUT<TaskCUFHEGateWIRE>(detail::genid(), 0, "in", 0, false);
     auto t1 = std::make_shared<TaskCUFHE2TFHEpp>();
-    b1.addTask(NodeLabel{b1.genid(), "cufhe2tfhepp", ""}, 0, t1);
+    b1.addTask(NodeLabel{detail::genid(), "cufhe2tfhepp", ""}, 0, t1);
     auto t2 = std::make_shared<TaskTFHEpp2CUFHE>();
-    b1.addTask(NodeLabel{b1.genid(), "tfhepp2cufhe", ""}, 0, t2);
-    auto t3 = b0.addOUTPUT<TaskCUFHEGateWIRE>(b0.genid(), 0, "out", 0, true);
+    b1.addTask(NodeLabel{detail::genid(), "tfhepp2cufhe", ""}, 0, t2);
+    auto t3 =
+        b0.addOUTPUT<TaskCUFHEGateWIRE>(detail::genid(), 0, "out", 0, true);
     b0.connectTasks(t1, t2);
 
     auto net0 = std::make_shared<TaskNetwork<CUFHEWorkerInfo>>(std::move(b0));

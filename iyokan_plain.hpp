@@ -224,32 +224,32 @@ inline TaskNetwork<uint8_t> makePlainRAMNetwork(const std::string &ramPortName)
 
     // Create RAM
     auto taskRAM = std::make_shared<TaskPlainRAM>();
-    builder.addTask(NodeLabel{builder.genid(), "RAM", "body"}, 0, taskRAM);
+    builder.addTask(NodeLabel{detail::genid(), "RAM", "body"}, 0, taskRAM);
     builder.registerTask("ram", ramPortName, 0, taskRAM);
 
     // Create inputs and outputs, and connect to RAM
     for (size_t i = 0; i < TaskPlainRAM::ADDRESS_BIT; i++) {
-        auto taskINPUT = builder.addINPUT<TaskPlainGateWIRE>(builder.genid(), 0,
+        auto taskINPUT = builder.addINPUT<TaskPlainGateWIRE>(detail::genid(), 0,
                                                              "addr", i, false);
         builder.connectTasks(taskINPUT, taskRAM);
     }
     auto taskWriteEnabled = builder.addINPUT<TaskPlainGateWIRE>(
-        builder.genid(), 0, "wren", 0, false);
+        detail::genid(), 0, "wren", 0, false);
     builder.connectTasks(taskWriteEnabled, taskRAM);
     for (size_t i = 0; i < 8; i++) {
-        auto taskINPUT = builder.addINPUT<TaskPlainGateWIRE>(builder.genid(), 0,
+        auto taskINPUT = builder.addINPUT<TaskPlainGateWIRE>(detail::genid(), 0,
                                                              "wdata", i, false);
         builder.connectTasks(taskINPUT, taskRAM);
     }
     for (size_t i = 0; i < 8; i++) {
         auto taskSplitter = std::make_shared<TaskPlainSplitter>(i);
         builder.addTask(
-            NodeLabel{builder.genid(), "SPLITTER", detail::fok("RAM[", i, "]")},
+            NodeLabel{detail::genid(), "SPLITTER", detail::fok("RAM[", i, "]")},
             0, taskSplitter);
         builder.connectTasks(taskRAM, taskSplitter);
 
         auto taskOUTPUT = builder.addOUTPUT<TaskPlainGateWIRE>(
-            builder.genid(), 0, "rdata", i, true);
+            detail::genid(), 0, "rdata", i, true);
         builder.connectTasks(taskSplitter, taskOUTPUT);
     }
 
@@ -281,14 +281,14 @@ inline TaskNetwork<uint8_t> makePlainROMNetwork()
     // Create inputs.
     std::vector<std::shared_ptr<TaskPlainGateWIRE>> inputs;
     for (int i = 0; i < 7; i++) {
-        auto taskINPUT = builder.addINPUT<TaskPlainGateWIRE>(builder.genid(), 0,
+        auto taskINPUT = builder.addINPUT<TaskPlainGateWIRE>(detail::genid(), 0,
                                                              "ROM", i, false);
         inputs.push_back(taskINPUT);
     }
 
     // Create ROM.
     auto taskROM = std::make_shared<TaskPlainROM>();
-    builder.addTask(NodeLabel{builder.genid(), "ROM", "body"}, 0, taskROM);
+    builder.addTask(NodeLabel{detail::genid(), "ROM", "body"}, 0, taskROM);
     builder.registerTask("rom", "all", 0, taskROM);
 
     // Connect inputs and ROM.
@@ -300,7 +300,7 @@ inline TaskNetwork<uint8_t> makePlainROMNetwork()
     for (int i = 0; i < 32; i++) {
         auto taskSplitter = std::make_shared<TaskPlainSplitter>(i);
         builder.addTask(
-            NodeLabel{builder.genid(), "SPLITTER", detail::fok("ROM[", i, "]")},
+            NodeLabel{detail::genid(), "SPLITTER", detail::fok("ROM[", i, "]")},
             0, taskSplitter);
         taskSplitters.push_back(taskSplitter);
 
@@ -310,7 +310,7 @@ inline TaskNetwork<uint8_t> makePlainROMNetwork()
     // Create outputs and connect corresponding splitter to it.
     for (int i = 0; i < 32; i++) {
         auto taskOUTPUT = builder.addOUTPUT<TaskPlainGateWIRE>(
-            builder.genid(), 0, "ROM", i, true);
+            detail::genid(), 0, "ROM", i, true);
         auto &&splitter = taskSplitters[i];
         builder.connectTasks(splitter, taskOUTPUT);
     }

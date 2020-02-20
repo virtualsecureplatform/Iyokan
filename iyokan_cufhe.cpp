@@ -210,7 +210,8 @@ void connectCUFHENetWithTFHEppNet(
         // Add the task cufhe2tfhepp to the network tfhepp.
         NetworkBuilderBase<TFHEppWorkerInfo> b;
         auto cufhe2tfhepp = std::make_shared<TaskCUFHE2TFHEpp>();
-        b.addTask(NodeLabel{b.genid(), "cufhe2tfhepp", ""}, 0, cufhe2tfhepp);
+        b.addTask(NodeLabel{detail::genid(), "cufhe2tfhepp", ""}, 0,
+                  cufhe2tfhepp);
         TFHEppNetwork net = std::move(b);
         tfhepp = tfhepp.merge(net);
 
@@ -234,7 +235,8 @@ void connectCUFHENetWithTFHEppNet(
         // Add the task tfhepp2cufhe to the network tfhepp.
         NetworkBuilderBase<TFHEppWorkerInfo> b;
         auto tfhepp2cufhe = std::make_shared<TaskTFHEpp2CUFHE>();
-        b.addTask(NodeLabel{b.genid(), "tfhepp2cufhe", ""}, 0, tfhepp2cufhe);
+        b.addTask(NodeLabel{detail::genid(), "tfhepp2cufhe", ""}, 0,
+                  tfhepp2cufhe);
         TFHEppNetwork net = std::move(b);
         tfhepp = tfhepp.merge(net);
 
@@ -311,15 +313,16 @@ void makeTFHEppRAMNetworkForCUFHEImpl(
     for (size_t i = 0; i < TaskCUFHERAMUX::ADDRESS_BIT; i++) {
         auto taskINPUT = bt.getTask<TaskTFHEppGateWIRE>("input", "addr", i);
         auto taskCB = std::make_shared<TaskTFHEppCBWithInv>();
-        bt.addTask(NodeLabel{bt.genid(), "CBWithInv", detail::fok("[", i, "]")},
-                   0, taskCB);
+        bt.addTask(
+            NodeLabel{detail::genid(), "CBWithInv", detail::fok("[", i, "]")},
+            0, taskCB);
         bt.connectTasks(taskINPUT, taskCB);
         cbs.push_back(taskCB);
     }
 
     // Create RAMUX.
-    auto taskRAMUX =
-        bt.emplaceTask<TaskCUFHERAMUX>(NodeLabel{bt.genid(), "RAMUX", ""}, 0);
+    auto taskRAMUX = bt.emplaceTask<TaskCUFHERAMUX>(
+        NodeLabel{detail::genid(), "RAMUX", ""}, 0);
     bt.registerTask("ram", ramPortName, indexByte, taskRAMUX);
 
     // Connect CBs and RAMUX.
@@ -328,7 +331,7 @@ void makeTFHEppRAMNetworkForCUFHEImpl(
 
     // Create SEIs and connect with CBs.
     auto taskSEI0 = std::make_shared<TaskTFHEppSEI>(0);
-    bt.addTask(NodeLabel{bt.genid(), "SEI", "[0]"}, 0, taskSEI0);
+    bt.addTask(NodeLabel{detail::genid(), "SEI", "[0]"}, 0, taskSEI0);
     bt.connectTasks(taskRAMUX, taskSEI0);
 
     // Create output for read-out data and connect.
@@ -344,7 +347,7 @@ void makeTFHEppRAMNetworkForCUFHEImpl(
 
     // Create MUXWoSE and connect.
     auto taskMUXWoSE = std::make_shared<TaskTFHEppGateMUXWoSE>();
-    bt.addTask(NodeLabel{bt.genid(), "MUXWoSE", ""}, 0, taskMUXWoSE);
+    bt.addTask(NodeLabel{detail::genid(), "MUXWoSE", ""}, 0, taskMUXWoSE);
     bt.connectTasks(taskSEI0, taskMUXWoSE);
     bt.connectTasks(taskInputWriteData, taskMUXWoSE);
     bt.connectTasks(taskInputWriteEnabled, taskMUXWoSE);
@@ -352,26 +355,22 @@ void makeTFHEppRAMNetworkForCUFHEImpl(
     // Create links of CMUXs -> SEI -> GateBootstrapping.
     for (int i = 0; i < (1 << TaskCUFHERAMUX::ADDRESS_BIT); i++) {
         // Create components...
-        auto taskCMUXs = bt.emplaceTask<TaskTFHEppRAMCMUXs>(
-            NodeLabel{bt.genid(), "CMUXs", detail::fok("[", i, "]")}, 0,
+        auto taskCMUXs = bt.emplaceTask<TaskTFHEppRAMCMUXsForCUFHE>(
+            NodeLabel{detail::genid(), "CMUXs", detail::fok("[", i, "]")}, 0,
             taskRAMUX->get(i).trlwehost, i);
 
-        auto tfhepp2cufhe = bt.emplaceTask<TaskTFHEpp2CUFHETRLWElvl1>(
-            NodeLabel{bt.genid(), "tfhepp2cufhe", ""}, 0);
-
         auto taskSEIAndKS = bc.emplaceTask<TaskCUFHERAMSEIAndKS>(
-            NodeLabel{bc.genid(), "SEI&KS", detail::fok("[", i, "]")}, 0);
+            NodeLabel{detail::genid(), "SEI&KS", detail::fok("[", i, "]")}, 0);
 
         auto taskGB = bc.emplaceTask<TaskCUFHERAMGateBootstrapping>(
-            NodeLabel{bc.genid(), "GB", detail::fok("[", i, "]")}, 0,
+            NodeLabel{detail::genid(), "GB", detail::fok("[", i, "]")}, 0,
             taskRAMUX->get(i));
 
         // ... and connect them.
         bt.connectTasks(taskMUXWoSE, taskCMUXs);
         for (auto&& cb : cbs)
             bt.connectTasks(cb, taskCMUXs);
-        bt.connectTasks(taskCMUXs, tfhepp2cufhe);
-        bridge1.push_back(connectWithBridge(tfhepp2cufhe, taskSEIAndKS));
+        bridge1.push_back(connectWithBridge(taskCMUXs, taskSEIAndKS));
         bc.connectTasks(taskSEIAndKS, taskGB);
     }
 }
@@ -386,17 +385,17 @@ CUFHENetworkWithTFHEpp makeTFHEppRAMNetworkForCUFHE(
 
     // Inputs for address.
     for (size_t i = 0; i < TaskCUFHERAMUX::ADDRESS_BIT; i++)
-        bt.addINPUT<TaskTFHEppGateWIRE>(bt.genid(), 0, "addr", i, false);
+        bt.addINPUT<TaskTFHEppGateWIRE>(detail::genid(), 0, "addr", i, false);
 
     // Input for write-in flag.
-    bt.addINPUT<TaskTFHEppGateWIRE>(bt.genid(), 0, "wren", 0, false);
+    bt.addINPUT<TaskTFHEppGateWIRE>(detail::genid(), 0, "wren", 0, false);
 
     for (int indexByte = 0; indexByte < 8; indexByte++) {
         // Input for data to write into RAM.
-        bt.addINPUT<TaskTFHEppGateWIRE>(bt.genid(), 0, "wdata", indexByte,
+        bt.addINPUT<TaskTFHEppGateWIRE>(detail::genid(), 0, "wdata", indexByte,
                                         false);
         // Output for data to be read from RAM.
-        bt.addOUTPUT<TaskTFHEppGateWIRE>(bt.genid(), 0, "rdata", indexByte,
+        bt.addOUTPUT<TaskTFHEppGateWIRE>(detail::genid(), 0, "rdata", indexByte,
                                          true);
 
         makeTFHEppRAMNetworkForCUFHEImpl(bc, bt, bridge0, bridge1, ramPortName,

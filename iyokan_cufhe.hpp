@@ -261,6 +261,100 @@ public:
     }
 };
 
+class TaskTFHEppRAMCMUXsForCUFHE : public TaskBase<TFHEppWorkerInfo> {
+private:
+    size_t numReadyInputs_;
+    std::shared_ptr<cufhe::cuFHETRLWElvl1> output_;
+    std::vector<std::weak_ptr<const TRGSWFFTlvl1Pair>> inputAddrs_;
+    std::weak_ptr<const TFHEpp::TRLWElvl1> inputWritten_;
+
+    const TFHEpp::TRLWElvl1& mem_;
+    const std::bitset<TaskTFHEppRAMUX::ADDRESS_BIT> addrBitset_;
+
+    AsyncThread thr_;
+
+public:
+    TaskTFHEppRAMCMUXsForCUFHE(const TFHEpp::TRLWElvl1& mem, size_t memIndex)
+        : numReadyInputs_(0),
+          output_(std::make_shared<cufhe::cuFHETRLWElvl1>()),
+          inputAddrs_(TaskTFHEppRAMUX::ADDRESS_BIT),
+          mem_(mem),
+          addrBitset_(memIndex)
+    {
+    }
+
+    virtual ~TaskTFHEppRAMCMUXsForCUFHE()
+    {
+    }
+
+    size_t getInputSize() const override
+    {
+        return TaskTFHEppRAMUX::ADDRESS_BIT + 1;
+    }
+
+    bool isValid() override
+    {
+        return this->depnode() &&
+               std::all_of(inputAddrs_.begin(), inputAddrs_.end(),
+                           [](auto&& in) { return in.use_count() != 0; }) &&
+               inputWritten_.use_count() != 0;
+    }
+
+    void tick() override
+    {
+        numReadyInputs_ = 0;
+    }
+
+    void notifyOneInputReady() override
+    {
+        numReadyInputs_++;
+        assert(numReadyInputs_ <= TaskTFHEppRAMUX::ADDRESS_BIT + 1);
+    }
+
+    bool areInputsReady() const override
+    {
+        return numReadyInputs_ == TaskTFHEppRAMUX::ADDRESS_BIT + 1;
+    }
+
+    bool hasFinished() const override
+    {
+        return thr_.hasFinished();
+    }
+
+    void addInputPtr(const std::shared_ptr<const TRGSWFFTlvl1Pair>& input)
+    {
+        auto it = std::find_if(inputAddrs_.begin(), inputAddrs_.end(),
+                               [](auto&& in) { return in.use_count() == 0; });
+        assert(it != inputAddrs_.end());
+        *it = input;
+    }
+
+    void addInputPtr(const std::shared_ptr<const TFHEpp::TRLWElvl1>& input)
+    {
+        assert(inputWritten_.use_count() == 0);
+        inputWritten_ = input;
+    }
+
+    std::shared_ptr<const cufhe::cuFHETRLWElvl1> getOutputPtr() const
+    {
+        return output_;
+    }
+
+    void startAsync(TFHEppWorkerInfo) override
+    {
+        thr_ = [this] {
+            output_->trlwehost = *inputWritten_.lock();
+            for (size_t j = 0; j < TaskTFHEppRAMUX::ADDRESS_BIT; j++) {
+                const TFHEpp::TRGSWFFTlvl1& in =
+                    addrBitset_[j] != 0 ? inputAddrs_[j].lock()->normal
+                                        : inputAddrs_[j].lock()->inverted;
+                TFHEpp::CMUXFFTlvl1(output_->trlwehost, in, output_->trlwehost,
+                                    mem_);
+            }
+        };
+    }
+};
+
 class TaskTFHEpp2CUFHETRLWElvl1
     : public TaskAsync<TFHEpp::TRLWElvl1, cufhe::cuFHETRLWElvl1,
                        TFHEppWorkerInfo> {
