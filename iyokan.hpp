@@ -289,6 +289,9 @@ private:
     struct Node {
         NodeLabel label;
         int index;
+        std::optional<std::chrono::high_resolution_clock::time_point>
+            start = std::nullopt,
+            end = std::nullopt;
     };
 
     struct Edge {
@@ -315,12 +318,39 @@ public:
 
     void startNode(const NodeLabel &label)
     {
-        node(label).index = numStartedNodes_++;
+        auto &n = node(label);
+        n.index = numStartedNodes_++;
+        assert(!n.start && !n.end);
+        n.start = std::chrono::high_resolution_clock::now();
+    }
+
+    void finishNode(const NodeLabel &label)
+    {
+        auto &n = node(label);
+        assert(n.start && !n.end);
+        n.end = std::chrono::high_resolution_clock::now();
     }
 
     void notify(const NodeLabel &from, const NodeLabel &to)
     {
         edges_.push_back(Edge{from.id, to.id, numNotifiedEdges_++});
+    }
+
+    void dumpTime(std::ostream &os) const
+    {
+        std::unordered_map<std::string, std::vector<Node>> kind2nodes;
+        for (auto &&[id, node] : nodes_)
+            kind2nodes[node.label.kind].push_back(node);
+        for (auto &&[kind, nodes] : kind2nodes) {
+            int64_t total = 0;
+            for (auto &&node : nodes) {
+                assert(node.start && node.end);
+                total += std::chrono::duration_cast<std::chrono::milliseconds>(
+                             *node.end - *node.start)
+                             .count();
+            }
+            os << kind << "\t" << total << "\t" << nodes.size() << std::endl;
+        }
     }
 
     void dumpDOT(std::ostream &os) const
@@ -369,6 +399,8 @@ template <class WorkerInfo>
 void DepNode<WorkerInfo>::propagate(ReadyQueue<WorkerInfo> &readyQueue,
                                     ProgressGraphMaker &graph)
 {
+    graph.finishNode(label_);
+
     propagate(readyQueue);
 
     for (auto &&dep_weak : dependents_) {
