@@ -620,7 +620,8 @@ public:
 
     void run()
     {
-        graph_->reset();
+        if (graph_)
+            graph_->reset();
         cufhe_.prepareToRun();
         tfhepp_.prepareToRun();
 
