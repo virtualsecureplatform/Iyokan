@@ -1,6 +1,10 @@
 cmake_minimum_required(VERSION 3.5)
 
-set(CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/sanitizers-cmake/cmake" ${CMAKE_MODULE_PATH})
+set(CMAKE_MODULE_PATH
+    ${CMAKE_SOURCE_DIR}
+    "${CMAKE_SOURCE_DIR}/sanitizers-cmake/cmake"
+    ${CMAKE_MODULE_PATH}
+)
 
 # Defaults to CMAKE_BUILD_TYPE=Debug
 if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
@@ -18,6 +22,7 @@ project(iyokan LANGUAGES CXX)
 find_package(Threads REQUIRED)
 find_package(OpenMP REQUIRED)
 find_package(Sanitizers)
+find_package(TcMalloc)
 
 add_subdirectory(TFHEpp)
 if (IYOKAN_ENABLE_CUDA)
@@ -41,6 +46,9 @@ if (IYOKAN_ENABLE_CUDA)
     list(APPEND IYOKAN_INCLUDE_DIRS ${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES})
 endif(IYOKAN_ENABLE_CUDA)
 set(IYOKAN_LIBS tfhe++ Threads::Threads OpenMP::OpenMP_CXX)
+if (TCMALLOC_FOUND)
+    list(APPEND IYOKAN_LIBS ${TCMALLOC_LIBRARIES})
+endif (TCMALLOC_FOUND)
 
 set(CMAKE_C_FLAGS "")
 set(CMAKE_C_FLAGS_DEBUG "")
