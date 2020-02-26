@@ -39,7 +39,6 @@ inline void copyCtxt(cufhe::Ctxt& dst, const cufhe::Ctxt& src,
 {
     if (stream) {
         cufhe::Copy(dst, src, *stream);
-        cufhe::Synchronize();
     }
     else {
         cufhe::CopyOnHost(dst, src);
