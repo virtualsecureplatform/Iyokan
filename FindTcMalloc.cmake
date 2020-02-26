@@ -33,17 +33,6 @@ SET(_tcmalloc_SEARCH_DIRS
   /sw # Fink
   /opt/local # DarwinPorts
   /opt/csw # Blastwave
-  /usr/include/google # Debain tcmalloc minimal
-  /usr/include/gperftools # Debian gperftools
-)
-
-FIND_PATH(TCMALLOC_INCLUDE_DIR
-  NAMES
-    tcmalloc.h
-  HINTS
-    ${_tcmalloc_SEARCH_DIRS}
-  PATH_SUFFIXES
-    include/tcmalloc
 )
 
 FIND_LIBRARY(TCMALLOC_LIBRARY
@@ -55,18 +44,16 @@ FIND_LIBRARY(TCMALLOC_LIBRARY
     lib64 lib
   )
 
-# handle the QUIETLY and REQUIRED arguments and set TCMALLOC_FOUND to TRUE if 
+# handle the QUIETLY and REQUIRED arguments and set TCMALLOC_FOUND to TRUE if
 # all listed variables are TRUE
 INCLUDE(FindPackageHandleStandardArgs)
 FIND_PACKAGE_HANDLE_STANDARD_ARGS(Tcmalloc DEFAULT_MSG
-    TCMALLOC_LIBRARY TCMALLOC_INCLUDE_DIR)
+    TCMALLOC_LIBRARY)
 
 IF(TCMALLOC_FOUND)
   SET(TCMALLOC_LIBRARIES ${TCMALLOC_LIBRARY})
-  SET(TCMALLOC_INCLUDE_DIRS ${TCMALLOC_INCLUDE_DIR})
 ENDIF(TCMALLOC_FOUND)
 
 MARK_AS_ADVANCED(
-  TCMALLOC_INCLUDE_DIR
   TCMALLOC_LIBRARY
 )
