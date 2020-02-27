@@ -368,6 +368,29 @@ public:
         }
     }
 
+    void dumpCSV(std::ostream &os) const
+    {
+        using namespace std::chrono;
+
+        for (auto &&[id, node] : nodes_) {
+            os << "\""
+               << duration_cast<nanoseconds>(
+                      node.start.value().time_since_epoch())
+                      .count()
+               << "\"";
+            os << ",\""
+               << duration_cast<nanoseconds>(
+                      node.end.value().time_since_epoch())
+                      .count()
+               << "\"";
+            os << ",\"" << node.index << "\"";
+            os << ",\"" << node.label.id << "\"";
+            os << ",\"" << node.label.kind << "\"";
+            os << ",\"" << node.label.desc << "\"";
+            os << std::endl;
+        }
+    }
+
     void dumpDOT(std::ostream &os) const
     {
         os << "digraph progress_graph_maker {" << std::endl;
