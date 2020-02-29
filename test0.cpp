@@ -1067,6 +1067,105 @@ void testBridgeBetweenCUFHEAndTFHEpp()
 }
 #endif
 
+void testBlueprint()
+{
+    using namespace blueprint;
+
+    NetworkBlueprint blueprint{"hoge.toml"};
+
+    {
+        const auto& files = blueprint.files();
+        assert(files.size() == 1);
+        assert(files[0].type == File::TYPE::IYOKANL1_JSON);
+        assert(files[0].path == "test/diamond-core-wo-ram-rom.json");
+        assert(files[0].name == "core");
+    }
+
+    {
+        const auto& roms = blueprint.builtinROMs();
+        assert(roms.size() == 1);
+        assert(roms[0].name == "rom");
+        assert(roms[0].inAddrWidth == 7);
+        assert(roms[0].outRdataWidth == 32);
+    }
+
+    {
+        const auto& rams = blueprint.builtinRAMs();
+        assert(rams.size() == 2);
+        assert(rams[0].name == "ramA" && rams[1].name == "ramB" ||
+               rams[1].name == "ramA" && rams[0].name == "ramB");
+        assert(rams[0].inAddrWidth == 8);
+        assert(rams[0].inWdataWidth == 8);
+        assert(rams[0].outRdataWidth == 8);
+        assert(rams[1].inAddrWidth == 8);
+        assert(rams[1].inWdataWidth == 8);
+        assert(rams[1].outRdataWidth == 8);
+    }
+
+    {
+        const auto& edges = blueprint.edges();
+        auto assertIn = [&edges](std::string fNodeName, std::string fPortName,
+                                 std::string tNodeName, std::string tPortName,
+                                 int size) {
+            for (int i = 0; i < size; i++) {
+                auto v =
+                    std::make_pair(Port{fNodeName, {"output", fPortName, i}},
+                                   Port{tNodeName, {"input", tPortName, i}});
+                auto it = std::find(edges.begin(), edges.end(), v);
+                assert(it != edges.end());
+            }
+        };
+        assertIn("core", "io_romAddr", "rom", "addr", 7);
+        assertIn("rom", "rdata", "core", "io_romData", 32);
+        assertIn("core", "io_memA_writeEnable", "ramA", "wren", 1);
+        assertIn("core", "io_memA_address", "ramA", "addr", 8);
+        assertIn("core", "io_memA_in", "ramA", "wdata", 8);
+        assertIn("ramA", "rdata", "core", "io_memA_out", 8);
+        assertIn("core", "io_memB_writeEnable", "ramB", "wren", 1);
+        assertIn("core", "io_memB_address", "ramB", "addr", 8);
+        assertIn("core", "io_memB_in", "ramB", "wdata", 8);
+        assertIn("ramB", "rdata", "core", "io_memB_out", 8);
+    }
+
+    {
+        const Port& port = blueprint.at("reset");
+        assert(port.nodeName == "core");
+        assert(port.portLabel.kind == "input");
+        assert(port.portLabel.portName == "reset");
+        assert(port.portLabel.portBit == 0);
+    }
+
+    {
+        const Port& port = blueprint.at("finflag");
+        assert(port.nodeName == "core");
+        assert(port.portLabel.kind == "output");
+        assert(port.portLabel.portName == "io_finishFlag");
+        assert(port.portLabel.portBit == 0);
+    }
+
+    for (int ireg = 0; ireg < 16; ireg++) {
+        for (int ibit = 0; ibit < 16; ibit++) {
+            const Port& port = blueprint.at(detail::fok("reg_x", ireg), ibit);
+            assert(port.nodeName == "core");
+            assert(port.portLabel.portName == detail::fok("io_regOut_x", ireg));
+            assert(port.portLabel.portBit == ibit);
+        }
+    }
+
+    {
+        const SingleROM* rom = std::get_if<SingleROM>(&blueprint.atROM());
+        assert(rom);
+        assert(rom->nodeName == "rom");
+    }
+
+    {
+        const RAM_AB* ram = std::get_if<RAM_AB>(&blueprint.atRAM());
+        assert(ram);
+        assert(ram->nodeAName == "ramA");
+        assert(ram->nodeBName == "ramB");
+    }
+}
+
 int main(int argc, char** argv)
 {
     AsyncThread::setNumThreads(std::thread::hardware_concurrency());
@@ -1122,6 +1221,7 @@ int main(int argc, char** argv)
 #endif
 
     testProgressGraphMaker();
+    testBlueprint();
 
     if (argc >= 2 && strcmp(argv[1], "slow") == 0) {
         TFHEppTestHelper::instance().prepareCircuitKey();

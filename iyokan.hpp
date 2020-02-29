@@ -22,12 +22,17 @@
 #include <map>
 #include <memory>
 #include <queue>
+#include <regex>
 #include <set>
 #include <sstream>
 #include <unordered_map>
+#include <variant>
 #include <vector>
 
 #include <ThreadPool.h>
+#include <toml.hpp>
+
+#include "error.hpp"
 
 // Forward declarations
 template <class WorkerInfo>
@@ -56,6 +61,19 @@ inline int genid()
     static int id = (1 << 16);
     return id++;
 }
+
+inline std::vector<std::string> regexMatch(const std::string &text,
+                                           const std::regex &re)
+{
+    std::vector<std::string> ret;
+    std::smatch m;
+    if (!std::regex_match(text, m, re))
+        return ret;
+    for (auto &&elm : m)
+        ret.push_back(elm.str());
+    return ret;
+}
+
 }  // namespace detail
 
 template <class WorkerInfo>
@@ -186,6 +204,12 @@ public:
 struct TaskLabel {
     std::string kind, portName;
     int portBit;
+
+    bool operator==(const TaskLabel &rhs) const
+    {
+        return kind == rhs.kind && portName == rhs.portName &&
+               portBit == rhs.portBit;
+    }
 
     bool operator<(const TaskLabel &rhs) const
     {
@@ -1228,6 +1252,244 @@ connectWithBridge(std::shared_ptr<T0> lhs, std::shared_ptr<T1> rhs)
     lhs->depnode()->addDependent(newrhs);
     return newrhs;
 }
+
+namespace blueprint {
+struct File {
+    enum class TYPE {
+        IYOKANL1_JSON,
+    } type;
+    std::string path, name;
+};
+struct BuiltinROM {
+    std::string name;
+    size_t inAddrWidth, outRdataWidth;
+};
+struct BuiltinRAM {
+    std::string name;
+    size_t inAddrWidth, inWdataWidth, outRdataWidth;
+};
+struct Port {
+    std::string nodeName;
+    TaskLabel portLabel;
+
+    bool operator==(const Port &rhs) const
+    {
+        return nodeName == rhs.nodeName && portLabel == rhs.portLabel;
+    }
+};
+struct SingleROM {
+    std::string nodeName;
+};
+struct RAM_AB {
+    std::string nodeAName, nodeBName;
+};
+
+using ROM = std::variant<std::monostate, SingleROM>;
+using RAM = std::variant<std::monostate, RAM_AB>;
+}  // namespace blueprint
+
+class NetworkBlueprint {
+private:
+    std::vector<blueprint::File> files_;
+    std::vector<blueprint::BuiltinROM> builtinROMs_;
+    std::vector<blueprint::BuiltinRAM> builtinRAMs_;
+    std::vector<std::pair<blueprint::Port, blueprint::Port>> edges_;
+
+    std::map<std::tuple<std::string, int>, blueprint::Port> atPorts_;
+    blueprint::ROM rom_;
+    blueprint::RAM ram_;
+
+private:
+    std::vector<blueprint::Port> parsePortString(const std::string &src,
+                                                 const std::string &kind)
+    {
+        std::string nodeName, portName;
+        int portBitFrom, portBitTo;
+
+        auto match = detail::regexMatch(
+            src, std::regex(
+                     R"(^@?(?:([^/]+)/)?([^[]+)(?:\[([0-9]+):([0-9]+)\])?$)"));
+        if (match.empty())
+            error::die("Invalid port string: ", src);
+
+        assert(match.size() == 1 + 4);
+
+        nodeName = match[1];
+        portName = match[2];
+
+        if (match[3].empty()) {  // hoge/piyo
+            assert(match[4].empty());
+            portBitFrom = 0;
+            portBitTo = 0;
+        }
+        else {  // hoge/piyo[foo:bar]
+            assert(!match[4].empty());
+            portBitFrom = std::stoi(match[3]);
+            portBitTo = std::stoi(match[4]);
+        }
+
+        std::vector<blueprint::Port> ret;
+        for (int i = portBitFrom; i < portBitTo + 1; i++)
+            ret.push_back(
+                blueprint::Port{nodeName, TaskLabel{kind, portName, i}});
+        return ret;
+    }
+
+public:
+    NetworkBlueprint(const std::string &fileName)
+    {
+        const auto src = toml::parse(fileName);
+
+        // [[file]]
+        {
+            const auto srcFiles =
+                toml::find<std::vector<toml::value>>(src, "file");
+            for (const auto &srcFile : srcFiles) {
+                const auto type = toml::find<std::string>(srcFile, "type");
+                const auto path = toml::find<std::string>(srcFile, "path");
+                const auto name = toml::find<std::string>(srcFile, "name");
+
+                assert(type == "iyokanl1-json");
+
+                files_.push_back(blueprint::File{
+                    blueprint::File::TYPE::IYOKANL1_JSON, path, name});
+            }
+        }
+
+        // [[builtin]]
+        {
+            const auto srcBuiltins =
+                toml::find<std::vector<toml::value>>(src, "builtin");
+            for (const auto &srcBuiltin : srcBuiltins) {
+                const auto type = toml::find<std::string>(srcBuiltin, "type");
+                const auto name = toml::find<std::string>(srcBuiltin, "name");
+
+                if (type == "rom") {
+                    const auto inAddrWidth =
+                        toml::find<size_t>(srcBuiltin, "in_addr_width");
+                    const auto outRdataWidth =
+                        toml::find<size_t>(srcBuiltin, "out_rdata_width");
+
+                    builtinROMs_.push_back(blueprint::BuiltinROM{
+                        name, inAddrWidth, outRdataWidth});
+                }
+                else if (type == "ram") {
+                    const auto inAddrWidth =
+                        toml::find<size_t>(srcBuiltin, "in_addr_width");
+                    const auto inWdataWidth =
+                        toml::find<size_t>(srcBuiltin, "in_wdata_width");
+                    const auto outRdataWidth =
+                        toml::find<size_t>(srcBuiltin, "out_rdata_width");
+
+                    builtinRAMs_.push_back(blueprint::BuiltinRAM{
+                        name, inAddrWidth, inWdataWidth, outRdataWidth});
+                }
+            }
+        }
+
+        // [connect]
+        {
+            const auto srcConnect = toml::find<toml::table>(src, "connect");
+            for (const auto &[srcKey, srcValue] : srcConnect) {
+                std::string srcTo = srcKey,
+                            srcFrom = toml::get<std::string>(srcValue),
+                            errMsg = detail::fok("Invalid connect: ", srcTo,
+                                                 " = ", srcFrom);
+
+                // Check if input is correct.
+                if (srcTo.empty() || srcFrom.empty() ||
+                    (srcTo[0] == '@' && srcFrom[0] == '@'))
+                    error::die(errMsg);
+
+                // @rom = ...
+                if (srcTo == "@rom") {
+                    rom_ = blueprint::SingleROM{srcFrom};
+                    continue;
+                }
+
+                // @ram = ...
+                if (srcTo == "@ram") {
+                    auto match = detail::regexMatch(
+                        srcFrom, std::regex("^AB:([^:]+):(.+)$"));
+                    if (match.size() != 1 + 2)
+                        error::die(errMsg);
+                    ram_ = blueprint::RAM_AB{match[1], match[2]};
+                    continue;
+                }
+
+                // Others.
+                std::vector<blueprint::Port> portsTo = parsePortString(srcTo,
+                                                                       "input"),
+                                             portsFrom = parsePortString(
+                                                 srcFrom, "output");
+                if (portsTo.size() != portsFrom.size())
+                    error::die(errMsg);
+
+                for (size_t i = 0; i < portsTo.size(); i++) {
+                    const blueprint::Port &to = portsTo[i];
+                    const blueprint::Port &from = portsFrom[i];
+
+                    if (srcTo[0] == '@') {  // @... = ...
+                        if (!to.nodeName.empty() || from.nodeName.empty())
+                            error::die(errMsg);
+
+                        auto key = std::make_tuple(to.portLabel.portName,
+                                                   to.portLabel.portBit);
+                        atPorts_.emplace(key, from);
+                    }
+                    else if (srcFrom[0] == '@') {  // ... = @...
+                        if (!from.nodeName.empty() || to.nodeName.empty())
+                            error::die(errMsg);
+
+                        auto key = std::make_tuple(from.portLabel.portName,
+                                                   from.portLabel.portBit);
+                        atPorts_.emplace(key, to);
+                    }
+                    else {  // ... = ...
+                        edges_.emplace_back(from, to);
+                    }
+                }
+            }
+        }
+    }
+
+    const std::vector<blueprint::File> &files() const
+    {
+        return files_;
+    }
+
+    const std::vector<blueprint::BuiltinROM> &builtinROMs() const
+    {
+        return builtinROMs_;
+    }
+
+    const std::vector<blueprint::BuiltinRAM> &builtinRAMs() const
+    {
+        return builtinRAMs_;
+    }
+
+    const std::vector<std::pair<blueprint::Port, blueprint::Port>> &edges()
+        const
+    {
+        return edges_;
+    }
+
+    const blueprint::Port &at(const std::string &portName,
+                              int portBit = 0) const
+    {
+        return atPorts_.at(std::make_tuple(portName, portBit));
+    }
+
+    const blueprint::ROM &atROM() const
+    {
+        return rom_;
+    }
+
+    const blueprint::RAM &atRAM() const
+    {
+        return ram_;
+    }
+};
 
 struct Options {
     // Processor's logic file.
