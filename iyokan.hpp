@@ -180,6 +180,21 @@ public:
     }
 };
 
+// TaskLabel is used to find a certain task. Not all tasks need to have
+// TaskLabel, because many tasks don't have to be modified (e.g. set initial
+// value) once networks are organized.
+struct TaskLabel {
+    std::string kind, portName;
+    int portBit;
+
+    bool operator<(const TaskLabel &rhs) const
+    {
+        return std::make_tuple(kind, portName, portBit) <
+               std::make_tuple(rhs.kind, rhs.portName, rhs.portBit);
+    }
+};
+
+// NodeLabel is used to identify a DepNode in debugging/profiling.
 struct NodeLabel {
     int id;
     std::string kind, desc;
@@ -505,14 +520,12 @@ protected:
 template <class WorkerInfo>
 class TaskNetwork {
 public:
-    using Name2TaskMap =
-        std::map<std::tuple</* kind */ std::string, /* portName */ std::string,
-                            /* portBit */ int>,
-                 std::shared_ptr<TaskBase<WorkerInfo>>>;
+    using Label2TaskMap =
+        std::map<TaskLabel, std::shared_ptr<TaskBase<WorkerInfo>>>;
 
 private:
     std::unordered_map<int, std::shared_ptr<DepNode<WorkerInfo>>> id2node_;
-    Name2TaskMap namedMems_;
+    Label2TaskMap namedMems_;
 
 private:
     bool verifyInputSizeExpected() const
@@ -534,14 +547,14 @@ private:
 public:
     TaskNetwork(
         std::unordered_map<int, std::shared_ptr<DepNode<WorkerInfo>>> id2node,
-        Name2TaskMap namedMems)
+        Label2TaskMap namedMems)
         : id2node_(std::move(id2node)), namedMems_(namedMems)
     {
     }
 
     TaskNetwork(NetworkBuilderBase<WorkerInfo> &&builder);
 
-    const Name2TaskMap &getNamedMems() const
+    const Label2TaskMap &getNamedMems() const
     {
         return namedMems_;
     }
@@ -564,12 +577,18 @@ public:
     }
 
     template <class T>
+    std::shared_ptr<T> get(TaskLabel label)
+    {
+        auto it = namedMems_.find(label);
+        assert(it != namedMems_.end());
+        return std::dynamic_pointer_cast<T>(it->second);
+    }
+
+    template <class T>
     std::shared_ptr<T> get(const std::string &kind, const std::string &portName,
                            int portBit)
     {
-        auto it = namedMems_.find(std::make_tuple(kind, portName, portBit));
-        assert(it != namedMems_.end());
-        return std::dynamic_pointer_cast<T>(it->second);
+        return get<T>(TaskLabel{kind, portName, portBit});
     }
 
     void tick()
@@ -618,8 +637,8 @@ public:
                LHS OUTPUT  |--> connects to >---|  RHS INPUT
                ------------+                    +-----------
             */
-            auto inkey = std::make_tuple("output", lPortName, lPortBit);
-            auto outkey = std::make_tuple("input", rPortName, rPortBit);
+            auto inkey = TaskLabel{"output", lPortName, lPortBit};
+            auto outkey = TaskLabel{"input", rPortName, rPortBit};
             auto in = std::dynamic_pointer_cast<Task<T, T, WorkerInfo>>(
                 namedMems_.at(inkey));
             auto out = std::dynamic_pointer_cast<Task<T, T, WorkerInfo>>(
@@ -639,8 +658,8 @@ public:
                RHS OUTPUT  |--> connects to >---|  LHS INPUT
                ------------+                    +-----------
             */
-            auto inkey = std::make_tuple("output", rPortName, rPortBit);
-            auto outkey = std::make_tuple("input", lPortName, lPortBit);
+            auto inkey = TaskLabel{"output", rPortName, rPortBit};
+            auto outkey = TaskLabel{"input", lPortName, lPortBit};
             auto in = std::dynamic_pointer_cast<Task<T, T, WorkerInfo>>(
                 rhs.namedMems_.at(inkey));
             auto out = std::dynamic_pointer_cast<Task<T, T, WorkerInfo>>(
@@ -666,9 +685,7 @@ public:
 private:
     std::unordered_map<int, std::shared_ptr<DepNode<WorkerInfo>>> id2node_;
 
-    std::map<std::tuple<std::string, std::string, int>,
-             std::shared_ptr<TaskBase<WorkerInfo>>>
-        namedMems_;
+    typename TaskNetwork<WorkerInfo>::Label2TaskMap namedMems_;
 
 protected:
     std::shared_ptr<DepNode<WorkerInfo>> node(int index)
@@ -682,7 +699,7 @@ public:
                                const std::string &portName, int portBit)
     {
         return std::dynamic_pointer_cast<T>(
-            namedMems_.at(std::make_tuple(kind, portName, portBit)));
+            namedMems_.at(TaskLabel{kind, portName, portBit}));
     }
 
     void addTask(NodeLabel label, int priority,
@@ -709,7 +726,7 @@ public:
                       const std::shared_ptr<TaskBase<WorkerInfo>> &task)
     {
         auto [item, inserted] =
-            namedMems_.emplace(std::make_tuple(kind, portName, portBit), task);
+            namedMems_.emplace(TaskLabel{kind, portName, portBit}, task);
         assert(inserted);
     }
 
