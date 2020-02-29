@@ -3,6 +3,9 @@
 
 namespace {
 
+using Name2NetMap =
+    std::unordered_map<std::string, std::shared_ptr<PlainNetwork>>;
+
 auto get(PlainNetwork &net, const std::string &kind,
          const std::string &portName, int portBit)
 {
@@ -11,26 +14,29 @@ auto get(PlainNetwork &net, const std::string &kind,
     return ret;
 }
 
-KVSPPlainResPacket makeResPacket(PlainNetwork &net, int numCycles,
+KVSPPlainResPacket makeResPacket(Name2NetMap name2net, int numCycles,
                                  bool ramEnabled)
 {
+    auto &core = *name2net.at("core");
+
     KVSPPlainResPacket resPacket;
     resPacket.numCycles = numCycles;
     // Get values of flags
-    resPacket.flags.emplace_back(get(net, "output", "io_finishFlag", 0)->get());
+    resPacket.flags.emplace_back(
+        get(core, "output", "io_finishFlag", 0)->get());
     // Get values of registers
     for (int reg = 0; reg < 16; reg++) {
         uint16_t &val = resPacket.regs.emplace_back(0);
         for (int bit = 0; bit < 16; bit++) {
-            int n =
-                get(net, "output", detail::fok("io_regOut_x", reg), bit)->get();
+            int n = get(core, "output", detail::fok("io_regOut_x", reg), bit)
+                        ->get();
             val |= (n & 1u) << bit;
         }
     }
     // Get values of RAM
     if (ramEnabled) {
-        auto ramA = net.get<TaskPlainRAM>("ram", "A", 0),
-             ramB = net.get<TaskPlainRAM>("ram", "B", 0);
+        auto ramA = name2net.at("ramA")->get<TaskPlainRAM>("ram", "A", 0),
+             ramB = name2net.at("ramB")->get<TaskPlainRAM>("ram", "B", 0);
         assert(ramA && ramB);
         for (int addr = 0; addr < 512; addr++) {
             resPacket.ram.push_back(
@@ -41,19 +47,20 @@ KVSPPlainResPacket makeResPacket(PlainNetwork &net, int numCycles,
         for (int addr = 0; addr < 512; addr++) {
             uint8_t &val = resPacket.ram.emplace_back(0);
             for (int bit = 0; bit < 8; bit++)
-                val |= get(net, "ram", std::to_string(addr), bit)->get() << bit;
+                val |= get(core, "ram", std::to_string(addr), bit)->get()
+                       << bit;
         }
     }
 
     return resPacket;
 }
 
-void setInitialRAM(PlainNetwork &net, const KVSPPlainReqPacket &reqPacket,
+void setInitialRAM(Name2NetMap &name2net, const KVSPPlainReqPacket &reqPacket,
                    bool ramEnabled)
 {
     if (ramEnabled) {
-        auto ramA = net.get<TaskPlainRAM>("ram", "A", 0),
-             ramB = net.get<TaskPlainRAM>("ram", "B", 0);
+        auto ramA = name2net.at("ramA")->get<TaskPlainRAM>("ram", "A", 0),
+             ramB = name2net.at("ramB")->get<TaskPlainRAM>("ram", "B", 0);
         assert(ramA && ramB);
         for (int addr = 0; addr < 512; addr++) {
             (addr % 2 == 1 ? ramA : ramB)
@@ -61,12 +68,68 @@ void setInitialRAM(PlainNetwork &net, const KVSPPlainReqPacket &reqPacket,
         }
     }
     else {
+        auto &core = *name2net.at("core");
         for (int addr = 0; addr < 512; addr++)
             for (int bit = 0; bit < 8; bit++)
-                get(net, "ram", std::to_string(addr), bit)
+                get(core, "ram", std::to_string(addr), bit)
                     ->set((reqPacket.ram.at(addr) >> bit) & 1);
     }
 }
+
+void connect(PlainNetwork &srcNet, const std::string &srcPortName,
+             int srcPortBit, PlainNetwork &dstNet,
+             const std::string &dstPortName, int dstPortBit)
+{
+    auto dst = dstNet.get<TaskPlainGate>("input", dstPortName, dstPortBit);
+    assert(dst);
+    auto src = srcNet.get<TaskPlainGate>("output", srcPortName, srcPortBit);
+    assert(src);
+
+    dst->acceptOneMoreInput();
+    NetworkBuilderBase<uint8_t>::connectTasks(src, dst);
+}
+
+class PlainNetworkRunner {
+private:
+    NetworkRunner<uint8_t, PlainWorker> plain_;
+    std::shared_ptr<ProgressGraphMaker> graph_;
+
+public:
+    PlainNetworkRunner(int numCPUWorkers,
+                       std::shared_ptr<ProgressGraphMaker> graph = nullptr)
+        : graph_(graph)
+    {
+        for (int i = 0; i < numCPUWorkers; i++)
+            plain_.addWorker(graph_);
+    }
+
+    bool isValid()
+    {
+        return plain_.isValid();
+    }
+
+    void addNetwork(std::shared_ptr<PlainNetwork> net)
+    {
+        plain_.addNetwork(net);
+    }
+
+    void run()
+    {
+        if (graph_)
+            graph_->reset();
+        plain_.prepareToRun();
+
+        while (plain_.getNumFinishedTargets() < plain_.numNodes()) {
+            assert(plain_.isRunning() && "Detected infinite loop");
+            plain_.update();
+        }
+    }
+
+    void tick()
+    {
+        plain_.tick();
+    }
+};
 
 }  // namespace
 
@@ -101,94 +164,75 @@ void doPlain(const Options &opt)
     // Read packet
     const auto reqPacket = readFromArchive<KVSPPlainReqPacket>(opt.inputFile);
 
-    // Read network
-    PlainNetworkBuilder::NetworkType net = [&opt, &reqPacket] {
+    // Create nodes
+    Name2NetMap name2net;
+
+    {
         std::ifstream ifs{opt.logicFile};
         assert(ifs);
-        auto net = readNetworkFromJSON<PlainNetworkBuilder>(ifs);
-        assert(net.isValid());
+        auto net = std::make_shared<PlainNetwork>(
+            readNetworkFromJSON<PlainNetworkBuilder>(ifs));
+        assert(net->isValid());
+        name2net.emplace("core", net);
+    }
 
-        if (opt.ramEnabled) {
-            // Create RAM
-            auto ramAnet = makePlainRAMNetwork("A"),
-                 ramBnet = makePlainRAMNetwork("B");
+    if (opt.ramEnabled) {
+        auto ramANet = std::make_shared<PlainNetwork>(makePlainRAMNetwork("A")),
+             ramBNet = std::make_shared<PlainNetwork>(makePlainRAMNetwork("B"));
+        name2net.emplace("ramA", ramANet);
+        name2net.emplace("ramB", ramBNet);
+    }
 
-            // Merge RAM
-            net = net.merge<uint8_t>(ramAnet,
-                                     {
-                                         {"io_memA_writeEnable", 0, "wren", 0},
-                                         {"io_memA_address", 0, "addr", 0},
-                                         {"io_memA_address", 1, "addr", 1},
-                                         {"io_memA_address", 2, "addr", 2},
-                                         {"io_memA_address", 3, "addr", 3},
-                                         {"io_memA_address", 4, "addr", 4},
-                                         {"io_memA_address", 5, "addr", 5},
-                                         {"io_memA_address", 6, "addr", 6},
-                                         {"io_memA_address", 7, "addr", 7},
-                                         {"io_memA_in", 0, "wdata", 0},
-                                         {"io_memA_in", 1, "wdata", 1},
-                                         {"io_memA_in", 2, "wdata", 2},
-                                         {"io_memA_in", 3, "wdata", 3},
-                                         {"io_memA_in", 4, "wdata", 4},
-                                         {"io_memA_in", 5, "wdata", 5},
-                                         {"io_memA_in", 6, "wdata", 6},
-                                         {"io_memA_in", 7, "wdata", 7},
-                                     },
-                                     {
-                                         {"rdata", 0, "io_memA_out", 0},
-                                         {"rdata", 1, "io_memA_out", 1},
-                                         {"rdata", 2, "io_memA_out", 2},
-                                         {"rdata", 3, "io_memA_out", 3},
-                                         {"rdata", 4, "io_memA_out", 4},
-                                         {"rdata", 5, "io_memA_out", 5},
-                                         {"rdata", 6, "io_memA_out", 6},
-                                         {"rdata", 7, "io_memA_out", 7},
-                                     })
-                      .merge<uint8_t>(ramBnet,
-                                      {
-                                          {"io_memB_writeEnable", 0, "wren", 0},
-                                          {"io_memB_address", 0, "addr", 0},
-                                          {"io_memB_address", 1, "addr", 1},
-                                          {"io_memB_address", 2, "addr", 2},
-                                          {"io_memB_address", 3, "addr", 3},
-                                          {"io_memB_address", 4, "addr", 4},
-                                          {"io_memB_address", 5, "addr", 5},
-                                          {"io_memB_address", 6, "addr", 6},
-                                          {"io_memB_address", 7, "addr", 7},
-                                          {"io_memB_in", 0, "wdata", 0},
-                                          {"io_memB_in", 1, "wdata", 1},
-                                          {"io_memB_in", 2, "wdata", 2},
-                                          {"io_memB_in", 3, "wdata", 3},
-                                          {"io_memB_in", 4, "wdata", 4},
-                                          {"io_memB_in", 5, "wdata", 5},
-                                          {"io_memB_in", 6, "wdata", 6},
-                                          {"io_memB_in", 7, "wdata", 7},
-                                      },
-                                      {
-                                          {"rdata", 0, "io_memB_out", 0},
-                                          {"rdata", 1, "io_memB_out", 1},
-                                          {"rdata", 2, "io_memB_out", 2},
-                                          {"rdata", 3, "io_memB_out", 3},
-                                          {"rdata", 4, "io_memB_out", 4},
-                                          {"rdata", 5, "io_memB_out", 5},
-                                          {"rdata", 6, "io_memB_out", 6},
-                                          {"rdata", 7, "io_memB_out", 7},
-                                      });
-        }
+    if (!opt.romPorts.empty()) {
+        auto romNet = std::make_shared<PlainNetwork>(makePlainROMNetwork());
+        name2net.emplace("rom", romNet);
+    }
 
-        if (opt.romPorts.empty()) {
-            // Set ROM
-            for (int addr = 0; addr < 128; addr++)
-                for (int bit = 0; bit < 32; bit++)
-                    get(net, "rom", std::to_string(addr), bit)
-                        ->set((reqPacket.rom.at((addr * 32 + bit) / 8) >>
-                               (bit % 8)) &
-                              1);
-            return net;
-        }
+    // Create edges
+    if (opt.ramEnabled) {
+        auto &core = *name2net.at("core"), &ramA = *name2net.at("ramA"),
+             &ramB = *name2net.at("ramB");
 
-        // Create ROM as external module and set data
-        auto rom = makePlainROMNetwork();
+        connect(core, "io_memA_writeEnable", 0, ramA, "wren", 0);
+        for (int i = 0; i < 8; i++)
+            connect(core, "io_memA_address", i, ramA, "addr", i);
+        for (int i = 0; i < 8; i++)
+            connect(core, "io_memA_in", i, ramA, "wdata", i);
+        for (int i = 0; i < 8; i++)
+            connect(ramA, "rdata", i, core, "io_memA_out", i);
+
+        connect(core, "io_memB_writeEnable", 0, ramB, "wren", 0);
+        for (int i = 0; i < 8; i++)
+            connect(core, "io_memB_address", i, ramB, "addr", i);
+        for (int i = 0; i < 8; i++)
+            connect(core, "io_memB_in", i, ramB, "wdata", i);
+        for (int i = 0; i < 8; i++)
+            connect(ramB, "rdata", i, core, "io_memB_out", i);
+    }
+
+    if (!opt.romPorts.empty()) {
+        auto &core = *name2net.at("core"), &rom = *name2net.at("rom");
+
+        for (int i = 0; i < 7; i++)
+            connect(core, "io_romAddr", i, rom, "ROM", i);
+        for (int i = 0; i < 32; i++)
+            connect(rom, "ROM", i, core, "io_romData", i);
+    }
+
+    // Set initial ROM data
+    if (opt.romPorts.empty()) {
+        auto &core = *name2net.at("core");
+
+        for (int addr = 0; addr < 128; addr++)
+            for (int bit = 0; bit < 32; bit++)
+                get(core, "rom", std::to_string(addr), bit)
+                    ->set(
+                        (reqPacket.rom.at((addr * 32 + bit) / 8) >> (bit % 8)) &
+                        1);
+    }
+    else {
+        auto &rom = *name2net.at("rom");
+
         for (int i = 0; i < 512 / 4; i++) {
             int val = 0;
             for (int j = 3; j >= 0; j--) {
@@ -199,21 +243,12 @@ void doPlain(const Options &opt)
             }
             rom.get<TaskPlainROM>("rom", "all", 0)->set4le(i << 2, val);
         }
+    }
 
-        // Merge ROM
-        std::vector<std::tuple<std::string, int, std::string, int>> lhs2rhs,
-            rhs2lhs;
-        assert(opt.romPorts.size() == 4);
-        int numLHS2RHS = std::stoi(opt.romPorts[1]),
-            numRHS2LHS = std::stoi(opt.romPorts[3]);
-        assert(0 <= numLHS2RHS && 0 <= numRHS2LHS);
-        for (int i = 0; i < numLHS2RHS; i++)
-            lhs2rhs.emplace_back(opt.romPorts[0], i, "ROM", i);
-        for (int i = 0; i < numRHS2LHS; i++)
-            rhs2lhs.emplace_back("ROM", i, opt.romPorts[2], i);
-
-        return net.merge<uint8_t>(rom, lhs2rhs, rhs2lhs);
-    }();
+    // Make runner
+    PlainNetworkRunner runner{opt.numWorkers};
+    for (auto &&p : name2net)
+        runner.addNetwork(p.second);
 
     // Get #cycles
     int numCycles = std::numeric_limits<int>::max();
@@ -221,11 +256,14 @@ void doPlain(const Options &opt)
         numCycles = opt.numCycles;
 
     // Reset
-    get(net, "input", "reset", 0)->set(1);
-    processAllGates(net, opt.numWorkers);
+    {
+        auto &core = *name2net.at("core");
+        get(core, "input", "reset", 0)->set(1);
+        runner.run();
+        get(core, "input", "reset", 0)->set(0);
+    }
 
     // Go computing
-    get(net, "input", "reset", 0)->set(0);
     std::optional<std::ofstream> dumpOS;
     if (opt.dumpEveryClock) {
         dumpOS = std::ofstream{*opt.dumpEveryClock};
@@ -237,25 +275,27 @@ void doPlain(const Options &opt)
         std::ostream &os = opt.quiet ? devnull : std::cout;
 
         numCycles = processCycles(numCycles, os, [&](bool first) {
+            auto &core = *name2net.at("core");
+
             if (dumpOS)
-                makeResPacket(net, opt.numCycles, opt.ramEnabled)
+                makeResPacket(name2net, opt.numCycles, opt.ramEnabled)
                     .printAsJSON(*dumpOS);
 
-            net.tick();
+            runner.tick();
 
             if (first)
-                setInitialRAM(net, reqPacket, opt.ramEnabled);
+                setInitialRAM(name2net, reqPacket, opt.ramEnabled);
 
-            processAllGates(net, opt.numWorkers);
+            runner.run();
 
-            bool hasFinished = get(net, "output", "io_finishFlag", 0)->get();
+            bool hasFinished = get(core, "output", "io_finishFlag", 0)->get();
             return hasFinished;
         });
     }
 
     // Print the results
     KVSPPlainResPacket resPacket =
-        makeResPacket(net, numCycles, opt.ramEnabled);
+        makeResPacket(name2net, numCycles, opt.ramEnabled);
     if (dumpOS)
         resPacket.printAsJSON(*dumpOS);
     resPacket.print(std::cout);

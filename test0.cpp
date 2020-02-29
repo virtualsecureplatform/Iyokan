@@ -1116,6 +1116,49 @@ void testDoTFHE()
     assert(plainResPacket.regs.at(0) == 42);
 }
 
+void testDoTFHEWithROM()
+{
+    auto& h = TFHEppTestHelper::instance();
+
+    Options opt;
+    opt.logicFile = "test/diamond-core-wo-rom.json";
+    opt.inputFile = h.getELFAsPacketFileWithCk("test/test00.elf");
+    opt.outputFile = "_test_res_packet00";
+    opt.numWorkers = std::thread::hardware_concurrency();
+    opt.numCycles = 8;
+    opt.romPorts = {"io_romAddr", "7", "io_romData", "32"};
+
+    doTFHE(opt);
+
+    writeToArchive("_test_sk", *h.sk());
+    auto resPacket = readFromArchive<KVSPResPacket>("_test_res_packet00");
+    auto plainResPacket = decrypt(*h.sk(), resPacket);
+    assert(plainResPacket.flags.at(0) == 1);
+    assert(plainResPacket.regs.at(0) == 42);
+}
+
+void testDoTFHEWithRAMROM()
+{
+    auto& h = TFHEppTestHelper::instance();
+
+    Options opt;
+    opt.logicFile = "test/diamond-core-wo-ram-rom.json";
+    opt.inputFile = h.getELFAsPacketFileWithCk("test/test00.elf");
+    opt.outputFile = "_test_res_packet00";
+    opt.numWorkers = std::thread::hardware_concurrency();
+    opt.numCycles = 8;
+    opt.romPorts = {"io_romAddr", "7", "io_romData", "32"};
+    opt.ramEnabled = true;
+
+    doTFHE(opt);
+
+    writeToArchive("_test_sk", *h.sk());
+    auto resPacket = readFromArchive<KVSPResPacket>("_test_res_packet00");
+    auto plainResPacket = decrypt(*h.sk(), resPacket);
+    assert(plainResPacket.flags.at(0) == 1);
+    assert(plainResPacket.regs.at(0) == 42);
+}
+
 #ifdef IYOKAN_CUDA_ENABLED
 #include "iyokan_cufhe.hpp"
 
@@ -1373,6 +1416,8 @@ int main(int argc, char** argv)
             makeTFHEppRAMNetwork("A"), makeTFHEppRAMNetwork("B"),
             makeTFHEppROMNetwork());
         testDoTFHE();
+        testDoTFHEWithROM();
+        testDoTFHEWithRAMROM();
 
 #ifdef IYOKAN_CUDA_ENABLED
         {

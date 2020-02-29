@@ -504,11 +504,15 @@ protected:
 
 template <class WorkerInfo>
 class TaskNetwork {
+public:
+    using Name2TaskMap =
+        std::map<std::tuple</* kind */ std::string, /* portName */ std::string,
+                            /* portBit */ int>,
+                 std::shared_ptr<TaskBase<WorkerInfo>>>;
+
 private:
     std::unordered_map<int, std::shared_ptr<DepNode<WorkerInfo>>> id2node_;
-    std::map<std::tuple<std::string, std::string, int>,
-             std::shared_ptr<TaskBase<WorkerInfo>>>
-        namedMems_;
+    Name2TaskMap namedMems_;
 
 private:
     bool verifyInputSizeExpected() const
@@ -530,14 +534,17 @@ private:
 public:
     TaskNetwork(
         std::unordered_map<int, std::shared_ptr<DepNode<WorkerInfo>>> id2node,
-        std::map<std::tuple<std::string, std::string, int>,
-                 std::shared_ptr<TaskBase<WorkerInfo>>>
-            namedMems)
+        Name2TaskMap namedMems)
         : id2node_(std::move(id2node)), namedMems_(namedMems)
     {
     }
 
     TaskNetwork(NetworkBuilderBase<WorkerInfo> &&builder);
+
+    const Name2TaskMap &getNamedMems() const
+    {
+        return namedMems_;
+    }
 
     size_t numNodes() const
     {
@@ -1263,5 +1270,88 @@ int processCycles(int numCycles, std::ostream &os, Func func)
 
     return numCycles;
 }
+
+template <class WorkerInfo, class WorkerType>
+class NetworkRunner {
+private:
+    std::shared_ptr<ReadyQueue<WorkerInfo>> readyQueue_;
+    size_t numFinishedTargets_;
+    std::vector<WorkerType> workers_;
+    std::vector<std::shared_ptr<TaskNetwork<WorkerInfo>>> nets_;
+
+public:
+    NetworkRunner()
+        : readyQueue_(std::make_shared<ReadyQueue<WorkerInfo>>()),
+          numFinishedTargets_(0)
+    {
+    }
+
+    bool isValid()
+    {
+        for (auto &&net : nets_)
+            if (!net->isValid())
+                return false;
+        return true;
+    }
+
+    void addNetwork(const std::shared_ptr<TaskNetwork<WorkerInfo>> &net)
+    {
+        nets_.push_back(net);
+    }
+
+    template <class... Args>
+    void addWorker(Args &&... args)
+    {
+        workers_.emplace_back(*readyQueue_, numFinishedTargets_,
+                              std::forward<Args>(args)...);
+    }
+
+    void prepareToRun()
+    {
+        assert(readyQueue_->empty());
+        assert(nets_.empty() || workers_.size() > 0);
+
+        numFinishedTargets_ = 0;
+        for (auto &&net : nets_)
+            net->pushReadyTasks(*readyQueue_);
+    }
+
+    size_t numNodes() const
+    {
+        size_t ret = 0;
+        for (auto &&net : nets_)
+            ret += net->numNodes();
+        return ret;
+    }
+
+    size_t getNumFinishedTargets() const
+    {
+        return numFinishedTargets_;
+    }
+
+    std::shared_ptr<ReadyQueue<WorkerInfo>> getReadyQueue() const
+    {
+        return readyQueue_;
+    }
+
+    bool isRunning() const
+    {
+        return std::any_of(workers_.begin(), workers_.end(),
+                           [](auto &&w) { return w.isWorking(); }) ||
+               !readyQueue_->empty();
+    }
+
+    void update()
+    {
+        for (auto &&w : workers_)
+            w.update();
+    }
+
+    void tick()
+    {
+        for (auto &&net : nets_)
+            net->tick();
+    }
+};
 
 #endif
