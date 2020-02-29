@@ -72,8 +72,9 @@ if (IYOKAN_ENABLE_CUDA)
 endif(IYOKAN_ENABLE_CUDA)
 
 ##### test0
-add_executable(test0 test0.cpp iyokan_plain.cpp iyokan_tfhepp.cpp)
+add_executable(test0 test0.cpp iyokan_plain.cpp iyokan_tfhepp.cpp ${BACKWARD_ENABLE})
 add_sanitizers(test0)
+add_backward(test0)
 target_compile_options(test0 PUBLIC "$<$<CONFIG:DEBUG>:${IYOKAN_CXXFLAGS_DEBUG}>")
 target_compile_options(test0 PUBLIC "$<$<CONFIG:RELEASE>:${IYOKAN_CXXFLAGS_RELEASE}>")
 target_link_libraries(test0 ${IYOKAN_LIBS})
@@ -85,8 +86,9 @@ if (IYOKAN_ENABLE_CUDA)
 endif(IYOKAN_ENABLE_CUDA)
 
 ##### kvsp-packet
-add_executable(kvsp-packet kvsp-packet.cpp)
+add_executable(kvsp-packet kvsp-packet.cpp ${BACKWARD_ENABLE})
 add_sanitizers(kvsp-packet)
+add_backward(kvsp-packet)
 target_compile_options(kvsp-packet PUBLIC "$<$<CONFIG:DEBUG>:${IYOKAN_CXXFLAGS_DEBUG}>")
 target_compile_options(kvsp-packet PUBLIC "$<$<CONFIG:RELEASE>:${IYOKAN_CXXFLAGS_RELEASE}>")
 target_link_libraries(kvsp-packet ${IYOKAN_LIBS})
