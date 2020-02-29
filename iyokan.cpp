@@ -67,7 +67,7 @@ int main(int argc, char **argv)
 
     switch (type) {
     case TYPE::PLAIN:
-        doPlain(opt);
+        doPlain(opt).print(std::cout);
         break;
     case TYPE::TFHE:
 #ifdef IYOKAN_CUDA_ENABLED

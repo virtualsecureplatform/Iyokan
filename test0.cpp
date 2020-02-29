@@ -689,68 +689,22 @@ void testProgressGraphMaker()
     assert(dot.find("n3 -> n4") != std::string::npos);
 }
 
-void testKVSPPlainPacket()
+void testDoPlainWithRAMROM()
 {
-    // Read packet
-    const KVSPPlainReqPacket reqPacket = parseELF("test/test00.elf");
+    // Prepare request packet
+    writeToArchive("_test_plain_req_packet00", parseELF("test/test00.elf"));
 
-    // Load network
-    auto net = []() {
-        const std::string fileName = "test/diamond-core.json";
-        std::ifstream ifs{fileName};
-        assert(ifs);
-        return readNetworkFromJSON<PlainNetworkBuilder>(ifs);
-    }();
-    assert(net.isValid());
+    Options opt;
+    opt.logicFile = "test/diamond-core-wo-ram-rom.json";
+    opt.inputFile = "_test_plain_req_packet00";
+    opt.numWorkers = std::thread::hardware_concurrency();
+    opt.numCycles = 8;
+    opt.romPorts = {"io_romAddr", "7", "io_romData", "32"};
+    opt.ramEnabled = true;
 
-    // Set ROM
-    for (int addr = 0; addr < 128; addr++)
-        for (int bit = 0; bit < 32; bit++)
-            net.get<TaskPlainGateMem>("rom", std::to_string(addr), bit)
-                ->set((reqPacket.rom.at((addr * 32 + bit) / 8) >> (bit % 8)) &
-                      1);
-    // Set RAM
-    for (int addr = 0; addr < 512; addr++)
-        for (int bit = 0; bit < 8; bit++)
-            net.get<TaskPlainGateMem>("ram", std::to_string(addr), bit)
-                ->set((reqPacket.ram.at(addr) >> bit) & 1);
-
-    // Reset
-    setInput(net.get<TaskPlainGateMem>("input", "reset", 0), 1);
-    processAllGates(net);
-
-    // Run
-    setInput(net.get<TaskPlainGateMem>("input", "reset", 0), 0);
-    for (int i = 0; i < 8; i++) {
-        net.tick();
-        processAllGates(net);
-    }
-
-    // Assert
-    auto assertOutput = [&](const std::string& portName, int bit,
-                            int expected) {
-        assert(getOutput(net.get<TaskPlainGateMem>("output", portName, bit)) ==
-               expected);
-    };
-
-    assertOutput("io_finishFlag", 0, 1);
-
-    assertOutput("io_regOut_x0", 0x00, 0);
-    assertOutput("io_regOut_x0", 0x01, 1);
-    assertOutput("io_regOut_x0", 0x02, 0);
-    assertOutput("io_regOut_x0", 0x03, 1);
-    assertOutput("io_regOut_x0", 0x04, 0);
-    assertOutput("io_regOut_x0", 0x05, 1);
-    assertOutput("io_regOut_x0", 0x06, 0);
-    assertOutput("io_regOut_x0", 0x07, 0);
-    assertOutput("io_regOut_x0", 0x08, 0);
-    assertOutput("io_regOut_x0", 0x09, 0);
-    assertOutput("io_regOut_x0", 0x0a, 0);
-    assertOutput("io_regOut_x0", 0x0b, 0);
-    assertOutput("io_regOut_x0", 0x0c, 0);
-    assertOutput("io_regOut_x0", 0x0d, 0);
-    assertOutput("io_regOut_x0", 0x0e, 0);
-    assertOutput("io_regOut_x0", 0x0f, 0);
+    KVSPPlainResPacket resPacket = doPlain(opt);
+    assert(resPacket.flags.at(0) == 1);
+    assert(resPacket.regs.at(0) == 42);
 }
 
 #include "iyokan_tfhepp.hpp"
@@ -1131,7 +1085,7 @@ int main(int argc, char** argv)
                                         uint8_t>(makePlainRAMNetwork("A"),
                                                  makePlainRAMNetwork("B"),
                                                  makePlainROMNetwork());
-    testKVSPPlainPacket();
+    testDoPlainWithRAMROM();
 
     testNOT<TFHEppNetworkBuilder>();
     testMUX<TFHEppNetworkBuilder>();

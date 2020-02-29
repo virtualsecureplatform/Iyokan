@@ -2,6 +2,7 @@
 #define VIRTUALSECUREPLATFORM_IYOKAN_PLAIN_HPP
 
 #include "iyokan.hpp"
+#include "packet.hpp"
 
 using TaskPlainGate = Task<uint8_t, uint8_t, uint8_t /*dummy*/>;
 using TaskPlainGateMem = TaskMem<uint8_t, uint8_t, uint8_t /* dummy */>;
@@ -318,7 +319,7 @@ inline TaskNetwork<uint8_t> makePlainROMNetwork()
     return TaskNetwork<uint8_t>(std::move(builder));
 }
 
-void doPlain(const Options &opt);
+KVSPPlainResPacket doPlain(const Options &opt);
 void processAllGates(PlainNetwork &net, int numWorkers,
                      std::shared_ptr<ProgressGraphMaker> graph = nullptr);
 

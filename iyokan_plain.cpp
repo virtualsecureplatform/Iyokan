@@ -140,7 +140,7 @@ void processAllGates(PlainNetwork &net, int numWorkers,
     assert(readyQueue.empty());
 }
 
-void doPlain(const Options &opt)
+KVSPPlainResPacket doPlain(const Options &opt)
 {
     // Read packet
     const auto reqPacket = readFromArchive<KVSPPlainReqPacket>(opt.inputFile);
@@ -269,5 +269,5 @@ void doPlain(const Options &opt)
         makeResPacket(name2net, numCycles, opt.ramEnabled);
     if (dumpOS)
         resPacket.printAsJSON(*dumpOS);
-    resPacket.print(std::cout);
+    return resPacket;
 }
