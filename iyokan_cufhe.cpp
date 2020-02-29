@@ -54,12 +54,6 @@ KVSPResPacket makeResPacket(Name2CUFHENetMap& name2cnet,
             }
         }
     }
-    else {
-        for (int addr = 0; addr < 512; addr++)
-            for (int bit = 0; bit < 8; bit++)
-                resPacket.ram.push_back(cufhe2tfhepp(
-                    get(core, "ram", std::to_string(addr), bit)->get()));
-    }
 
     return resPacket;
 }
@@ -73,25 +67,15 @@ void dumpResultAsJSON(std::ostream& os, const KVSPResPacket& resPacket,
 }
 
 void setInitialRAM(Name2CUFHENetMap& name2cnet, Name2TFHEppNetMap& name2tnet,
-                   const KVSPReqPacket& reqPacket, bool ramEnabled)
+                   const KVSPReqPacket& reqPacket)
 {
-    if (ramEnabled) {
-        auto &ramA = *name2tnet.at("ramA"), &ramB = *name2tnet.at("ramB");
+    auto &ramA = *name2tnet.at("ramA"), &ramB = *name2tnet.at("ramB");
 
-        for (int addr = 0; addr < 512; addr++)
-            for (int bit = 0; bit < 8; bit++)
-                (addr % 2 == 1 ? ramA.get<TaskCUFHERAMUX>("ram", "A", bit)
-                               : ramB.get<TaskCUFHERAMUX>("ram", "B", bit))
-                    ->set(addr / 2, reqPacket.ramCk.at(addr * 8 + bit));
-    }
-    else {
-        auto& core = *name2cnet.at("core");
-
-        for (int addr = 0; addr < 512; addr++)
-            for (int bit = 0; bit < 8; bit++)
-                get(core, "ram", std::to_string(addr), bit)
-                    ->set(*tfhepp2cufhe(reqPacket.ram.at(addr * 8 + bit)));
-    }
+    for (int addr = 0; addr < 512; addr++)
+        for (int bit = 0; bit < 8; bit++)
+            (addr % 2 == 1 ? ramA.get<TaskCUFHERAMUX>("ram", "A", bit)
+                           : ramB.get<TaskCUFHERAMUX>("ram", "B", bit))
+                ->set(addr / 2, reqPacket.ramCk.at(addr * 8 + bit));
 }
 
 template <class T>
@@ -575,15 +559,7 @@ void doCUFHE(const Options& opt)
     }
 
     // Set initial ROM data
-    if (opt.romPorts.empty()) {
-        auto& core = *name2cnet.at("core");
-
-        for (int addr = 0; addr < 128; addr++)
-            for (int bit = 0; bit < 32; bit++)
-                get(core, "rom", std::to_string(addr), bit)
-                    ->set(*tfhepp2cufhe((reqPacket.rom.at(addr * 32 + bit))));
-    }
-    else {
+    if (!opt.romPorts.empty()) {
         assert(reqPacket.circuitKey);
         auto& rom = *name2tnet.at("rom");
 
@@ -643,8 +619,8 @@ void doCUFHE(const Options& opt)
 
             runner.tick();
 
-            if (first)
-                setInitialRAM(name2cnet, name2tnet, reqPacket, opt.ramEnabled);
+            if (first && opt.ramEnabled)
+                setInitialRAM(name2cnet, name2tnet, reqPacket);
 
             runner.run();
             return false;

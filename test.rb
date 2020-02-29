@@ -69,27 +69,6 @@ check_code "./kvsp-packet", ["plain", "test/test00.elf", "_test_plain_req_packet
 
 test_iyokan [
   "plain",
-  "-l", "test/diamond-core.json",
-  "-i", "_test_plain_req_packet00",
-] do |r|
-  assert_regex r, /#cycle\t8/
-  assert_regex r, /f0\t1/
-  assert_regex r, /x0\t42/
-end
-
-test_iyokan [
-  "plain",
-  "-l", "test/diamond-core-wo-rom.json",
-  "-i", "_test_plain_req_packet00",
-  "--enable-rom", "io_romAddr:7:io_romData:32",
-] do |r|
-  assert_regex r, /#cycle\t8/
-  assert_regex r, /f0\t1/
-  assert_regex r, /x0\t42/
-end
-
-test_iyokan [
-  "plain",
   "-l", "test/diamond-core-wo-ram-rom.json",
   "-i", "_test_plain_req_packet00",
   "--enable-rom", "io_romAddr:7:io_romData:32",
@@ -119,33 +98,6 @@ if $SLOW_MODE_ENABLED
 
   test_iyokan [
     "tfhe",
-    "-l", "test/diamond-core.json",
-    "-i", "_test_req_packet00",
-    "-o", "_test_res_packet00",
-    "-c", "8",
-  ] do |_|
-    r = check_code "./kvsp-packet", ["dec", "_test_sk", "_test_res_packet00"]
-    assert_regex r, /#cycle\t8/
-    assert_regex r, /f0\t1/
-    assert_regex r, /x0\t42/
-  end
-
-  test_iyokan [
-    "tfhe",
-    "-l", "test/diamond-core-wo-rom.json",
-    "-i", "_test_req_packet00",
-    "-o", "_test_res_packet00",
-    "-c", "8",
-    "--enable-rom", "io_romAddr:7:io_romData:32",
-  ] do |_|
-    r = check_code "./kvsp-packet", ["dec", "_test_sk", "_test_res_packet00"]
-    assert_regex r, /#cycle\t8/
-    assert_regex r, /f0\t1/
-    assert_regex r, /x0\t42/
-  end
-
-  test_iyokan [
-    "tfhe",
     "-l", "test/diamond-core-wo-ram-rom.json",
     "-i", "_test_req_packet00",
     "-o", "_test_res_packet00",
@@ -162,25 +114,12 @@ if $SLOW_MODE_ENABLED
   if $CUDA_MODE_ENABLED
     test_iyokan [
       "tfhe",
-      "-l", "test/diamond-core.json",
-      "-i", "_test_req_packet00",
-      "-o", "_test_res_packet00",
-      "-c", "8",
-      "--enable-gpu",
-    ] do |_|
-      r = check_code "./kvsp-packet", ["dec", "_test_sk", "_test_res_packet00"]
-      assert_regex r, /#cycle\t8/
-      assert_regex r, /f0\t1/
-      assert_regex r, /x0\t42/
-    end
-
-    test_iyokan [
-      "tfhe",
-      "-l", "test/diamond-core-wo-rom.json",
+      "-l", "test/diamond-core-wo-ram-rom.json",
       "-i", "_test_req_packet00",
       "-o", "_test_res_packet00",
       "-c", "8",
       "--enable-rom", "io_romAddr:7:io_romData:32",
+      "--enable-ram",
       "--enable-gpu",
     ] do |_|
       r = check_code "./kvsp-packet", ["dec", "_test_sk", "_test_res_packet00"]

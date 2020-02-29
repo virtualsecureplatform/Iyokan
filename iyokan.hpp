@@ -922,18 +922,6 @@ void readNetworkFromJSONImpl(NetworkBuilder &builder, picojson::value &v)
         else if (type == "MUX") {
             builder.MUX(id, priority);
         }
-        else if (type == "ROM") {
-            int romAddress =
-                static_cast<int>(cell.at("romAddress").get<double>());
-            int romBit = static_cast<int>(cell.at("romBit").get<double>());
-            builder.ROM(id, std::to_string(romAddress), romBit, priority);
-        }
-        else if (type == "RAM") {
-            int ramAddress =
-                static_cast<int>(cell.at("ramAddress").get<double>());
-            int ramBit = static_cast<int>(cell.at("ramBit").get<double>());
-            builder.RAM(id, std::to_string(ramAddress), ramBit, priority);
-        }
         else {
             throw std::runtime_error("Not implemented:" + type);
         }
@@ -988,17 +976,8 @@ void readNetworkFromJSONImpl(NetworkBuilder &builder, picojson::value &v)
             builder.connect(B, id);
             builder.connect(S, id);
         }
-        else if (type == "ROM") {
-            // picojson::array &Q = output.at("Q").get<picojson::array>();
-            // Nothing to do!
-        }
-        else if (type == "RAM") {
-            int D = static_cast<int>(input.at("D").get<double>());
-            // picojson::array &Q = output.at("Q").get<picojson::array>();
-            builder.connect(D, id);
-        }
         else {
-            throw std::runtime_error("Not executed");
+            throw std::runtime_error("Not implemented:" + type);
         }
     }
 }

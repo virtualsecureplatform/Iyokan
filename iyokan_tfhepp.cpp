@@ -46,12 +46,6 @@ KVSPResPacket makeResPacket(Name2NetMap &name2net, int numCycles,
             }
         }
     }
-    else {
-        for (int addr = 0; addr < 512; addr++)
-            for (int bit = 0; bit < 8; bit++)
-                resPacket.ram.push_back(
-                    get(core, "ram", std::to_string(addr), bit)->get());
-    }
 
     return resPacket;
 }
@@ -64,24 +58,14 @@ void dumpResultAsJSON(std::ostream &os, const KVSPResPacket &resPacket,
     decrypt(*sk, resPacket).printAsJSON(os);
 }
 
-void setInitialRAM(Name2NetMap &name2net, const KVSPReqPacket &reqPacket,
-                   bool ramEnabled)
+void setInitialRAM(Name2NetMap &name2net, const KVSPReqPacket &reqPacket)
 {
-    if (ramEnabled) {
-        auto &ramA = *name2net.at("ramA"), &ramB = *name2net.at("ramB");
-        for (int addr = 0; addr < 512; addr++)
-            for (int bit = 0; bit < 8; bit++)
-                (addr % 2 == 1 ? ramA.get<TaskTFHEppRAMUX>("ram", "A", bit)
-                               : ramB.get<TaskTFHEppRAMUX>("ram", "B", bit))
-                    ->set(addr / 2, reqPacket.ramCk.at(addr * 8 + bit));
-    }
-    else {
-        auto &core = *name2net.at("core");
-        for (int addr = 0; addr < 512; addr++)
-            for (int bit = 0; bit < 8; bit++)
-                get(core, "ram", std::to_string(addr), bit)
-                    ->set(reqPacket.ram.at(addr * 8 + bit));
-    }
+    auto &ramA = *name2net.at("ramA"), &ramB = *name2net.at("ramB");
+    for (int addr = 0; addr < 512; addr++)
+        for (int bit = 0; bit < 8; bit++)
+            (addr % 2 == 1 ? ramA.get<TaskTFHEppRAMUX>("ram", "A", bit)
+                           : ramB.get<TaskTFHEppRAMUX>("ram", "B", bit))
+                ->set(addr / 2, reqPacket.ramCk.at(addr * 8 + bit));
 }
 
 void connect(TFHEppNetwork &srcNet, const std::string &srcPortName,
@@ -230,15 +214,7 @@ void doTFHE(const Options &opt)
     }
 
     // Set initial ROM data
-    if (opt.romPorts.empty()) {
-        auto &core = *name2net.at("core");
-
-        for (int addr = 0; addr < 128; addr++)
-            for (int bit = 0; bit < 32; bit++)
-                get(core, "rom", std::to_string(addr), bit)
-                    ->set((reqPacket.rom.at(addr * 32 + bit)));
-    }
-    else {
+    if (!opt.romPorts.empty()) {
         assert(reqPacket.circuitKey);
         auto &rom = *name2net.at("rom");
 
@@ -292,8 +268,8 @@ void doTFHE(const Options &opt)
 
             runner.tick();
 
-            if (first)
-                setInitialRAM(name2net, reqPacket, opt.ramEnabled);
+            if (first && opt.ramEnabled)
+                setInitialRAM(name2net, reqPacket);
 
             runner.run();
 

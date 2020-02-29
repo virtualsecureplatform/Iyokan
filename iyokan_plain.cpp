@@ -43,36 +43,17 @@ KVSPPlainResPacket makeResPacket(Name2NetMap name2net, int numCycles,
                 (addr % 2 == 1 ? ramA : ramB)->get(addr / 2));
         }
     }
-    else {
-        for (int addr = 0; addr < 512; addr++) {
-            uint8_t &val = resPacket.ram.emplace_back(0);
-            for (int bit = 0; bit < 8; bit++)
-                val |= get(core, "ram", std::to_string(addr), bit)->get()
-                       << bit;
-        }
-    }
 
     return resPacket;
 }
 
-void setInitialRAM(Name2NetMap &name2net, const KVSPPlainReqPacket &reqPacket,
-                   bool ramEnabled)
+void setInitialRAM(Name2NetMap &name2net, const KVSPPlainReqPacket &reqPacket)
 {
-    if (ramEnabled) {
-        auto ramA = name2net.at("ramA")->get<TaskPlainRAM>("ram", "A", 0),
-             ramB = name2net.at("ramB")->get<TaskPlainRAM>("ram", "B", 0);
-        assert(ramA && ramB);
-        for (int addr = 0; addr < 512; addr++) {
-            (addr % 2 == 1 ? ramA : ramB)
-                ->set(addr / 2, reqPacket.ram.at(addr));
-        }
-    }
-    else {
-        auto &core = *name2net.at("core");
-        for (int addr = 0; addr < 512; addr++)
-            for (int bit = 0; bit < 8; bit++)
-                get(core, "ram", std::to_string(addr), bit)
-                    ->set((reqPacket.ram.at(addr) >> bit) & 1);
+    auto ramA = name2net.at("ramA")->get<TaskPlainRAM>("ram", "A", 0),
+         ramB = name2net.at("ramB")->get<TaskPlainRAM>("ram", "B", 0);
+    assert(ramA && ramB);
+    for (int addr = 0; addr < 512; addr++) {
+        (addr % 2 == 1 ? ramA : ramB)->set(addr / 2, reqPacket.ram.at(addr));
     }
 }
 
@@ -220,17 +201,7 @@ void doPlain(const Options &opt)
     }
 
     // Set initial ROM data
-    if (opt.romPorts.empty()) {
-        auto &core = *name2net.at("core");
-
-        for (int addr = 0; addr < 128; addr++)
-            for (int bit = 0; bit < 32; bit++)
-                get(core, "rom", std::to_string(addr), bit)
-                    ->set(
-                        (reqPacket.rom.at((addr * 32 + bit) / 8) >> (bit % 8)) &
-                        1);
-    }
-    else {
+    if (!opt.romPorts.empty()) {
         auto &rom = *name2net.at("rom");
 
         for (int i = 0; i < 512 / 4; i++) {
@@ -283,8 +254,8 @@ void doPlain(const Options &opt)
 
             runner.tick();
 
-            if (first)
-                setInitialRAM(name2net, reqPacket, opt.ramEnabled);
+            if (first && opt.ramEnabled)
+                setInitialRAM(name2net, reqPacket);
 
             runner.run();
 

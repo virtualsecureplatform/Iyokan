@@ -439,157 +439,6 @@ void testFromJSONtest_counter_4bit()
     }
 }
 
-template <class NetworkBuilder>
-void testFromJSONdiamond_core()
-{
-    const std::string fileName = "test/diamond-core.json";
-    std::ifstream ifs{fileName};
-    assert(ifs);
-
-    auto net = readNetworkFromJSON<NetworkBuilder>(ifs);
-    assert(net.isValid());
-
-    // 0: 74 80     lsi ra, 24
-    // 2: 00 00     nop
-    setInput(get<NetworkBuilder>(net, "rom", "0", 0x00), 0);
-    setInput(get<NetworkBuilder>(net, "rom", "0", 0x01), 0);
-    setInput(get<NetworkBuilder>(net, "rom", "0", 0x02), 1);
-    setInput(get<NetworkBuilder>(net, "rom", "0", 0x03), 0);
-    setInput(get<NetworkBuilder>(net, "rom", "0", 0x04), 1);
-    setInput(get<NetworkBuilder>(net, "rom", "0", 0x05), 1);
-    setInput(get<NetworkBuilder>(net, "rom", "0", 0x06), 1);
-    setInput(get<NetworkBuilder>(net, "rom", "0", 0x07), 0);
-
-    setInput(get<NetworkBuilder>(net, "rom", "0", 0x08), 0);
-    setInput(get<NetworkBuilder>(net, "rom", "0", 0x09), 0);
-    setInput(get<NetworkBuilder>(net, "rom", "0", 0x0a), 0);
-    setInput(get<NetworkBuilder>(net, "rom", "0", 0x0b), 0);
-    setInput(get<NetworkBuilder>(net, "rom", "0", 0x0c), 0);
-    setInput(get<NetworkBuilder>(net, "rom", "0", 0x0d), 0);
-    setInput(get<NetworkBuilder>(net, "rom", "0", 0x0e), 0);
-    setInput(get<NetworkBuilder>(net, "rom", "0", 0x0f), 1);
-
-    setInput(get<NetworkBuilder>(net, "rom", "0", 0x10), 0);
-    setInput(get<NetworkBuilder>(net, "rom", "0", 0x11), 0);
-    setInput(get<NetworkBuilder>(net, "rom", "0", 0x12), 0);
-    setInput(get<NetworkBuilder>(net, "rom", "0", 0x13), 0);
-    setInput(get<NetworkBuilder>(net, "rom", "0", 0x14), 0);
-    setInput(get<NetworkBuilder>(net, "rom", "0", 0x15), 0);
-    setInput(get<NetworkBuilder>(net, "rom", "0", 0x16), 0);
-    setInput(get<NetworkBuilder>(net, "rom", "0", 0x17), 0);
-
-    setInput(get<NetworkBuilder>(net, "rom", "0", 0x18), 0);
-    setInput(get<NetworkBuilder>(net, "rom", "0", 0x19), 0);
-    setInput(get<NetworkBuilder>(net, "rom", "0", 0x1a), 0);
-    setInput(get<NetworkBuilder>(net, "rom", "0", 0x1b), 0);
-    setInput(get<NetworkBuilder>(net, "rom", "0", 0x1c), 0);
-    setInput(get<NetworkBuilder>(net, "rom", "0", 0x1d), 0);
-    setInput(get<NetworkBuilder>(net, "rom", "0", 0x1e), 0);
-    setInput(get<NetworkBuilder>(net, "rom", "0", 0x1f), 0);
-
-    SET_INPUT("reset", 0, 1);
-    processAllGates(net);
-
-    SET_INPUT("reset", 0, 0);
-
-    for (int i = 0; i < 5; i++) {
-        net.tick();
-        processAllGates(net);
-    }
-
-    ASSERT_OUTPUT_EQ("io_regOut_x0", 0x00, 0);
-    ASSERT_OUTPUT_EQ("io_regOut_x0", 0x01, 0);
-    ASSERT_OUTPUT_EQ("io_regOut_x0", 0x02, 0);
-    ASSERT_OUTPUT_EQ("io_regOut_x0", 0x03, 1);
-    ASSERT_OUTPUT_EQ("io_regOut_x0", 0x04, 1);
-    ASSERT_OUTPUT_EQ("io_regOut_x0", 0x05, 0);
-    ASSERT_OUTPUT_EQ("io_regOut_x0", 0x06, 0);
-    ASSERT_OUTPUT_EQ("io_regOut_x0", 0x07, 0);
-    ASSERT_OUTPUT_EQ("io_regOut_x0", 0x08, 0);
-    ASSERT_OUTPUT_EQ("io_regOut_x0", 0x09, 0);
-    ASSERT_OUTPUT_EQ("io_regOut_x0", 0x0a, 0);
-    ASSERT_OUTPUT_EQ("io_regOut_x0", 0x0b, 0);
-    ASSERT_OUTPUT_EQ("io_regOut_x0", 0x0c, 0);
-    ASSERT_OUTPUT_EQ("io_regOut_x0", 0x0d, 0);
-    ASSERT_OUTPUT_EQ("io_regOut_x0", 0x0e, 0);
-    ASSERT_OUTPUT_EQ("io_regOut_x0", 0x0f, 0);
-}
-
-template <class NetworkBuilder, class TaskROM, class NormalT, class ROMNetwork>
-void testFromJSONdiamond_core_wo_rom(ROMNetwork rom)
-{
-    assert(rom.isValid());
-
-    const std::string fileName = "test/diamond-core-wo-rom.json";
-    std::ifstream ifs{fileName};
-    assert(ifs);
-
-    auto core = readNetworkFromJSON<NetworkBuilder>(ifs);
-    assert(core.isValid());
-
-    auto net = core.template merge<NormalT>(
-        rom,
-        {
-            {"io_romAddr", 0, "ROM", 0},
-            {"io_romAddr", 1, "ROM", 1},
-            {"io_romAddr", 2, "ROM", 2},
-            {"io_romAddr", 3, "ROM", 3},
-            {"io_romAddr", 4, "ROM", 4},
-            {"io_romAddr", 5, "ROM", 5},
-            {"io_romAddr", 6, "ROM", 6},
-        },
-        {
-            {"ROM", 0, "io_romData", 0},   {"ROM", 1, "io_romData", 1},
-            {"ROM", 2, "io_romData", 2},   {"ROM", 3, "io_romData", 3},
-            {"ROM", 4, "io_romData", 4},   {"ROM", 5, "io_romData", 5},
-            {"ROM", 6, "io_romData", 6},   {"ROM", 7, "io_romData", 7},
-            {"ROM", 8, "io_romData", 8},   {"ROM", 9, "io_romData", 9},
-            {"ROM", 10, "io_romData", 10}, {"ROM", 11, "io_romData", 11},
-            {"ROM", 12, "io_romData", 12}, {"ROM", 13, "io_romData", 13},
-            {"ROM", 14, "io_romData", 14}, {"ROM", 15, "io_romData", 15},
-            {"ROM", 16, "io_romData", 16}, {"ROM", 17, "io_romData", 17},
-            {"ROM", 18, "io_romData", 18}, {"ROM", 19, "io_romData", 19},
-            {"ROM", 20, "io_romData", 20}, {"ROM", 21, "io_romData", 21},
-            {"ROM", 22, "io_romData", 22}, {"ROM", 23, "io_romData", 23},
-            {"ROM", 24, "io_romData", 24}, {"ROM", 25, "io_romData", 25},
-            {"ROM", 26, "io_romData", 26}, {"ROM", 27, "io_romData", 27},
-            {"ROM", 28, "io_romData", 28}, {"ROM", 29, "io_romData", 29},
-            {"ROM", 30, "io_romData", 30}, {"ROM", 31, "io_romData", 31},
-        });
-    assert(net.isValid());
-
-    // 0: 74 80     lsi ra, 24
-    // 2: 00 00     nop
-    setROM(*net.template get<TaskROM>("rom", "all", 0),
-           std::vector<uint8_t>{0x74, 0x80});
-
-    SET_INPUT("reset", 0, 1);
-    processAllGates(net);
-
-    SET_INPUT("reset", 0, 0);
-    for (int i = 0; i < 5; i++) {
-        net.tick();
-        processAllGates(net);
-    }
-
-    ASSERT_OUTPUT_EQ("io_regOut_x0", 0x00, 0);
-    ASSERT_OUTPUT_EQ("io_regOut_x0", 0x01, 0);
-    ASSERT_OUTPUT_EQ("io_regOut_x0", 0x02, 0);
-    ASSERT_OUTPUT_EQ("io_regOut_x0", 0x03, 1);
-    ASSERT_OUTPUT_EQ("io_regOut_x0", 0x04, 1);
-    ASSERT_OUTPUT_EQ("io_regOut_x0", 0x05, 0);
-    ASSERT_OUTPUT_EQ("io_regOut_x0", 0x06, 0);
-    ASSERT_OUTPUT_EQ("io_regOut_x0", 0x07, 0);
-    ASSERT_OUTPUT_EQ("io_regOut_x0", 0x08, 0);
-    ASSERT_OUTPUT_EQ("io_regOut_x0", 0x09, 0);
-    ASSERT_OUTPUT_EQ("io_regOut_x0", 0x0a, 0);
-    ASSERT_OUTPUT_EQ("io_regOut_x0", 0x0b, 0);
-    ASSERT_OUTPUT_EQ("io_regOut_x0", 0x0c, 0);
-    ASSERT_OUTPUT_EQ("io_regOut_x0", 0x0d, 0);
-    ASSERT_OUTPUT_EQ("io_regOut_x0", 0x0e, 0);
-    ASSERT_OUTPUT_EQ("io_regOut_x0", 0x0f, 0);
-}
-
 template <class NetworkBuilder, class TaskROM, class NormalT, class RAMNetwork,
           class ROMNetwork>
 void testFromJSONdiamond_core_wo_ram_rom(RAMNetwork ramA, RAMNetwork ramB,
@@ -1096,47 +945,6 @@ void testTFHEppSerialization()
     }
 }
 
-void testDoTFHE()
-{
-    auto& h = TFHEppTestHelper::instance();
-
-    Options opt;
-    opt.logicFile = "test/diamond-core.json";
-    opt.inputFile = h.getELFAsPacketFile("test/test00.elf");
-    opt.outputFile = "_test_res_packet00";
-    opt.numWorkers = std::thread::hardware_concurrency();
-    opt.numCycles = 8;
-
-    doTFHE(opt);
-
-    writeToArchive("_test_sk", *h.sk());
-    auto resPacket = readFromArchive<KVSPResPacket>("_test_res_packet00");
-    auto plainResPacket = decrypt(*h.sk(), resPacket);
-    assert(plainResPacket.flags.at(0) == 1);
-    assert(plainResPacket.regs.at(0) == 42);
-}
-
-void testDoTFHEWithROM()
-{
-    auto& h = TFHEppTestHelper::instance();
-
-    Options opt;
-    opt.logicFile = "test/diamond-core-wo-rom.json";
-    opt.inputFile = h.getELFAsPacketFileWithCk("test/test00.elf");
-    opt.outputFile = "_test_res_packet00";
-    opt.numWorkers = std::thread::hardware_concurrency();
-    opt.numCycles = 8;
-    opt.romPorts = {"io_romAddr", "7", "io_romData", "32"};
-
-    doTFHE(opt);
-
-    writeToArchive("_test_sk", *h.sk());
-    auto resPacket = readFromArchive<KVSPResPacket>("_test_res_packet00");
-    auto plainResPacket = decrypt(*h.sk(), resPacket);
-    assert(plainResPacket.flags.at(0) == 1);
-    assert(plainResPacket.regs.at(0) == 42);
-}
-
 void testDoTFHEWithRAMROM()
 {
     auto& h = TFHEppTestHelper::instance();
@@ -1240,47 +1048,6 @@ int getOutput(std::shared_ptr<TaskCUFHEGateMem> task)
     return p.get();
 }
 
-void testDoCUFHE()
-{
-    auto& h = TFHEppTestHelper::instance();
-
-    Options opt;
-    opt.logicFile = "test/diamond-core.json";
-    opt.inputFile = h.getELFAsPacketFile("test/test00.elf");
-    opt.outputFile = "_test_res_packet00";
-    opt.numWorkers = 240;
-    opt.numCycles = 8;
-
-    doCUFHE(opt);
-
-    writeToArchive("_test_sk", *h.sk());
-    auto resPacket = readFromArchive<KVSPResPacket>("_test_res_packet00");
-    auto plainResPacket = decrypt(*h.sk(), resPacket);
-    assert(plainResPacket.flags.at(0) == 1);
-    assert(plainResPacket.regs.at(0) == 42);
-}
-
-void testDoCUFHEWithROM()
-{
-    auto& h = TFHEppTestHelper::instance();
-
-    Options opt;
-    opt.logicFile = "test/diamond-core-wo-rom.json";
-    opt.inputFile = h.getELFAsPacketFileWithCk("test/test00.elf");
-    opt.outputFile = "_test_res_packet00";
-    opt.numWorkers = 240;
-    opt.numCycles = 8;
-    opt.romPorts = {"io_romAddr", "7", "io_romData", "32"};
-
-    doCUFHE(opt);
-
-    writeToArchive("_test_sk", *h.sk());
-    auto resPacket = readFromArchive<KVSPResPacket>("_test_res_packet00");
-    auto plainResPacket = decrypt(*h.sk(), resPacket);
-    assert(plainResPacket.flags.at(0) == 1);
-    assert(plainResPacket.regs.at(0) == 42);
-}
-
 void testDoCUFHEWithRAMROM()
 {
     auto& h = TFHEppTestHelper::instance();
@@ -1360,9 +1127,6 @@ int main(int argc, char** argv)
     testFromJSONtest_register_4bit<PlainNetworkBuilder>();
     testSequentialCircuit<PlainNetworkBuilder>();
     testFromJSONtest_counter_4bit<PlainNetworkBuilder>();
-    testFromJSONdiamond_core<PlainNetworkBuilder>();
-    testFromJSONdiamond_core_wo_rom<PlainNetworkBuilder, TaskPlainROM, uint8_t>(
-        makePlainROMNetwork());
     testFromJSONdiamond_core_wo_ram_rom<PlainNetworkBuilder, TaskPlainROM,
                                         uint8_t>(makePlainRAMNetwork("A"),
                                                  makePlainRAMNetwork("B"),
@@ -1407,26 +1171,13 @@ int main(int argc, char** argv)
     if (argc >= 2 && strcmp(argv[1], "slow") == 0) {
         TFHEppTestHelper::instance().prepareCircuitKey();
 
-        testFromJSONdiamond_core<TFHEppNetworkBuilder>();
-        testFromJSONdiamond_core_wo_rom<TFHEppNetworkBuilder, TaskTFHEppROMUX,
-                                        TFHEpp::TLWElvl0>(
-            makeTFHEppROMNetwork());
         testFromJSONdiamond_core_wo_ram_rom<TFHEppNetworkBuilder,
                                             TaskTFHEppROMUX, TFHEpp::TLWElvl0>(
             makeTFHEppRAMNetwork("A"), makeTFHEppRAMNetwork("B"),
             makeTFHEppROMNetwork());
-        testDoTFHE();
-        testDoTFHEWithROM();
         testDoTFHEWithRAMROM();
 
 #ifdef IYOKAN_CUDA_ENABLED
-        {
-            CUFHETestHelper::CUFHEManager man;
-
-            testFromJSONdiamond_core<CUFHENetworkBuilder>();
-        }
-        testDoCUFHE();
-        testDoCUFHEWithROM();
         testDoCUFHEWithRAMROM();
 #endif
     }
