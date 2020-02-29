@@ -701,6 +701,7 @@ void testDoPlainWithRAMROM()
     opt.numCycles = 8;
     opt.romPorts = {"io_romAddr", "7", "io_romData", "32"};
     opt.ramEnabled = true;
+    opt.quiet = true;
 
     KVSPPlainResPacket resPacket = doPlain(opt);
     assert(resPacket.flags.at(0) == 1);
