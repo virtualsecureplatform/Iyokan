@@ -896,17 +896,13 @@ TaskNetwork<WorkerInfo>::TaskNetwork(NetworkBuilderBase<WorkerInfo> &&builder)
 
 #include <picojson.h>
 
-// Read JSON from the stream, build a network, and return a tuple of inputs,
-// outputs, and nodes.
 template <class NetworkBuilder>
 typename NetworkBuilder::NetworkType readNetworkFromJSON(std::istream &is)
 {
-    // Read the stream as picojson::value.
     picojson::value v;
     const std::string err = picojson::parse(v, is);
-    if (!err.empty()) {
-        throw std::runtime_error(err);
-    }
+    if (!err.empty())
+        error::die("Invalid JSON of network: ", err);
 
     NetworkBuilder builder;
     readNetworkFromJSONImpl(builder, v);
@@ -920,66 +916,51 @@ void readNetworkFromJSONImpl(NetworkBuilder &builder, picojson::value &v)
     picojson::object &obj = v.get<picojson::object>();
     picojson::array &cells = obj["cells"].get<picojson::array>();
     picojson::array &ports = obj["ports"].get<picojson::array>();
-    for (const auto &e : ports) {  // vectorをrange-based-forでまわしている。
+    for (const auto &e : ports) {
         picojson::object port = e.get<picojson::object>();
         std::string type = port.at("type").get<std::string>();
         int id = static_cast<int>(port.at("id").get<double>());
         std::string portName = port.at("portName").get<std::string>();
         int portBit = static_cast<int>(port.at("portBit").get<double>());
         int priority = static_cast<int>(port.at("priority").get<double>());
-        if (type == "input") {
+        if (type == "input")
             builder.INPUT(id, portName, portBit, priority);
-        }
-        else if (type == "output") {
+        else if (type == "output")
             builder.OUTPUT(id, portName, portBit, priority);
-        }
     }
-    for (const auto &e : cells) {  // vectorをrange-based-forでまわしている。
+    for (const auto &e : cells) {
         picojson::object cell = e.get<picojson::object>();
         std::string type = cell.at("type").get<std::string>();
         int id = static_cast<int>(cell.at("id").get<double>());
         int priority = static_cast<int>(cell.at("priority").get<double>());
-        if (type == "AND") {
+        if (type == "AND")
             builder.AND(id, priority);
-        }
-        else if (type == "NAND") {
+        else if (type == "NAND")
             builder.NAND(id, priority);
-        }
-        else if (type == "ANDNOT") {
+        else if (type == "ANDNOT")
             builder.ANDNOT(id, priority);
-        }
-        else if (type == "XOR") {
+        else if (type == "XOR")
             builder.XOR(id, priority);
-        }
-        else if (type == "XNOR") {
+        else if (type == "XNOR")
             builder.XNOR(id, priority);
-        }
-        else if (type == "DFFP") {
+        else if (type == "DFFP")
             builder.DFF(id, priority);
-        }
-        else if (type == "NOT") {
+        else if (type == "NOT")
             builder.NOT(id, priority);
-        }
-        else if (type == "NOR") {
+        else if (type == "NOR")
             builder.NOR(id, priority);
-        }
-        else if (type == "OR") {
+        else if (type == "OR")
             builder.OR(id, priority);
-        }
-        else if (type == "ORNOT") {
+        else if (type == "ORNOT")
             builder.ORNOT(id, priority);
-        }
-        else if (type == "MUX") {
+        else if (type == "MUX")
             builder.MUX(id, priority);
-        }
-        else {
-            throw std::runtime_error("Not implemented:" + type);
-        }
+        else
+            error::die("Invalid JSON of network. Invalid type: ", type);
     }
-    for (const auto &e : ports) {  // vectorをrange-based-forでまわしている。
+    for (const auto &e : ports) {
         picojson::object port = e.get<picojson::object>();
         std::string type = port.at("type").get<std::string>();
-        std::string name = port.at("name").get<std::string>();
         int id = static_cast<int>(port.at("id").get<double>());
         picojson::array &bits = port.at("bits").get<picojson::array>();
         if (type == "input") {
@@ -992,42 +973,37 @@ void readNetworkFromJSONImpl(NetworkBuilder &builder, picojson::value &v)
             }
         }
     }
-    for (const auto &e : cells) {  // vectorをrange-based-forでまわしている。
+    for (const auto &e : cells) {
         picojson::object cell = e.get<picojson::object>();
         std::string type = cell.at("type").get<std::string>();
         int id = static_cast<int>(cell.at("id").get<double>());
         picojson::object input = cell.at("input").get<picojson::object>();
-        picojson::object output = cell.at("output").get<picojson::object>();
         if (type == "AND" || type == "NAND" || type == "XOR" ||
             type == "XNOR" || type == "NOR" || type == "ANDNOT" ||
             type == "OR" || type == "ORNOT") {
             int A = static_cast<int>(input.at("A").get<double>());
             int B = static_cast<int>(input.at("B").get<double>());
-            // picojson::array &Y = output.at("Y").get<picojson::array>();
             builder.connect(A, id);
             builder.connect(B, id);
         }
         else if (type == "DFFP") {
             int D = static_cast<int>(input.at("D").get<double>());
-            // picojson::array &Q = output.at("Q").get<picojson::array>();
             builder.connect(D, id);
         }
         else if (type == "NOT") {
             int A = static_cast<int>(input.at("A").get<double>());
-            // picojson::array &Y = output.at("Y").get<picojson::array>();
             builder.connect(A, id);
         }
         else if (type == "MUX") {
             int A = static_cast<int>(input.at("A").get<double>());
             int B = static_cast<int>(input.at("B").get<double>());
             int S = static_cast<int>(input.at("S").get<double>());
-            // picojson::array &Y = output.at("Y").get<picojson::array>();
             builder.connect(A, id);
             builder.connect(B, id);
             builder.connect(S, id);
         }
         else {
-            throw std::runtime_error("Not implemented:" + type);
+            error::die("Invalid JSON of network. Invalid type: ", type);
         }
     }
 }
