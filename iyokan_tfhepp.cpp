@@ -6,79 +6,12 @@ namespace {
 using Name2NetMap =
     std::unordered_map<std::string, std::shared_ptr<TFHEppNetwork>>;
 
-auto get(TFHEppNetwork &net, const std::string &kind,
-         const std::string &portName, int portBit)
-{
-    auto ret = net.get<TaskTFHEppGateMem>(kind, portName, portBit);
-    assert(ret && "Possibly invalid port name or port bit");
-    return ret;
-}
-
-KVSPResPacket makeResPacket(Name2NetMap &name2net, int numCycles,
-                            bool ramEnabled)
-{
-    auto &core = *name2net.at("core");
-
-    KVSPResPacket resPacket;
-    resPacket.numCycles = numCycles;
-    // Get values of flags
-    resPacket.flags.push_back(get(core, "output", "io_finishFlag", 0)->get());
-    // Get values of registers
-    for (int reg = 0; reg < 16; reg++) {
-        resPacket.regs.emplace_back();
-        for (int bit = 0; bit < 16; bit++)
-            resPacket.regs[reg].push_back(
-                get(core, "output", detail::fok("io_regOut_x", reg), bit)
-                    ->get());
-    }
-    // Get values of RAM
-    if (ramEnabled) {
-        auto &ramA = *name2net.at("ramA");
-        auto &ramB = *name2net.at("ramB");
-
-        for (int addr = 0; addr < 512; addr++) {
-            for (int bit = 0; bit < 8; bit++) {
-                auto ram = addr % 2 == 1
-                               ? ramA.get<TaskTFHEppRAMUX>("ram", "A", bit)
-                               : ramB.get<TaskTFHEppRAMUX>("ram", "B", bit);
-                assert(ram);
-                resPacket.ramCk.push_back(ram->get(addr / 2));
-            }
-        }
-    }
-
-    return resPacket;
-}
-
 void dumpResultAsJSON(std::ostream &os, const KVSPResPacket &resPacket,
                       const std::string &fileSecretKey)
 {
     auto sk = std::make_shared<TFHEpp::SecretKey>();
     readFromArchive(*sk, fileSecretKey);
     decrypt(*sk, resPacket).printAsJSON(os);
-}
-
-void setInitialRAM(Name2NetMap &name2net, const KVSPReqPacket &reqPacket)
-{
-    auto &ramA = *name2net.at("ramA"), &ramB = *name2net.at("ramB");
-    for (int addr = 0; addr < 512; addr++)
-        for (int bit = 0; bit < 8; bit++)
-            (addr % 2 == 1 ? ramA.get<TaskTFHEppRAMUX>("ram", "A", bit)
-                           : ramB.get<TaskTFHEppRAMUX>("ram", "B", bit))
-                ->set(addr / 2, reqPacket.ramCk.at(addr * 8 + bit));
-}
-
-void connect(TFHEppNetwork &srcNet, const std::string &srcPortName,
-             int srcPortBit, TFHEppNetwork &dstNet,
-             const std::string &dstPortName, int dstPortBit)
-{
-    auto dst = dstNet.get<TaskTFHEppGate>("input", dstPortName, dstPortBit);
-    assert(dst);
-    auto src = srcNet.get<TaskTFHEppGate>("output", srcPortName, srcPortBit);
-    assert(src);
-
-    dst->acceptOneMoreInput();
-    NetworkBuilderBase<TFHEppWorkerInfo>::connectTasks(src, dst);
 }
 
 class TFHEppNetworkRunner {
@@ -123,6 +56,217 @@ public:
     }
 };
 
+class TFHEppFrontend {
+private:
+    Name2NetMap name2net_;
+    const Options &opt_;
+    KVSPReqPacket reqPacket_;
+
+private:
+    template <class T = TaskTFHEppGate>
+    std::shared_ptr<T> get(const blueprint::Port &port)
+    {
+        auto it = name2net_.find(port.nodeName);
+        if (it == name2net_.end())
+            error::die("Invalid network. Not found: ", port.nodeName);
+        auto task = it->second->get_if<T>(port.portLabel);
+        if (!task)
+            error::die("Invalid network. Not found: ", port.nodeName, "/",
+                       port.portLabel.portName, "[", port.portLabel.portBit,
+                       "]");
+        return task;
+    }
+
+    template <class T = TaskTFHEppGateMem>
+    std::shared_ptr<T> get_at(const std::string &kind,
+                              const std::string &portName, int portBit = 0)
+    {
+        auto port = opt_.blueprint->at(portName, portBit);
+        if (!port || port->portLabel.kind != kind)
+            error::die("Invalid network. Not found: ", portName, "[", portBit,
+                       "]");
+        auto task = std::dynamic_pointer_cast<T>(get(*port));
+        if (!task)
+            error::die("Invalid network. Not found: ", portName, "[", portBit,
+                       "]");
+        return task;
+    }
+
+    KVSPResPacket makeResPacket()
+    {
+        KVSPResPacket resPacket;
+        resPacket.numCycles = opt_.numCycles;
+        // Get values of flags
+        resPacket.flags.push_back(get_at("output", "finflag")->get());
+        // Get values of registers
+        for (int reg = 0; reg < 16; reg++) {
+            resPacket.regs.emplace_back();
+            for (int bit = 0; bit < 16; bit++)
+                resPacket.regs[reg].push_back(
+                    get_at("output", detail::fok("reg_x", reg), bit)->get());
+        }
+        // Get values of RAM
+        if (auto atRAMOpt = opt_.blueprint->atRAM(); atRAMOpt) {
+            using namespace blueprint;
+            const RAM_AB *atRAM = std::get_if<RAM_AB>(&*atRAMOpt);
+            assert(atRAM);
+            for (int addr = 0; addr < 512; addr++) {
+                for (int bit = 0; bit < 8; bit++) {
+                    auto &ram = addr % 2 == 1
+                                    ? *get<TaskTFHEppRAMUX>(
+                                          {atRAM->nodeAName, {"ram", "", bit}})
+                                    : *get<TaskTFHEppRAMUX>(
+                                          {atRAM->nodeBName, {"ram", "", bit}});
+                    resPacket.ramCk.push_back(ram.get(addr / 2));
+                }
+            }
+        }
+
+        return resPacket;
+    }
+
+    void setInitialRAM()
+    {
+        if (auto atRAMOpt = opt_.blueprint->atRAM(); atRAMOpt) {
+            using namespace blueprint;
+            const RAM_AB *atRAM = std::get_if<RAM_AB>(&*atRAMOpt);
+            assert(atRAM);
+            for (int addr = 0; addr < 512; addr++) {
+                for (int bit = 0; bit < 8; bit++) {
+                    auto &ram = addr % 2 == 1
+                                    ? *get<TaskTFHEppRAMUX>(
+                                          {atRAM->nodeAName, {"ram", "", bit}})
+                                    : *get<TaskTFHEppRAMUX>(
+                                          {atRAM->nodeBName, {"ram", "", bit}});
+                    ram.set(addr / 2, reqPacket_.ramCk.at(addr * 8 + bit));
+                }
+            }
+        }
+    }
+
+public:
+    TFHEppFrontend(const Options &opt)
+        : opt_(opt), reqPacket_(readFromArchive<KVSPReqPacket>(opt.inputFile))
+    {
+        assert(opt.blueprint);
+    }
+
+    void go()
+    {
+        // Create network according to blueprint
+        const NetworkBlueprint &bp = *opt_.blueprint;
+
+        // [[file]]
+        for (const auto &file : bp.files()) {
+            std::ifstream ifs{file.path, std::ios::binary};
+            if (!ifs)
+                error::die("Invalid [[file]] path: ", file.path);
+            auto net = std::make_shared<TFHEppNetwork>(
+                readNetworkFromJSON<TFHEppNetworkBuilder>(ifs));
+            if (!net->isValid())
+                error::die("Invalid network named: ", file.name);
+            name2net_.emplace(file.name, net);
+        }
+
+        // [[builtin]] type = ram
+        for (const auto &ram : bp.builtinRAMs()) {
+            assert(reqPacket_.circuitKey);
+            assert(ram.inAddrWidth == 8 && ram.inWdataWidth == 8 &&
+                   ram.outRdataWidth == 8);
+            auto net =
+                std::make_shared<TFHEppNetwork>(makeTFHEppRAMNetwork(""));
+            name2net_.emplace(ram.name, net);
+        }
+
+        // [[builtin]] type = rom
+        for (const auto &rom : bp.builtinROMs()) {
+            assert(reqPacket_.circuitKey);
+            assert(rom.inAddrWidth == 7 && rom.outRdataWidth == 32);
+            auto net = std::make_shared<TFHEppNetwork>(makeTFHEppROMNetwork());
+            name2net_.emplace(rom.name, net);
+        }
+
+        // [connect]
+        for (const auto &[src, dst] : bp.edges()) {
+            assert(src.portLabel.kind == "output");
+            assert(dst.portLabel.kind == "input");
+            auto srcTask = get(src);
+            auto dstTask = get(dst);
+            dstTask->acceptOneMoreInput();
+            NetworkBuilderBase<TFHEpp::TLWElvl0>::connectTasks(srcTask,
+                                                               dstTask);
+        }
+
+        // Set initial ROM data
+        if (auto atROMOpt = bp.atROM(); atROMOpt) {
+            using namespace blueprint;
+            const SingleROM *atROM = std::get_if<SingleROM>(&atROMOpt.value());
+            assert(atROM);
+            auto &rom =
+                *get<TaskTFHEppROMUX>({atROM->nodeName, {"rom", "all", 0}});
+
+            const int ROM_UNIT = 1024 / 8;
+            assert(reqPacket_.romCk.size() == 512 / ROM_UNIT);
+            for (int i = 0; i < 512 / ROM_UNIT; i++) {
+                int offset = ROM_UNIT * i;
+                rom.set128le(offset, reqPacket_.romCk[i]);
+            }
+        }
+
+        // Make runner
+        TFHEppWorkerInfo wi{TFHEpp::lweParams{}, reqPacket_.gateKey,
+                            reqPacket_.circuitKey};
+        TFHEppNetworkRunner runner{opt_.numCPUWorkers, wi};
+        for (auto &&p : name2net_)
+            runner.addNetwork(p.second);
+
+        // Reset
+        {
+            TFHEpp::TLWElvl0 one, zero;
+            TFHEpp::HomCONSTANTONE(one);
+            TFHEpp::HomCONSTANTZERO(zero);
+
+            auto &reset = *get_at("input", "reset");
+            reset.set(one);
+            runner.run();
+            reset.set(zero);
+        }
+
+        // Go computing
+        std::optional<std::ofstream> dumpOS;
+        if (opt_.dumpEveryClock) {
+            dumpOS = std::ofstream{*opt_.dumpEveryClock};
+            assert(*dumpOS);
+        }
+
+        {
+            std::stringstream devnull;
+            std::ostream &os = opt_.quiet ? devnull : std::cout;
+
+            processCycles(opt_.numCycles, os, [&](bool first) {
+                if (dumpOS)
+                    dumpResultAsJSON(*dumpOS, makeResPacket(),
+                                     opt_.secretKey.value());
+
+                runner.tick();
+
+                if (first)
+                    setInitialRAM();
+
+                runner.run();
+
+                return false;
+            });
+        }
+
+        // Dump result packet
+        KVSPResPacket resPacket = makeResPacket();
+        if (dumpOS)
+            dumpResultAsJSON(*dumpOS, resPacket, opt_.secretKey.value());
+        writeToArchive(opt_.outputFile, resPacket);
+    }
+};
+
 }  // namespace
 
 void processAllGates(TFHEppNetwork &net, int numWorkers, TFHEppWorkerInfo wi,
@@ -153,134 +297,5 @@ void processAllGates(TFHEppNetwork &net, int numWorkers, TFHEppWorkerInfo wi,
 
 void doTFHE(const Options &opt)
 {
-    // Read packet
-    const auto reqPacket = readFromArchive<KVSPReqPacket>(opt.inputFile);
-
-    // Create nodes
-    Name2NetMap name2net;
-
-    {
-        std::ifstream ifs{opt.logicFile};
-        assert(ifs);
-        auto net = std::make_shared<TFHEppNetwork>(
-            readNetworkFromJSON<TFHEppNetworkBuilder>(ifs));
-        assert(net->isValid());
-        name2net.emplace("core", net);
-    }
-
-    if (opt.ramEnabled) {
-        auto ramANet =
-                 std::make_shared<TFHEppNetwork>(makeTFHEppRAMNetwork("A")),
-             ramBNet =
-                 std::make_shared<TFHEppNetwork>(makeTFHEppRAMNetwork("B"));
-        name2net.emplace("ramA", ramANet);
-        name2net.emplace("ramB", ramBNet);
-    }
-
-    if (!opt.romPorts.empty()) {
-        auto romNet = std::make_shared<TFHEppNetwork>(makeTFHEppROMNetwork());
-        name2net.emplace("rom", romNet);
-    }
-
-    // Create edges
-    if (opt.ramEnabled) {
-        auto &core = *name2net.at("core"), &ramA = *name2net.at("ramA"),
-             &ramB = *name2net.at("ramB");
-
-        connect(core, "io_memA_writeEnable", 0, ramA, "wren", 0);
-        for (int i = 0; i < 8; i++)
-            connect(core, "io_memA_address", i, ramA, "addr", i);
-        for (int i = 0; i < 8; i++)
-            connect(core, "io_memA_in", i, ramA, "wdata", i);
-        for (int i = 0; i < 8; i++)
-            connect(ramA, "rdata", i, core, "io_memA_out", i);
-
-        connect(core, "io_memB_writeEnable", 0, ramB, "wren", 0);
-        for (int i = 0; i < 8; i++)
-            connect(core, "io_memB_address", i, ramB, "addr", i);
-        for (int i = 0; i < 8; i++)
-            connect(core, "io_memB_in", i, ramB, "wdata", i);
-        for (int i = 0; i < 8; i++)
-            connect(ramB, "rdata", i, core, "io_memB_out", i);
-    }
-
-    if (!opt.romPorts.empty()) {
-        auto &core = *name2net.at("core"), &rom = *name2net.at("rom");
-
-        for (int i = 0; i < 7; i++)
-            connect(core, "io_romAddr", i, rom, "ROM", i);
-        for (int i = 0; i < 32; i++)
-            connect(rom, "ROM", i, core, "io_romData", i);
-    }
-
-    // Set initial ROM data
-    if (!opt.romPorts.empty()) {
-        assert(reqPacket.circuitKey);
-        auto &rom = *name2net.at("rom");
-
-        const int ROM_UNIT = 1024 / 8;
-        assert(reqPacket.romCk.size() == 512 / ROM_UNIT);
-        for (int i = 0; i < 512 / ROM_UNIT; i++) {
-            int offset = ROM_UNIT * i;
-            rom.get<TaskTFHEppROMUX>("rom", "all", 0)
-                ->set128le(offset, reqPacket.romCk[i]);
-        }
-    }
-
-    // Make runner
-    TFHEppWorkerInfo wi{TFHEpp::lweParams{}, reqPacket.gateKey,
-                        reqPacket.circuitKey};
-    TFHEppNetworkRunner runner{opt.numWorkers, wi};
-    for (auto &&p : name2net)
-        runner.addNetwork(p.second);
-
-    // Reset
-    {
-        TFHEpp::TLWElvl0 one, zero;
-        TFHEpp::HomCONSTANTONE(one);
-        TFHEpp::HomCONSTANTZERO(zero);
-
-        auto &core = *name2net.at("core");
-        get(core, "input", "reset", 0)->set(one);
-        runner.run();
-        get(core, "input", "reset", 0)->set(zero);
-    }
-
-    // Go computing
-    std::optional<std::ofstream> dumpOS;
-    if (opt.dumpEveryClock) {
-        dumpOS = std::ofstream{*opt.dumpEveryClock};
-        assert(*dumpOS);
-    }
-
-    {
-        std::stringstream devnull;
-        std::ostream &os = opt.quiet ? devnull : std::cout;
-
-        processCycles(opt.numCycles, os, [&](bool first) {
-            auto &core = *name2net.at("core");
-
-            if (dumpOS) {
-                KVSPResPacket resPacket =
-                    makeResPacket(name2net, opt.numCycles, opt.ramEnabled);
-                dumpResultAsJSON(*dumpOS, resPacket, opt.secretKey.value());
-            }
-
-            runner.tick();
-
-            if (first && opt.ramEnabled)
-                setInitialRAM(name2net, reqPacket);
-
-            runner.run();
-
-            return false;
-        });
-    }
-
-    // Dump result packet
-    KVSPResPacket resPacket =
-        makeResPacket(name2net, opt.numCycles, opt.ramEnabled);
-    if (dumpOS)
-        dumpResultAsJSON(*dumpOS, resPacket, opt.secretKey.value());
-    writeToArchive(opt.outputFile, resPacket);
+    TFHEppFrontend{opt}.go();
 }

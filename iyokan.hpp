@@ -601,11 +601,20 @@ public:
     }
 
     template <class T>
-    std::shared_ptr<T> get(TaskLabel label)
+    std::shared_ptr<T> get_if(TaskLabel label)
     {
         auto it = namedMems_.find(label);
-        assert(it != namedMems_.end());
+        if (it == namedMems_.end())
+            return nullptr;
         return std::dynamic_pointer_cast<T>(it->second);
+    }
+
+    template <class T>
+    std::shared_ptr<T> get(TaskLabel label)
+    {
+        auto ret = std::dynamic_pointer_cast<T>(namedMems_.at(label));
+        assert(ret);
+        return ret;
     }
 
     template <class T>
@@ -1296,8 +1305,8 @@ private:
     std::vector<std::pair<blueprint::Port, blueprint::Port>> edges_;
 
     std::map<std::tuple<std::string, int>, blueprint::Port> atPorts_;
-    blueprint::ROM rom_;
-    blueprint::RAM ram_;
+    std::optional<blueprint::ROM> rom_;
+    std::optional<blueprint::RAM> ram_;
 
 private:
     std::vector<blueprint::Port> parsePortString(const std::string &src,
@@ -1474,32 +1483,31 @@ public:
         return edges_;
     }
 
-    const blueprint::Port &at(const std::string &portName,
-                              int portBit = 0) const
+    std::optional<blueprint::Port> at(const std::string &portName,
+                                      int portBit = 0) const
     {
-        return atPorts_.at(std::make_tuple(portName, portBit));
+        auto it = atPorts_.find(std::make_tuple(portName, portBit));
+        if (it == atPorts_.end())
+            return std::nullopt;
+        return it->second;
     }
 
-    const blueprint::ROM &atROM() const
+    const std::optional<blueprint::ROM> &atROM() const
     {
         return rom_;
     }
 
-    const blueprint::RAM &atRAM() const
+    const std::optional<blueprint::RAM> &atRAM() const
     {
         return ram_;
     }
 };
 
 struct Options {
-    // Processor's logic file.
-    std::string logicFile;
-    // Port corresponding between core and ROM if enabled.
-    std::vector<std::string> romPorts;
-    // Misc.
+    std::optional<NetworkBlueprint> blueprint;
     std::string inputFile, outputFile;
-    int numWorkers = -1, numCycles = 0;
-    bool ramEnabled = false;
+    int numCPUWorkers = std::thread::hardware_concurrency(),
+        numGPUWorkers = 80 * 10, numCycles = -1;
     std::optional<std::string> secretKey;
     bool quiet = false;
     std::optional<std::string> dumpEveryClock;

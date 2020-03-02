@@ -15,15 +15,15 @@ int main(int argc, char **argv)
 
     Options opt;
     bool enableGPU = false;
+    std::string blueprintFilePath;
 
     app.require_subcommand();
     enum class TYPE { PLAIN, TFHE } type;
-    app.add_option("-l", opt.logicFile, "")
+    app.add_option("--blueprint", blueprintFilePath, "")
         ->required()
         ->check(CLI::ExistingFile);
-    app.add_option("-t", opt.numWorkers, "")->check(CLI::PositiveNumber);
-    app.add_option("--enable-rom", opt.romPorts, "")->delimiter(':');
-    app.add_flag("--enable-ram", opt.ramEnabled, "");
+    app.add_option("--cpu", opt.numCPUWorkers, "")->check(CLI::PositiveNumber);
+    app.add_option("--gpu", opt.numGPUWorkers, "")->check(CLI::PositiveNumber);
     app.add_option("-i", opt.inputFile, "")
         ->required()
         ->check(CLI::ExistingFile);
@@ -54,16 +54,9 @@ int main(int argc, char **argv)
 
     CLI11_PARSE(app, argc, argv);
 
-    assert(opt.romPorts.empty() || opt.romPorts.size() == 4);
+    opt.blueprint = NetworkBlueprint{blueprintFilePath};
 
-    if (opt.numWorkers < 0) {
-        if (enableGPU)
-            opt.numWorkers = 240;
-        else
-            opt.numWorkers = std::thread::hardware_concurrency();
-    }
-
-    AsyncThread::setNumThreads(opt.numWorkers);
+    AsyncThread::setNumThreads(opt.numCPUWorkers);
 
     switch (type) {
     case TYPE::PLAIN:

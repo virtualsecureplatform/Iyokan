@@ -6,70 +6,6 @@ namespace {
 using Name2NetMap =
     std::unordered_map<std::string, std::shared_ptr<PlainNetwork>>;
 
-auto get(PlainNetwork &net, const std::string &kind,
-         const std::string &portName, int portBit)
-{
-    auto ret = net.get<TaskPlainGateMem>(kind, portName, portBit);
-    assert(ret && "Possibly invalid port name or portBit");
-    return ret;
-}
-
-KVSPPlainResPacket makeResPacket(Name2NetMap name2net, int numCycles,
-                                 bool ramEnabled)
-{
-    auto &core = *name2net.at("core");
-
-    KVSPPlainResPacket resPacket;
-    resPacket.numCycles = numCycles;
-    // Get values of flags
-    resPacket.flags.emplace_back(
-        get(core, "output", "io_finishFlag", 0)->get());
-    // Get values of registers
-    for (int reg = 0; reg < 16; reg++) {
-        uint16_t &val = resPacket.regs.emplace_back(0);
-        for (int bit = 0; bit < 16; bit++) {
-            int n = get(core, "output", detail::fok("io_regOut_x", reg), bit)
-                        ->get();
-            val |= (n & 1u) << bit;
-        }
-    }
-    // Get values of RAM
-    if (ramEnabled) {
-        auto ramA = name2net.at("ramA")->get<TaskPlainRAM>("ram", "A", 0),
-             ramB = name2net.at("ramB")->get<TaskPlainRAM>("ram", "B", 0);
-        assert(ramA && ramB);
-        for (int addr = 0; addr < 512; addr++) {
-            resPacket.ram.push_back(
-                (addr % 2 == 1 ? ramA : ramB)->get(addr / 2));
-        }
-    }
-
-    return resPacket;
-}
-
-void setInitialRAM(Name2NetMap &name2net, const KVSPPlainReqPacket &reqPacket)
-{
-    auto ramA = name2net.at("ramA")->get<TaskPlainRAM>("ram", "A", 0),
-         ramB = name2net.at("ramB")->get<TaskPlainRAM>("ram", "B", 0);
-    assert(ramA && ramB);
-    for (int addr = 0; addr < 512; addr++) {
-        (addr % 2 == 1 ? ramA : ramB)->set(addr / 2, reqPacket.ram.at(addr));
-    }
-}
-
-void connect(PlainNetwork &srcNet, const std::string &srcPortName,
-             int srcPortBit, PlainNetwork &dstNet,
-             const std::string &dstPortName, int dstPortBit)
-{
-    auto dst = dstNet.get<TaskPlainGate>("input", dstPortName, dstPortBit);
-    assert(dst);
-    auto src = srcNet.get<TaskPlainGate>("output", srcPortName, srcPortBit);
-    assert(src);
-
-    dst->acceptOneMoreInput();
-    NetworkBuilderBase<uint8_t>::connectTasks(src, dst);
-}
-
 class PlainNetworkRunner {
 private:
     NetworkRunner<uint8_t, PlainWorker> plain_;
@@ -112,6 +48,213 @@ public:
     }
 };
 
+class PlainFrontend {
+private:
+    Name2NetMap name2net_;
+    const Options &opt_;
+    KVSPPlainReqPacket reqPacket_;
+
+private:
+    template <class T = TaskPlainGate>
+    std::shared_ptr<T> get(const blueprint::Port &port)
+    {
+        auto it = name2net_.find(port.nodeName);
+        if (it == name2net_.end())
+            error::die("Invalid network. Not found: ", port.nodeName);
+        auto task = it->second->get_if<T>(port.portLabel);
+        if (!task)
+            error::die("Invalid network. Not found: ", port.nodeName, "/",
+                       port.portLabel.portName, "[", port.portLabel.portBit,
+                       "]");
+        return task;
+    }
+
+    template <class T = TaskPlainGateMem>
+    std::shared_ptr<T> get_at(const std::string &kind,
+                              const std::string &portName, int portBit = 0)
+    {
+        auto port = opt_.blueprint->at(portName, portBit);
+        if (!port || port->portLabel.kind != kind)
+            error::die("Invalid network. Not found: ", portName, "[", portBit,
+                       "]");
+        auto task = std::dynamic_pointer_cast<T>(get(*port));
+        if (!task)
+            error::die("Invalid network. Not found: ", portName, "[", portBit,
+                       "]");
+        return task;
+    }
+
+    KVSPPlainResPacket makeResPacket(int numCycles)
+    {
+        KVSPPlainResPacket resPacket;
+        resPacket.numCycles = numCycles;
+        // Get values of flags
+        resPacket.flags.emplace_back(get_at("output", "finflag")->get());
+        // Get values of registers
+        for (int reg = 0; reg < 16; reg++) {
+            uint16_t &val = resPacket.regs.emplace_back(0);
+            for (int bit = 0; bit < 16; bit++) {
+                int n = get_at("output", detail::fok("reg_x", reg), bit)->get();
+                val |= (n & 1u) << bit;
+            }
+        }
+        // Get values of RAM
+        if (auto atRAMOpt = opt_.blueprint->atRAM(); atRAMOpt) {
+            using namespace blueprint;
+            const RAM_AB *atRAM = std::get_if<RAM_AB>(&*atRAMOpt);
+            assert(atRAM);
+            auto &ramA = *get<TaskPlainRAM>({atRAM->nodeAName, {"ram", "", 0}}),
+                 &ramB = *get<TaskPlainRAM>({atRAM->nodeBName, {"ram", "", 0}});
+            for (int addr = 0; addr < 512; addr++) {
+                resPacket.ram.push_back(
+                    (addr % 2 == 1 ? ramA : ramB).get(addr / 2));
+            }
+        }
+
+        return resPacket;
+    }
+
+    void setInitialRAM()
+    {
+        if (auto atRAMOpt = opt_.blueprint->atRAM(); atRAMOpt) {
+            using namespace blueprint;
+            const RAM_AB *atRAM = std::get_if<RAM_AB>(&*atRAMOpt);
+            assert(atRAM);
+            auto &ramA = *get<TaskPlainRAM>({atRAM->nodeAName, {"ram", "", 0}}),
+                 &ramB = *get<TaskPlainRAM>({atRAM->nodeBName, {"ram", "", 0}});
+            for (int addr = 0; addr < 512; addr++) {
+                (addr % 2 == 1 ? ramA : ramB)
+                    .set(addr / 2, reqPacket_.ram.at(addr));
+            }
+        }
+    }
+
+public:
+    PlainFrontend(const Options &opt)
+        : opt_(opt),
+          reqPacket_(readFromArchive<KVSPPlainReqPacket>(opt.inputFile))
+    {
+        assert(opt.blueprint);
+    }
+
+    KVSPPlainResPacket go()
+    {
+        // Create network according to blueprint
+        const NetworkBlueprint &bp = *opt_.blueprint;
+
+        // [[file]]
+        for (const auto &file : bp.files()) {
+            std::ifstream ifs{file.path, std::ios::binary};
+            if (!ifs)
+                error::die("Invalid [[file]] path: ", file.path);
+            auto net = std::make_shared<PlainNetwork>(
+                readNetworkFromJSON<PlainNetworkBuilder>(ifs));
+            if (!net->isValid())
+                error::die("Invalid network named: ", file.name);
+            name2net_.emplace(file.name, net);
+        }
+
+        // [[builtin]] type = ram
+        for (const auto &ram : bp.builtinRAMs()) {
+            assert(ram.inAddrWidth == 8 && ram.inWdataWidth == 8 &&
+                   ram.outRdataWidth == 8);
+            auto net = std::make_shared<PlainNetwork>(makePlainRAMNetwork(""));
+            name2net_.emplace(ram.name, net);
+        }
+
+        // [[builtin]] type = rom
+        for (const auto &rom : bp.builtinROMs()) {
+            assert(rom.inAddrWidth == 7 && rom.outRdataWidth == 32);
+            auto net = std::make_shared<PlainNetwork>(makePlainROMNetwork());
+            name2net_.emplace(rom.name, net);
+        }
+
+        // [connect]
+        for (const auto &[src, dst] : bp.edges()) {
+            assert(src.portLabel.kind == "output");
+            assert(dst.portLabel.kind == "input");
+            auto srcTask = get(src);
+            auto dstTask = get(dst);
+            dstTask->acceptOneMoreInput();
+            NetworkBuilderBase<uint8_t>::connectTasks(srcTask, dstTask);
+        }
+
+        // Set initial ROM data
+        if (auto atROMOpt = bp.atROM(); atROMOpt) {
+            using namespace blueprint;
+            const SingleROM *atROM = std::get_if<SingleROM>(&atROMOpt.value());
+            assert(atROM);
+            auto &rom =
+                *get<TaskPlainROM>({atROM->nodeName, {"rom", "all", 0}});
+
+            for (int i = 0; i < 512 / 4; i++) {
+                int val = 0;
+                for (int j = 3; j >= 0; j--) {
+                    size_t offset = i * 4 + j;
+                    val = (val << 8) | (offset < reqPacket_.rom.size()
+                                            ? reqPacket_.rom[offset]
+                                            : 0x00);
+                }
+                rom.set4le(i << 2, val);
+            }
+        }
+
+        // Make runner
+        PlainNetworkRunner runner{opt_.numCPUWorkers};
+        for (auto &&p : name2net_)
+            runner.addNetwork(p.second);
+
+        // Get #cycles
+        int numCycles = std::numeric_limits<int>::max();
+        if (opt_.numCycles > 0)
+            numCycles = opt_.numCycles;
+
+        // Reset
+        {
+            auto reset = get_at("input", "reset");
+            assert(reset);
+            reset->set(1);
+            runner.run();
+            reset->set(0);
+        }
+
+        // Go computing
+        std::optional<std::ofstream> dumpOS;
+        if (opt_.dumpEveryClock) {
+            dumpOS = std::ofstream{*opt_.dumpEveryClock};
+            assert(*dumpOS);
+        }
+
+        {
+            std::stringstream devnull;
+            std::ostream &os = opt_.quiet ? devnull : std::cout;
+
+            auto finflag = get_at("output", "finflag");
+            assert(finflag);
+
+            numCycles = processCycles(numCycles, os, [&](bool first) {
+                if (dumpOS)
+                    makeResPacket(opt_.numCycles).printAsJSON(*dumpOS);
+
+                runner.tick();
+
+                if (first)
+                    setInitialRAM();
+
+                runner.run();
+
+                return finflag->get();
+            });
+        }
+
+        // Print the results
+        KVSPPlainResPacket resPacket = makeResPacket(numCycles);
+        if (dumpOS)
+            resPacket.printAsJSON(*dumpOS);
+        return resPacket;
+    }
+};
+
 }  // namespace
 
 void processAllGates(PlainNetwork &net, int numWorkers,
@@ -142,132 +285,5 @@ void processAllGates(PlainNetwork &net, int numWorkers,
 
 KVSPPlainResPacket doPlain(const Options &opt)
 {
-    // Read packet
-    const auto reqPacket = readFromArchive<KVSPPlainReqPacket>(opt.inputFile);
-
-    // Create nodes
-    Name2NetMap name2net;
-
-    {
-        std::ifstream ifs{opt.logicFile};
-        assert(ifs);
-        auto net = std::make_shared<PlainNetwork>(
-            readNetworkFromJSON<PlainNetworkBuilder>(ifs));
-        assert(net->isValid());
-        name2net.emplace("core", net);
-    }
-
-    if (opt.ramEnabled) {
-        auto ramANet = std::make_shared<PlainNetwork>(makePlainRAMNetwork("A")),
-             ramBNet = std::make_shared<PlainNetwork>(makePlainRAMNetwork("B"));
-        name2net.emplace("ramA", ramANet);
-        name2net.emplace("ramB", ramBNet);
-    }
-
-    if (!opt.romPorts.empty()) {
-        auto romNet = std::make_shared<PlainNetwork>(makePlainROMNetwork());
-        name2net.emplace("rom", romNet);
-    }
-
-    // Create edges
-    if (opt.ramEnabled) {
-        auto &core = *name2net.at("core"), &ramA = *name2net.at("ramA"),
-             &ramB = *name2net.at("ramB");
-
-        connect(core, "io_memA_writeEnable", 0, ramA, "wren", 0);
-        for (int i = 0; i < 8; i++)
-            connect(core, "io_memA_address", i, ramA, "addr", i);
-        for (int i = 0; i < 8; i++)
-            connect(core, "io_memA_in", i, ramA, "wdata", i);
-        for (int i = 0; i < 8; i++)
-            connect(ramA, "rdata", i, core, "io_memA_out", i);
-
-        connect(core, "io_memB_writeEnable", 0, ramB, "wren", 0);
-        for (int i = 0; i < 8; i++)
-            connect(core, "io_memB_address", i, ramB, "addr", i);
-        for (int i = 0; i < 8; i++)
-            connect(core, "io_memB_in", i, ramB, "wdata", i);
-        for (int i = 0; i < 8; i++)
-            connect(ramB, "rdata", i, core, "io_memB_out", i);
-    }
-
-    if (!opt.romPorts.empty()) {
-        auto &core = *name2net.at("core"), &rom = *name2net.at("rom");
-
-        for (int i = 0; i < 7; i++)
-            connect(core, "io_romAddr", i, rom, "ROM", i);
-        for (int i = 0; i < 32; i++)
-            connect(rom, "ROM", i, core, "io_romData", i);
-    }
-
-    // Set initial ROM data
-    if (!opt.romPorts.empty()) {
-        auto &rom = *name2net.at("rom");
-
-        for (int i = 0; i < 512 / 4; i++) {
-            int val = 0;
-            for (int j = 3; j >= 0; j--) {
-                size_t offset = i * 4 + j;
-                val = (val << 8) |
-                      (offset < reqPacket.rom.size() ? reqPacket.rom[offset]
-                                                     : 0x00);
-            }
-            rom.get<TaskPlainROM>("rom", "all", 0)->set4le(i << 2, val);
-        }
-    }
-
-    // Make runner
-    PlainNetworkRunner runner{opt.numWorkers};
-    for (auto &&p : name2net)
-        runner.addNetwork(p.second);
-
-    // Get #cycles
-    int numCycles = std::numeric_limits<int>::max();
-    if (opt.numCycles > 0)
-        numCycles = opt.numCycles;
-
-    // Reset
-    {
-        auto &core = *name2net.at("core");
-        get(core, "input", "reset", 0)->set(1);
-        runner.run();
-        get(core, "input", "reset", 0)->set(0);
-    }
-
-    // Go computing
-    std::optional<std::ofstream> dumpOS;
-    if (opt.dumpEveryClock) {
-        dumpOS = std::ofstream{*opt.dumpEveryClock};
-        assert(*dumpOS);
-    }
-
-    {
-        std::stringstream devnull;
-        std::ostream &os = opt.quiet ? devnull : std::cout;
-
-        numCycles = processCycles(numCycles, os, [&](bool first) {
-            auto &core = *name2net.at("core");
-
-            if (dumpOS)
-                makeResPacket(name2net, opt.numCycles, opt.ramEnabled)
-                    .printAsJSON(*dumpOS);
-
-            runner.tick();
-
-            if (first && opt.ramEnabled)
-                setInitialRAM(name2net, reqPacket);
-
-            runner.run();
-
-            bool hasFinished = get(core, "output", "io_finishFlag", 0)->get();
-            return hasFinished;
-        });
-    }
-
-    // Print the results
-    KVSPPlainResPacket resPacket =
-        makeResPacket(name2net, numCycles, opt.ramEnabled);
-    if (dumpOS)
-        resPacket.printAsJSON(*dumpOS);
-    return resPacket;
+    return PlainFrontend{opt}.go();
 }

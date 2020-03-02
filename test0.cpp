@@ -456,47 +456,47 @@ void testFromJSONdiamond_core_wo_ram_rom(RAMNetwork ramA, RAMNetwork ramB,
     auto net =
         core.template merge<NormalT>(rom,
                                      {
-                                         {"io_romAddr", 0, "ROM", 0},
-                                         {"io_romAddr", 1, "ROM", 1},
-                                         {"io_romAddr", 2, "ROM", 2},
-                                         {"io_romAddr", 3, "ROM", 3},
-                                         {"io_romAddr", 4, "ROM", 4},
-                                         {"io_romAddr", 5, "ROM", 5},
-                                         {"io_romAddr", 6, "ROM", 6},
+                                         {"io_romAddr", 0, "addr", 0},
+                                         {"io_romAddr", 1, "addr", 1},
+                                         {"io_romAddr", 2, "addr", 2},
+                                         {"io_romAddr", 3, "addr", 3},
+                                         {"io_romAddr", 4, "addr", 4},
+                                         {"io_romAddr", 5, "addr", 5},
+                                         {"io_romAddr", 6, "addr", 6},
                                      },
                                      {
-                                         {"ROM", 0, "io_romData", 0},
-                                         {"ROM", 1, "io_romData", 1},
-                                         {"ROM", 2, "io_romData", 2},
-                                         {"ROM", 3, "io_romData", 3},
-                                         {"ROM", 4, "io_romData", 4},
-                                         {"ROM", 5, "io_romData", 5},
-                                         {"ROM", 6, "io_romData", 6},
-                                         {"ROM", 7, "io_romData", 7},
-                                         {"ROM", 8, "io_romData", 8},
-                                         {"ROM", 9, "io_romData", 9},
-                                         {"ROM", 10, "io_romData", 10},
-                                         {"ROM", 11, "io_romData", 11},
-                                         {"ROM", 12, "io_romData", 12},
-                                         {"ROM", 13, "io_romData", 13},
-                                         {"ROM", 14, "io_romData", 14},
-                                         {"ROM", 15, "io_romData", 15},
-                                         {"ROM", 16, "io_romData", 16},
-                                         {"ROM", 17, "io_romData", 17},
-                                         {"ROM", 18, "io_romData", 18},
-                                         {"ROM", 19, "io_romData", 19},
-                                         {"ROM", 20, "io_romData", 20},
-                                         {"ROM", 21, "io_romData", 21},
-                                         {"ROM", 22, "io_romData", 22},
-                                         {"ROM", 23, "io_romData", 23},
-                                         {"ROM", 24, "io_romData", 24},
-                                         {"ROM", 25, "io_romData", 25},
-                                         {"ROM", 26, "io_romData", 26},
-                                         {"ROM", 27, "io_romData", 27},
-                                         {"ROM", 28, "io_romData", 28},
-                                         {"ROM", 29, "io_romData", 29},
-                                         {"ROM", 30, "io_romData", 30},
-                                         {"ROM", 31, "io_romData", 31},
+                                         {"rdata", 0, "io_romData", 0},
+                                         {"rdata", 1, "io_romData", 1},
+                                         {"rdata", 2, "io_romData", 2},
+                                         {"rdata", 3, "io_romData", 3},
+                                         {"rdata", 4, "io_romData", 4},
+                                         {"rdata", 5, "io_romData", 5},
+                                         {"rdata", 6, "io_romData", 6},
+                                         {"rdata", 7, "io_romData", 7},
+                                         {"rdata", 8, "io_romData", 8},
+                                         {"rdata", 9, "io_romData", 9},
+                                         {"rdata", 10, "io_romData", 10},
+                                         {"rdata", 11, "io_romData", 11},
+                                         {"rdata", 12, "io_romData", 12},
+                                         {"rdata", 13, "io_romData", 13},
+                                         {"rdata", 14, "io_romData", 14},
+                                         {"rdata", 15, "io_romData", 15},
+                                         {"rdata", 16, "io_romData", 16},
+                                         {"rdata", 17, "io_romData", 17},
+                                         {"rdata", 18, "io_romData", 18},
+                                         {"rdata", 19, "io_romData", 19},
+                                         {"rdata", 20, "io_romData", 20},
+                                         {"rdata", 21, "io_romData", 21},
+                                         {"rdata", 22, "io_romData", 22},
+                                         {"rdata", 23, "io_romData", 23},
+                                         {"rdata", 24, "io_romData", 24},
+                                         {"rdata", 25, "io_romData", 25},
+                                         {"rdata", 26, "io_romData", 26},
+                                         {"rdata", 27, "io_romData", 27},
+                                         {"rdata", 28, "io_romData", 28},
+                                         {"rdata", 29, "io_romData", 29},
+                                         {"rdata", 30, "io_romData", 30},
+                                         {"rdata", 31, "io_romData", 31},
                                      })
             .template merge<NormalT>(ramA,
                                      {
@@ -695,12 +695,9 @@ void testDoPlainWithRAMROM()
     writeToArchive("_test_plain_req_packet00", parseELF("test/test00.elf"));
 
     Options opt;
-    opt.logicFile = "test/diamond-core-wo-ram-rom.json";
+    opt.blueprint = NetworkBlueprint{"test/cahp-diamond.toml"};
     opt.inputFile = "_test_plain_req_packet00";
-    opt.numWorkers = std::thread::hardware_concurrency();
     opt.numCycles = 8;
-    opt.romPorts = {"io_romAddr", "7", "io_romData", "32"};
-    opt.ramEnabled = true;
     opt.quiet = true;
 
     KVSPPlainResPacket resPacket = doPlain(opt);
@@ -905,13 +902,10 @@ void testDoTFHEWithRAMROM()
     auto& h = TFHEppTestHelper::instance();
 
     Options opt;
-    opt.logicFile = "test/diamond-core-wo-ram-rom.json";
+    opt.blueprint = NetworkBlueprint{"test/cahp-diamond.toml"};
     opt.inputFile = h.getELFAsPacketFileWithCk("test/test00.elf");
     opt.outputFile = "_test_res_packet00";
-    opt.numWorkers = std::thread::hardware_concurrency();
     opt.numCycles = 8;
-    opt.romPorts = {"io_romAddr", "7", "io_romData", "32"};
-    opt.ramEnabled = true;
 
     doTFHE(opt);
 
@@ -1008,13 +1002,10 @@ void testDoCUFHEWithRAMROM()
     auto& h = TFHEppTestHelper::instance();
 
     Options opt;
-    opt.logicFile = "test/diamond-core-wo-ram-rom.json";
+    opt.blueprint = NetworkBlueprint{"test/cahp-diamond.toml"};
     opt.inputFile = h.getELFAsPacketFileWithCk("test/test00.elf");
     opt.outputFile = "_test_res_packet00";
-    opt.numWorkers = 240;
     opt.numCycles = 8;
-    opt.romPorts = {"io_romAddr", "7", "io_romData", "32"};
-    opt.ramEnabled = true;
 
     doCUFHE(opt);
 
@@ -1071,7 +1062,7 @@ void testBlueprint()
 {
     using namespace blueprint;
 
-    NetworkBlueprint blueprint{"hoge.toml"};
+    NetworkBlueprint blueprint{"test/cahp-diamond.toml"};
 
     {
         const auto& files = blueprint.files();
@@ -1128,7 +1119,7 @@ void testBlueprint()
     }
 
     {
-        const Port& port = blueprint.at("reset");
+        const Port& port = blueprint.at("reset").value();
         assert(port.nodeName == "core");
         assert(port.portLabel.kind == "input");
         assert(port.portLabel.portName == "reset");
@@ -1136,7 +1127,7 @@ void testBlueprint()
     }
 
     {
-        const Port& port = blueprint.at("finflag");
+        const Port& port = blueprint.at("finflag").value();
         assert(port.nodeName == "core");
         assert(port.portLabel.kind == "output");
         assert(port.portLabel.portName == "io_finishFlag");
@@ -1145,7 +1136,8 @@ void testBlueprint()
 
     for (int ireg = 0; ireg < 16; ireg++) {
         for (int ibit = 0; ibit < 16; ibit++) {
-            const Port& port = blueprint.at(detail::fok("reg_x", ireg), ibit);
+            const Port& port =
+                blueprint.at(detail::fok("reg_x", ireg), ibit).value();
             assert(port.nodeName == "core");
             assert(port.portLabel.portName == detail::fok("io_regOut_x", ireg));
             assert(port.portLabel.portBit == ibit);
@@ -1153,13 +1145,14 @@ void testBlueprint()
     }
 
     {
-        const SingleROM* rom = std::get_if<SingleROM>(&blueprint.atROM());
+        const SingleROM* rom =
+            std::get_if<SingleROM>(&blueprint.atROM().value());
         assert(rom);
         assert(rom->nodeName == "rom");
     }
 
     {
-        const RAM_AB* ram = std::get_if<RAM_AB>(&blueprint.atRAM());
+        const RAM_AB* ram = std::get_if<RAM_AB>(&blueprint.atRAM().value());
         assert(ram);
         assert(ram->nodeAName == "ramA");
         assert(ram->nodeBName == "ramB");

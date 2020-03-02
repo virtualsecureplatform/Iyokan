@@ -69,10 +69,8 @@ check_code "./kvsp-packet", ["plain", "test/test00.elf", "_test_plain_req_packet
 
 test_iyokan [
   "plain",
-  "-l", "test/diamond-core-wo-ram-rom.json",
+  "--blueprint", "test/cahp-diamond.toml",
   "-i", "_test_plain_req_packet00",
-  "--enable-rom", "io_romAddr:7:io_romData:32",
-  "--enable-ram",
 ] do |r|
   assert_regex r, /#cycle\t8/
   assert_regex r, /f0\t1/
@@ -81,10 +79,8 @@ end
 
 test_iyokan [
   "plain",
-  "-l", "test/diamond-core-wo-ram-rom.json",
+  "--blueprint", "test/cahp-diamond.toml",
   "-i", "_test_plain_req_packet00",
-  "--enable-rom", "io_romAddr:7:io_romData:32",
-  "--enable-ram",
   "--enable-dump-every-clock", "_test_dump",
 ] do |r|
   json = JSON.parse(open("_test_dump").read.lines[-1])
@@ -98,12 +94,10 @@ if $SLOW_MODE_ENABLED
 
   test_iyokan [
     "tfhe",
-    "-l", "test/diamond-core-wo-ram-rom.json",
+    "--blueprint", "test/cahp-diamond.toml",
     "-i", "_test_req_packet00",
     "-o", "_test_res_packet00",
     "-c", "8",
-    "--enable-rom", "io_romAddr:7:io_romData:32",
-    "--enable-ram",
   ] do |_|
     r = check_code "./kvsp-packet", ["dec", "_test_sk", "_test_res_packet00"]
     assert_regex r, /#cycle\t8/
@@ -114,12 +108,10 @@ if $SLOW_MODE_ENABLED
   if $CUDA_MODE_ENABLED
     test_iyokan [
       "tfhe",
-      "-l", "test/diamond-core-wo-ram-rom.json",
+      "--blueprint", "test/cahp-diamond.toml",
       "-i", "_test_req_packet00",
       "-o", "_test_res_packet00",
       "-c", "8",
-      "--enable-rom", "io_romAddr:7:io_romData:32",
-      "--enable-ram",
       "--enable-gpu",
     ] do |_|
       r = check_code "./kvsp-packet", ["dec", "_test_sk", "_test_res_packet00"]

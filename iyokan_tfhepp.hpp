@@ -640,21 +640,21 @@ inline TaskNetwork<TFHEppWorkerInfo> makeTFHEppRAMNetwork(
 inline TaskNetwork<TFHEppWorkerInfo> makeTFHEppROMNetwork()
 {
     /*
-       INPUT (ROM[0]) -- CB --+-----+  +-- SEI --- OUTPUT (ROM[0])
-                              |  R  |  |
-       INPUT (ROM[1]) -- CB --+  O  +--+-- SEI --- OUTPUT (ROM[1])
-                              |  M  |  |
-       INPUT (ROM[2]) -- CB --+  U  +  +-- SEI --- OUTPUT (ROM[2])
-                              |  X  |  |
-                                ...       ...
-                              |     |  |
-       INPUT (ROM[6]) -- CB --+-----+  +-- SEI --- OUTPUT (ROM[6])
-                                       |
-                                       +-- SEI --- OUTPUT (ROM[7])
-                                       |
-                                          ...
-                                       |
-                                       +-- SEI --- OUTPUT (ROM[31])
+       INPUT (addr[0]) -- CB --+-----+  +-- SEI --- OUTPUT (rdata[0])
+                               |  R  |  |
+       INPUT (addr[1]) -- CB --+  O  +--+-- SEI --- OUTPUT (rdata[1])
+                               |  M  |  |
+       INPUT (addr[2]) -- CB --+  U  +  +-- SEI --- OUTPUT (rdata[2])
+                               |  X  |  |
+                                 ...       ...
+                               |     |  |
+       INPUT (addr[6]) -- CB --+-----+  +-- SEI --- OUTPUT (rdata[6])
+                                        |
+                                        +-- SEI --- OUTPUT (rdata[7])
+                                        |
+                                           ...
+                                        |
+                                        +-- SEI --- OUTPUT (rdata[31])
     */
 
     NetworkBuilderBase<TFHEppWorkerInfo> builder;
@@ -663,7 +663,7 @@ inline TaskNetwork<TFHEppWorkerInfo> makeTFHEppROMNetwork()
     std::vector<std::shared_ptr<TaskTFHEppCB>> cbs;
     for (int i = 0; i < 7; i++) {
         auto taskINPUT = builder.addINPUT<TaskTFHEppGateWIRE>(
-            detail::genid(), 0, "ROM", i, false);
+            detail::genid(), 0, "addr", i, false);
         auto taskCB = std::make_shared<TaskTFHEppCB>();
         builder.addTask(
             NodeLabel{detail::genid(), "CB", detail::fok("[", i, "]")}, 0,
@@ -690,7 +690,7 @@ inline TaskNetwork<TFHEppWorkerInfo> makeTFHEppROMNetwork()
         builder.connectTasks(taskROMUX, taskSEI);
 
         auto taskOUTPUT = builder.addOUTPUT<TaskTFHEppGateWIRE>(
-            detail::genid(), 0, "ROM", i, true);
+            detail::genid(), 0, "rdata", i, true);
         builder.connectTasks(taskSEI, taskOUTPUT);
     }
 

@@ -8,56 +8,6 @@ using Name2TFHEppNetMap =
 using Name2CUFHENetMap =
     std::unordered_map<std::string, std::shared_ptr<CUFHENetwork>>;
 
-struct CUFHENetworkManager {
-    std::shared_ptr<CUFHENetwork> core;
-    std::shared_ptr<TFHEppNetwork> ramA, ramB;
-};
-
-auto get(CUFHENetwork& net, const std::string& kind,
-         const std::string& portName, int portBit)
-{
-    auto ret = net.get<TaskCUFHEGateMem>(kind, portName, portBit);
-    assert(ret && "Possibly invalid port name or port bit");
-    return ret;
-}
-
-KVSPResPacket makeResPacket(Name2CUFHENetMap& name2cnet,
-                            Name2TFHEppNetMap& name2tnet, int numCycles,
-                            bool ramEnabled)
-{
-    auto& core = *name2cnet.at("core");
-
-    KVSPResPacket resPacket;
-    resPacket.numCycles = numCycles;
-    // Get values of flags
-    resPacket.flags.push_back(
-        cufhe2tfhepp(get(core, "output", "io_finishFlag", 0)->get()));
-    // Get values of registers
-    for (int reg = 0; reg < 16; reg++) {
-        resPacket.regs.emplace_back();
-        for (int bit = 0; bit < 16; bit++)
-            resPacket.regs[reg].push_back(cufhe2tfhepp(
-                get(core, "output", detail::fok("io_regOut_x", reg), bit)
-                    ->get()));
-    }
-    // Get values of RAM
-    if (ramEnabled) {
-        auto &ramA = *name2tnet.at("ramA"), &ramB = *name2tnet.at("ramB");
-
-        for (int addr = 0; addr < 512; addr++) {
-            for (int bit = 0; bit < 8; bit++) {
-                auto ram = addr % 2 == 1
-                               ? ramA.get<TaskCUFHERAMUX>("ram", "A", bit)
-                               : ramB.get<TaskCUFHERAMUX>("ram", "B", bit);
-                assert(ram);
-                resPacket.ramCk.push_back(ram->get(addr / 2).trlwehost);
-            }
-        }
-    }
-
-    return resPacket;
-}
-
 void dumpResultAsJSON(std::ostream& os, const KVSPResPacket& resPacket,
                       const std::string& fileSecretKey)
 {
@@ -66,64 +16,11 @@ void dumpResultAsJSON(std::ostream& os, const KVSPResPacket& resPacket,
     decrypt(*sk, resPacket).printAsJSON(os);
 }
 
-void setInitialRAM(Name2CUFHENetMap& name2cnet, Name2TFHEppNetMap& name2tnet,
-                   const KVSPReqPacket& reqPacket)
-{
-    auto &ramA = *name2tnet.at("ramA"), &ramB = *name2tnet.at("ramB");
-
-    for (int addr = 0; addr < 512; addr++)
-        for (int bit = 0; bit < 8; bit++)
-            (addr % 2 == 1 ? ramA.get<TaskCUFHERAMUX>("ram", "A", bit)
-                           : ramB.get<TaskCUFHERAMUX>("ram", "B", bit))
-                ->set(addr / 2, reqPacket.ramCk.at(addr * 8 + bit));
-}
-
 template <class T>
 void merge(std::vector<T>& dst, const std::vector<T>& src)
 {
     dst.reserve(dst.size() + src.size());
     std::copy(src.begin(), src.end(), std::back_inserter(dst));
-}
-
-void connect(CUFHENetwork& srcNet, const std::string& srcPortName,
-             int srcPortBit, CUFHENetwork& dstNet,
-             const std::string& dstPortName, int dstPortBit)
-{
-    auto dst = dstNet.get<TaskCUFHEGate>("input", dstPortName, dstPortBit);
-    assert(dst);
-    auto src = srcNet.get<TaskCUFHEGate>("output", srcPortName, srcPortBit);
-    assert(src);
-
-    dst->acceptOneMoreInput();
-    NetworkBuilderBase<CUFHEWorkerInfo>::connectTasks(src, dst);
-}
-
-}  // namespace
-
-void processAllGates(CUFHENetwork& net, int numWorkers,
-                     std::shared_ptr<ProgressGraphMaker> graph)
-{
-    ReadyQueue<CUFHEWorkerInfo> readyQueue;
-    net.pushReadyTasks(readyQueue);
-
-    // Create workers.
-    size_t numFinishedTargets = 0;
-    std::vector<CUFHEWorker> workers;
-    for (int i = 0; i < numWorkers; i++)
-        workers.emplace_back(readyQueue, numFinishedTargets, graph);
-
-    // Process all targets.
-    while (numFinishedTargets < net.numNodes()) {
-        // Detect infinite loops.
-        assert(std::any_of(workers.begin(), workers.end(),
-                           [](auto&& w) { return w.isWorking(); }) ||
-               !readyQueue.empty());
-
-        for (auto&& w : workers)
-            w.update();
-    }
-
-    assert(readyQueue.empty());
 }
 
 std::shared_ptr<cufhe::PubKey> tfhepp2cufhe(const TFHEpp::GateKey& src)
@@ -481,159 +378,286 @@ CUFHENetworkWithTFHEpp makeTFHEppROMNetworkForCUFHE()
     return ret;
 }
 
-void doCUFHE(const Options& opt)
-{
-    // Read packet
-    const auto reqPacket = readFromArchive<KVSPReqPacket>(opt.inputFile);
+class CUFHEFrontend {
+private:
+    Name2TFHEppNetMap name2tnet_;
+    Name2CUFHENetMap name2cnet_;
+    std::vector<std::shared_ptr<CUFHE2TFHEppBridge>> bridges0_;
+    std::vector<std::shared_ptr<TFHEpp2CUFHEBridge>> bridges1_;
+    const Options& opt_;
+    KVSPReqPacket reqPacket_;
 
-    // Prepare cuFHE
-    cufhe::SetGPUNum(1);
-    cufhe::SetSeed();
-    cufhe::Initialize(*tfhepp2cufhe(*reqPacket.gateKey));
-
-    // Create nodes
-    Name2TFHEppNetMap name2tnet;
-    Name2CUFHENetMap name2cnet;
-    std::vector<std::shared_ptr<CUFHE2TFHEppBridge>> bridges0;
-    std::vector<std::shared_ptr<TFHEpp2CUFHEBridge>> bridges1;
-
+private:
+    template <class T = TaskCUFHEGate>
+    std::shared_ptr<T> get(const blueprint::Port& port)
     {
-        std::ifstream ifs{opt.logicFile};
-        assert(ifs);
-        auto net = std::make_shared<CUFHENetwork>(
-            readNetworkFromJSON<CUFHENetworkBuilder>(ifs));
-        assert(net->isValid());
-        name2cnet.emplace("core", net);
-    }
-
-    if (opt.ramEnabled) {
-        auto ramA = makeTFHEppRAMNetworkForCUFHE("A"),
-             ramB = makeTFHEppRAMNetworkForCUFHE("B");
-        name2tnet.emplace("ramA", ramA.tfheppNet);
-        name2cnet.emplace("ramA", ramA.cufheNet);
-        merge(bridges0, ramA.bridges0);
-        merge(bridges1, ramA.bridges1);
-        name2tnet.emplace("ramB", ramB.tfheppNet);
-        name2cnet.emplace("ramB", ramB.cufheNet);
-        merge(bridges0, ramB.bridges0);
-        merge(bridges1, ramB.bridges1);
-    }
-
-    if (!opt.romPorts.empty()) {
-        auto rom = makeTFHEppROMNetworkForCUFHE();
-        name2tnet.emplace("rom", rom.tfheppNet);
-        name2cnet.emplace("rom", rom.cufheNet);
-        merge(bridges0, rom.bridges0);
-        merge(bridges1, rom.bridges1);
-    }
-
-    // Create edges
-    if (opt.ramEnabled) {
-        auto &core = *name2cnet.at("core"), &ramA = *name2cnet.at("ramA"),
-             &ramB = *name2cnet.at("ramB");
-
-        connect(core, "io_memA_writeEnable", 0, ramA, "wren", 0);
-        for (int i = 0; i < 8; i++)
-            connect(core, "io_memA_address", i, ramA, "addr", i);
-        for (int i = 0; i < 8; i++)
-            connect(core, "io_memA_in", i, ramA, "wdata", i);
-        for (int i = 0; i < 8; i++)
-            connect(ramA, "rdata", i, core, "io_memA_out", i);
-
-        connect(core, "io_memB_writeEnable", 0, ramB, "wren", 0);
-        for (int i = 0; i < 8; i++)
-            connect(core, "io_memB_address", i, ramB, "addr", i);
-        for (int i = 0; i < 8; i++)
-            connect(core, "io_memB_in", i, ramB, "wdata", i);
-        for (int i = 0; i < 8; i++)
-            connect(ramB, "rdata", i, core, "io_memB_out", i);
-    }
-
-    if (!opt.romPorts.empty()) {
-        auto &core = *name2cnet.at("core"), &rom = *name2cnet.at("rom");
-
-        for (int i = 0; i < 7; i++)
-            connect(core, "io_romAddr", i, rom, "ROM", i);
-        for (int i = 0; i < 32; i++)
-            connect(rom, "ROM", i, core, "io_romData", i);
-    }
-
-    // Set initial ROM data
-    if (!opt.romPorts.empty()) {
-        assert(reqPacket.circuitKey);
-        auto& rom = *name2tnet.at("rom");
-
-        const int ROM_UNIT = 1024 / 8;
-        assert(reqPacket.romCk.size() == 512 / ROM_UNIT);
-        for (int i = 0; i < 512 / ROM_UNIT; i++) {
-            int offset = ROM_UNIT * i;
-            rom.get<TaskTFHEppROMUX>("rom", "all", 0)
-                ->set128le(offset, reqPacket.romCk[i]);
+        if constexpr (std::is_same_v<typename T::ParamWorkerInfo,
+                                     CUFHEWorkerInfo>) {
+            // CUFHE
+            auto it = name2cnet_.find(port.nodeName);
+            if (it == name2cnet_.end())
+                error::die("Invalid network. Not found: ", port.nodeName);
+            auto task = it->second->get_if<T>(port.portLabel);
+            if (!task)
+                error::die("Invalid network. Not found: ", port.nodeName, "/",
+                           port.portLabel.portName, "[", port.portLabel.portBit,
+                           "]");
+            return task;
+        }
+        else {
+            // TFHEpp
+            auto it = name2tnet_.find(port.nodeName);
+            if (it == name2tnet_.end())
+                error::die("Invalid network. Not found: ", port.nodeName);
+            auto task = it->second->get_if<T>(port.portLabel);
+            if (!task)
+                error::die("Invalid network. Not found: ", port.nodeName, "/",
+                           port.portLabel.portName, "[", port.portLabel.portBit,
+                           "]");
+            return task;
         }
     }
 
-    // Make runner
-    CUFHENetworkRunner runner{
-        opt.numWorkers, static_cast<int>(std::thread::hardware_concurrency()),
-        TFHEppWorkerInfo{TFHEpp::lweParams{}, reqPacket.gateKey,
-                         reqPacket.circuitKey}};
-    for (auto&& p : name2cnet)
-        runner.addNetwork(p.second);
-    for (auto&& p : name2tnet)
-        runner.addNetwork(p.second);
-    for (auto&& bridge0 : bridges0)
-        runner.addBridge(bridge0);
-    for (auto&& bridge1 : bridges1)
-        runner.addBridge(bridge1);
-
-    // Reset
+    template <class T = TaskCUFHEGateMem>
+    std::shared_ptr<T> get_at(const std::string& kind,
+                              const std::string& portName, int portBit = 0)
     {
-        cufhe::Ctxt one, zero;
-        cufhe::ConstantOne(one);
-        cufhe::ConstantZero(zero);
-        cufhe::Synchronize();
-
-        auto& core = *name2cnet.at("core");
-        get(core, "input", "reset", 0)->set(one);
-        runner.run();
-        get(core, "input", "reset", 0)->set(zero);
+        auto port = opt_.blueprint->at(portName, portBit);
+        if (!port || port->portLabel.kind != kind)
+            error::die("Invalid network. Not found: ", portName, "[", portBit,
+                       "]");
+        auto task = std::dynamic_pointer_cast<T>(get(*port));
+        if (!task)
+            error::die("Invalid network. Not found: ", portName, "[", portBit,
+                       "]");
+        return task;
     }
 
-    // Go computing
-    std::optional<std::ofstream> dumpOS;
-    if (opt.dumpEveryClock) {
-        dumpOS = std::ofstream{*opt.dumpEveryClock};
-        assert(*dumpOS);
-    }
-
+    KVSPResPacket makeResPacket()
     {
-        std::stringstream devnull;
-        std::ostream& os = opt.quiet ? devnull : std::cout;
-
-        processCycles(opt.numCycles, os, [&](bool first) {
-            if (dumpOS) {
-                KVSPResPacket resPacket = makeResPacket(
-                    name2cnet, name2tnet, opt.numCycles, opt.ramEnabled);
-                dumpResultAsJSON(*dumpOS, resPacket, opt.secretKey.value());
+        KVSPResPacket resPacket;
+        resPacket.numCycles = opt_.numCycles;
+        // Get values of flags
+        resPacket.flags.push_back(
+            cufhe2tfhepp(get_at("output", "finflag")->get()));
+        // Get values of registers
+        for (int reg = 0; reg < 16; reg++) {
+            resPacket.regs.emplace_back();
+            for (int bit = 0; bit < 16; bit++)
+                resPacket.regs[reg].push_back(cufhe2tfhepp(
+                    get_at("output", detail::fok("reg_x", reg), bit)->get()));
+        }
+        // Get values of RAM
+        if (auto atRAMOpt = opt_.blueprint->atRAM(); atRAMOpt) {
+            using namespace blueprint;
+            const RAM_AB* atRAM = std::get_if<RAM_AB>(&*atRAMOpt);
+            assert(atRAM);
+            for (int addr = 0; addr < 512; addr++) {
+                for (int bit = 0; bit < 8; bit++) {
+                    auto& ram = addr % 2 == 1
+                                    ? *get<TaskCUFHERAMUX>(
+                                          {atRAM->nodeAName, {"ram", "", bit}})
+                                    : *get<TaskCUFHERAMUX>(
+                                          {atRAM->nodeBName, {"ram", "", bit}});
+                    resPacket.ramCk.push_back(ram.get(addr / 2).trlwehost);
+                }
             }
+        }
 
-            runner.tick();
-
-            if (first && opt.ramEnabled)
-                setInitialRAM(name2cnet, name2tnet, reqPacket);
-
-            runner.run();
-            return false;
-        });
+        return resPacket;
     }
 
-    // Dump result packet
-    KVSPResPacket resPacket =
-        makeResPacket(name2cnet, name2tnet, opt.numCycles, opt.ramEnabled);
-    if (dumpOS)
-        dumpResultAsJSON(*dumpOS, resPacket, opt.secretKey.value());
-    writeToArchive(opt.outputFile, resPacket);
+    void setInitialRAM()
+    {
+        if (auto atRAMOpt = opt_.blueprint->atRAM(); atRAMOpt) {
+            using namespace blueprint;
+            const RAM_AB* atRAM = std::get_if<RAM_AB>(&*atRAMOpt);
+            assert(atRAM);
+            for (int addr = 0; addr < 512; addr++) {
+                for (int bit = 0; bit < 8; bit++) {
+                    auto& ram = addr % 2 == 1
+                                    ? *get<TaskCUFHERAMUX>(
+                                          {atRAM->nodeAName, {"ram", "", bit}})
+                                    : *get<TaskCUFHERAMUX>(
+                                          {atRAM->nodeBName, {"ram", "", bit}});
+                    ram.set(addr / 2, reqPacket_.ramCk.at(addr * 8 + bit));
+                }
+            }
+        }
+    }
 
-    // Clean cuFHE up
-    cufhe::CleanUp();
+public:
+    CUFHEFrontend(const Options& opt)
+        : opt_(opt), reqPacket_(readFromArchive<KVSPReqPacket>(opt.inputFile))
+    {
+        assert(opt.blueprint);
+    }
+
+    void go()
+    {
+        const NetworkBlueprint& bp = *opt_.blueprint;
+
+        // Prepare cuFHE
+        cufhe::SetGPUNum(1);
+        cufhe::SetSeed();
+        cufhe::Initialize(*tfhepp2cufhe(*reqPacket_.gateKey));
+
+        // [[file]]
+        for (const auto& file : bp.files()) {
+            std::ifstream ifs{file.path, std::ios::binary};
+            if (!ifs)
+                error::die("Invalid [[file]] path: ", file.path);
+            auto net = std::make_shared<CUFHENetwork>(
+                readNetworkFromJSON<CUFHENetworkBuilder>(ifs));
+            if (!net->isValid())
+                error::die("Invalid network named: ", file.name);
+            name2cnet_.emplace(file.name, net);
+        }
+
+        // [[builtin]] type = ram
+        for (const auto& ram : bp.builtinRAMs()) {
+            assert(reqPacket_.circuitKey);
+            assert(ram.inAddrWidth == 8 && ram.inWdataWidth == 8 &&
+                   ram.outRdataWidth == 8);
+
+            auto net = makeTFHEppRAMNetworkForCUFHE("");
+            name2cnet_.emplace(ram.name, net.cufheNet);
+            name2tnet_.emplace(ram.name, net.tfheppNet);
+            merge(bridges0_, net.bridges0);
+            merge(bridges1_, net.bridges1);
+        }
+
+        // [[builtin]] type = rom
+        for (const auto& rom : bp.builtinROMs()) {
+            assert(reqPacket_.circuitKey);
+            assert(rom.inAddrWidth == 7 && rom.outRdataWidth == 32);
+
+            auto net = makeTFHEppROMNetworkForCUFHE();
+            name2cnet_.emplace(rom.name, net.cufheNet);
+            name2tnet_.emplace(rom.name, net.tfheppNet);
+            merge(bridges0_, net.bridges0);
+            merge(bridges1_, net.bridges1);
+        }
+
+        // [connect]
+        for (const auto& [src, dst] : bp.edges()) {
+            assert(src.portLabel.kind == "output");
+            assert(dst.portLabel.kind == "input");
+            auto srcTask = get(src);
+            auto dstTask = get(dst);
+            dstTask->acceptOneMoreInput();
+            NetworkBuilderBase<cufhe::Ctxt>::connectTasks(srcTask, dstTask);
+        }
+
+        // Set initial ROM data
+        if (auto atROMOpt = bp.atROM(); atROMOpt) {
+            using namespace blueprint;
+            const SingleROM* atROM = std::get_if<SingleROM>(&atROMOpt.value());
+            assert(atROM);
+            auto& rom =
+                *get<TaskTFHEppROMUX>({atROM->nodeName, {"rom", "all", 0}});
+
+            const int ROM_UNIT = 1024 / 8;
+            assert(reqPacket_.romCk.size() == 512 / ROM_UNIT);
+            for (int i = 0; i < 512 / ROM_UNIT; i++) {
+                int offset = ROM_UNIT * i;
+                rom.set128le(offset, reqPacket_.romCk[i]);
+            }
+        }
+
+        // Make runner
+        CUFHENetworkRunner runner{
+            opt_.numGPUWorkers, opt_.numCPUWorkers,
+            TFHEppWorkerInfo{TFHEpp::lweParams{}, reqPacket_.gateKey,
+                             reqPacket_.circuitKey}};
+        for (auto&& p : name2cnet_)
+            runner.addNetwork(p.second);
+        for (auto&& p : name2tnet_)
+            runner.addNetwork(p.second);
+        for (auto&& bridge0 : bridges0_)
+            runner.addBridge(bridge0);
+        for (auto&& bridge1 : bridges1_)
+            runner.addBridge(bridge1);
+
+        // Reset
+        {
+            cufhe::Ctxt one, zero;
+            cufhe::ConstantOne(one);
+            cufhe::ConstantZero(zero);
+            cufhe::Synchronize();
+
+            auto& reset = *get_at("input", "reset");
+            reset.set(one);
+            runner.run();
+            reset.set(zero);
+        }
+
+        // Go computing
+        std::optional<std::ofstream> dumpOS;
+        if (opt_.dumpEveryClock) {
+            dumpOS = std::ofstream{*opt_.dumpEveryClock};
+            assert(*dumpOS);
+        }
+
+        {
+            std::stringstream devnull;
+            std::ostream& os = opt_.quiet ? devnull : std::cout;
+
+            processCycles(opt_.numCycles, os, [&](bool first) {
+                if (dumpOS)
+                    dumpResultAsJSON(*dumpOS, makeResPacket(),
+                                     opt_.secretKey.value());
+
+                runner.tick();
+
+                if (first)
+                    setInitialRAM();
+
+                runner.run();
+                return false;
+            });
+        }
+
+        // Dump result packet
+        KVSPResPacket resPacket = makeResPacket();
+        if (dumpOS)
+            dumpResultAsJSON(*dumpOS, resPacket, opt_.secretKey.value());
+        writeToArchive(opt_.outputFile, resPacket);
+
+        // Clean cuFHE up
+        cufhe::CleanUp();
+    }
+};
+
+}  // namespace
+
+void processAllGates(CUFHENetwork& net, int numWorkers,
+                     std::shared_ptr<ProgressGraphMaker> graph)
+{
+    ReadyQueue<CUFHEWorkerInfo> readyQueue;
+    net.pushReadyTasks(readyQueue);
+
+    // Create workers.
+    size_t numFinishedTargets = 0;
+    std::vector<CUFHEWorker> workers;
+    for (int i = 0; i < numWorkers; i++)
+        workers.emplace_back(readyQueue, numFinishedTargets, graph);
+
+    // Process all targets.
+    while (numFinishedTargets < net.numNodes()) {
+        // Detect infinite loops.
+        assert(std::any_of(workers.begin(), workers.end(),
+                           [](auto&& w) { return w.isWorking(); }) ||
+               !readyQueue.empty());
+
+        for (auto&& w : workers)
+            w.update();
+    }
+
+    assert(readyQueue.empty());
+}
+
+void doCUFHE(const Options& opt)
+{
+    CUFHEFrontend{opt}.go();
 }

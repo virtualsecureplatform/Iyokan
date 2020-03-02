@@ -260,21 +260,21 @@ inline TaskNetwork<uint8_t> makePlainRAMNetwork(const std::string &ramPortName)
 inline TaskNetwork<uint8_t> makePlainROMNetwork()
 {
     /*
-       INPUT (ROM[0]) ---+-----+  +-- SPLITTER --- OUTPUT (ROM[0])
-                         |     |  |
-       INPUT (ROM[1]) ---+ ROM +--+-- SPLITTER --- OUTPUT (ROM[1])
-                         |     |  |
-       INPUT (ROM[2]) ---+     +  +-- SPLITTER --- OUTPUT (ROM[2])
-                         |     |  |
-                           ...       ...
-                         |     |  |
-       INPUT (ROM[6]) ---+-----+  +-- SPLITTER --- OUTPUT (ROM[6])
-                                  |
-                                  +-- SPLITTER --- OUTPUT (ROM[7])
-                                  |
-                                     ...
-                                  |
-                                  +-- SPLITTER --- OUTPUT (ROM[31])
+       INPUT (addr[0]) ---+-----+  +-- SPLITTER --- OUTPUT (rdata[0])
+                          |     |  |
+       INPUT (addr[1]) ---+ ROM +--+-- SPLITTER --- OUTPUT (rdata[1])
+                          |     |  |
+       INPUT (addr[2]) ---+     +  +-- SPLITTER --- OUTPUT (rdata[2])
+                          |     |  |
+                            ...       ...
+                          |     |  |
+       INPUT (addr[6]) ---+-----+  +-- SPLITTER --- OUTPUT (rdata[6])
+                                   |
+                                   +-- SPLITTER --- OUTPUT (rdata[7])
+                                   |
+                                      ...
+                                   |
+                                   +-- SPLITTER --- OUTPUT (rdata[31])
     */
 
     NetworkBuilderBase<uint8_t> builder;
@@ -283,7 +283,7 @@ inline TaskNetwork<uint8_t> makePlainROMNetwork()
     std::vector<std::shared_ptr<TaskPlainGateWIRE>> inputs;
     for (int i = 0; i < 7; i++) {
         auto taskINPUT = builder.addINPUT<TaskPlainGateWIRE>(detail::genid(), 0,
-                                                             "ROM", i, false);
+                                                             "addr", i, false);
         inputs.push_back(taskINPUT);
     }
 
@@ -311,7 +311,7 @@ inline TaskNetwork<uint8_t> makePlainROMNetwork()
     // Create outputs and connect corresponding splitter to it.
     for (int i = 0; i < 32; i++) {
         auto taskOUTPUT = builder.addOUTPUT<TaskPlainGateWIRE>(
-            detail::genid(), 0, "ROM", i, true);
+            detail::genid(), 0, "rdata", i, true);
         auto &&splitter = taskSplitters[i];
         builder.connectTasks(splitter, taskOUTPUT);
     }
