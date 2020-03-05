@@ -761,7 +761,8 @@ public:
                                  const std::string &portName, int portBit,
                                  Args &&... args)
     {
-        NodeLabel label{id, "OUTPUT", utility::fok(portName, "[", portBit, "]")};
+        NodeLabel label{id, "OUTPUT",
+                        utility::fok(portName, "[", portBit, "]")};
         auto task = std::make_shared<T>(std::forward<Args>(args)...);
         addTask(label, priority, task);
         registerTask("output", portName, portBit, task);
@@ -1349,7 +1350,7 @@ public:
                 std::string srcTo = srcKey,
                             srcFrom = toml::get<std::string>(srcValue),
                             errMsg = utility::fok("Invalid connect: ", srcTo,
-                                                 " = ", srcFrom);
+                                                  " = ", srcFrom);
 
                 // Check if input is correct.
                 if (srcTo.empty() || srcFrom.empty() ||

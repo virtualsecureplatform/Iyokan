@@ -1138,7 +1138,8 @@ void testBlueprint()
             const Port& port =
                 blueprint.at(utility::fok("reg_x", ireg), ibit).value();
             assert(port.nodeName == "core");
-            assert(port.portLabel.portName == utility::fok("io_regOut_x", ireg));
+            assert(port.portLabel.portName ==
+                   utility::fok("io_regOut_x", ireg));
             assert(port.portLabel.portBit == ibit);
         }
     }

@@ -254,9 +254,9 @@ inline TaskNetwork<uint8_t> makePlainRAMNetwork(const std::string &ramPortName)
     }
     for (size_t i = 0; i < 8; i++) {
         auto taskSplitter = std::make_shared<TaskPlainSplitter>(i);
-        builder.addTask(
-            NodeLabel{detail::genid(), "SPLITTER", utility::fok("RAM[", i, "]")},
-            0, taskSplitter);
+        builder.addTask(NodeLabel{detail::genid(), "SPLITTER",
+                                  utility::fok("RAM[", i, "]")},
+                        0, taskSplitter);
         builder.connectTasks(taskRAM, taskSplitter);
 
         auto taskOUTPUT = builder.addOUTPUT<TaskPlainGateWIRE>(
@@ -310,9 +310,9 @@ inline TaskNetwork<uint8_t> makePlainROMNetwork()
     std::vector<std::shared_ptr<TaskPlainSplitter>> taskSplitters;
     for (int i = 0; i < 32; i++) {
         auto taskSplitter = std::make_shared<TaskPlainSplitter>(i);
-        builder.addTask(
-            NodeLabel{detail::genid(), "SPLITTER", utility::fok("ROM[", i, "]")},
-            0, taskSplitter);
+        builder.addTask(NodeLabel{detail::genid(), "SPLITTER",
+                                  utility::fok("ROM[", i, "]")},
+                        0, taskSplitter);
         taskSplitters.push_back(taskSplitter);
 
         builder.connectTasks(taskROM, taskSplitter);
