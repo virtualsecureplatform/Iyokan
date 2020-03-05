@@ -17,6 +17,7 @@
 
 #include <algorithm>
 #include <cassert>
+#include <filesystem>
 #include <future>
 #include <iostream>
 #include <map>
@@ -1294,21 +1295,31 @@ private:
 public:
     NetworkBlueprint(const std::string &fileName)
     {
+        namespace fs = std::filesystem;
+
+        // Parse config file
         const auto src = toml::parse(fileName);
+
+        // Find working directory of config
+        fs::path wd = fs::absolute(fileName);
+        wd.remove_filename();
 
         // [[file]]
         {
             const auto srcFiles =
                 toml::find<std::vector<toml::value>>(src, "file");
             for (const auto &srcFile : srcFiles) {
-                const auto type = toml::find<std::string>(srcFile, "type");
-                const auto path = toml::find<std::string>(srcFile, "path");
-                const auto name = toml::find<std::string>(srcFile, "name");
+                std::string type = toml::find<std::string>(srcFile, "type");
+                fs::path path = toml::find<std::string>(srcFile, "path");
+                std::string name = toml::find<std::string>(srcFile, "name");
 
                 assert(type == "iyokanl1-json");
 
+                if (path.is_relative())
+                    path = wd / path;  // Make path absolute
+
                 files_.push_back(blueprint::File{
-                    blueprint::File::TYPE::IYOKANL1_JSON, path, name});
+                    blueprint::File::TYPE::IYOKANL1_JSON, path.string(), name});
             }
         }
 

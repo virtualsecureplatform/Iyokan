@@ -1,6 +1,6 @@
 [[file]]
 type = "iyokanl1-json"
-path = "test/diamond-core-wo-ram-rom.json"
+path = "diamond-core-wo-ram-rom.json"
 name = "core"
 
 [[builtin]]
