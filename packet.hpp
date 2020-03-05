@@ -235,9 +235,14 @@ void readFromArchive(T& res, std::istream& is)
 template <class T>
 void readFromArchive(T& res, const std::string& path)
 {
-    std::ifstream ifs{path, std::ios::binary};
-    assert(ifs && "Can't open the file to read from; maybe not found?");
-    readFromArchive<T>(res, ifs);
+    try {
+        std::ifstream ifs{path, std::ios::binary};
+        assert(ifs && "Can't open the file to read from; maybe not found?");
+        readFromArchive<T>(res, ifs);
+    }
+    catch (std::exception& ex) {
+        error::die("Invalid archive: ", path);
+    }
 }
 
 template <class T>
@@ -266,9 +271,14 @@ void writeToArchive(std::ostream& os, const T& src)
 template <class T>
 void writeToArchive(const std::string& path, const T& src)
 {
-    std::ofstream ofs{path, std::ios::binary};
-    assert(ofs && "Can't open the file to write in; maybe not allowed?");
-    return writeToArchive(ofs, src);
+    try {
+        std::ofstream ofs{path, std::ios::binary};
+        assert(ofs && "Can't open the file to write in; maybe not allowed?");
+        return writeToArchive(ofs, src);
+    }
+    catch (std::exception& ex) {
+        error::die("Unable to write into archive: ", path);
+    }
 }
 
 #endif
