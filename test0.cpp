@@ -1067,7 +1067,8 @@ void testBlueprint()
         const auto& files = blueprint.files();
         assert(files.size() == 1);
         assert(files[0].type == File::TYPE::IYOKANL1_JSON);
-        assert(files[0].path == "test/diamond-core-wo-ram-rom.json");
+        assert(files[0].path ==
+               std::filesystem::absolute("test/diamond-core-wo-ram-rom.json"));
         assert(files[0].name == "core");
     }
 
