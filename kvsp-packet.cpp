@@ -121,6 +121,12 @@ void doPlainUnpack(std::string inputFileName)
     print(packet, std::cout);
 }
 
+void doPlainUnpackJSON(std::string inputFileName)
+{
+    auto packet = readFromArchive<PlainPacket>(inputFileName);
+    printAsJSON(packet, std::cout);
+}
+
 void doEnc(std::string keyFileName, std::string inputFileName,
            std::string outputFileName)
 {
@@ -153,6 +159,7 @@ int main(int argc, char** argv)
        kvsp-packet dec-json KEY-FILE INPUT-FILE
        kvsp-packet plain-pack INPUT-FILE OUTPUT-FILE
        kvsp-packet plain-unpack INPUT-FILE
+       kvsp-packet plain-unpack-json INPUT-FILE
     */
 
     assert(argc >= 3 && "Invalid command-line arguments");
@@ -181,6 +188,10 @@ int main(int argc, char** argv)
     else if (subcommand == "plain-unpack") {
         assert(argc == 3 && "Invalid command-line arguments");
         doPlainUnpack(argv[2]);
+    }
+    else if (subcommand == "plain-unpack-json") {
+        assert(argc == 3 && "Invalid command-line arguments");
+        doPlainUnpackJSON(argv[2]);
     }
     else {
         assert("Invalid command-line arguments");

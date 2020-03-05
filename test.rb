@@ -77,6 +77,11 @@ test_iyokan [
   assert_regex r, /#cycle\t8/
   assert_regex r, /f0\t1/
   assert_regex r, /x0\t42/
+
+  r = check_code "./kvsp-packet", ["plain-unpack-json", "_test_plain_res_packet00"]
+  json = JSON.parse(r)
+  assert_include json, { "type" => "flag", "addr" => 0, "byte" => 1 }
+  assert_include json, { "type" => "reg", "addr" => 0, "byte" => 42 }
 end
 
 test_iyokan [
@@ -137,6 +142,11 @@ if $SLOW_MODE_ENABLED
       assert_regex r, /#cycle\t8/
       assert_regex r, /f0\t1/
       assert_regex r, /x0\t42/
+
+      r = check_code "./kvsp-packet", ["dec-json", "_test_sk", "_test_res_packet00"]
+      json = JSON.parse(r)
+      assert_include json, { "type" => "flag", "addr" => 0, "byte" => 1 }
+      assert_include json, { "type" => "reg", "addr" => 0, "byte" => 42 }
     end
 
     test_iyokan [
