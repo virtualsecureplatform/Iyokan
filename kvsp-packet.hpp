@@ -35,7 +35,8 @@ inline PlainPacket parseELF(std::istream& is)
             ramB.push_back(ram[i]);
     }
 
-    return PlainPacket{{{"ramA", ramA}, {"ramB", ramB}}, {{"rom", rom}}};
+    return PlainPacket{
+        {{"ramA", ramA}, {"ramB", ramB}}, {{"rom", rom}}, {}, std::nullopt};
 }
 
 inline PlainPacket parseELF(const std::string& path)

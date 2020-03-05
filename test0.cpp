@@ -1,6 +1,6 @@
-#include "iyokan.hpp"
-
 #include "kvsp-packet.hpp"
+
+#include "iyokan.hpp"
 
 //
 #include <fstream>

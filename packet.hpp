@@ -181,7 +181,8 @@ TFHEPacket PlainPacket::encrypt(const TFHEpp::SecretKey& key) const
                     std::make_shared<TFHEpp::CircuitKey>(key),
                     {},
                     {},
-                    {}};
+                    {},
+                    numCycles};
     // Encrypt RAM
     for (auto&& [name, src] : ram) {
         auto [it, inserted] = tfhe.ram.emplace(name, encryptRAM(key, src));

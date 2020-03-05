@@ -32,7 +32,7 @@ endif(IYOKAN_ENABLE_CUDA)
 
 add_subdirectory(${CMAKE_SOURCE_DIR}/backward-cpp)
 
-set(IYOKAN_CXXFLAGS -Wall -Wextra -pedantic -g3)
+set(IYOKAN_CXXFLAGS -Wall -Wextra -pedantic -Wno-sign-compare -g3)
 set(IYOKAN_CXXFLAGS_DEBUG   ${IYOKAN_CXXFLAGS} -O0)
 set(IYOKAN_CXXFLAGS_RELEASE ${IYOKAN_CXXFLAGS} -O3 -march=native)
 set(IYOKAN_INCLUDE_DIRS
