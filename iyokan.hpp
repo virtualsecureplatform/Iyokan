@@ -1437,7 +1437,7 @@ struct Options {
         numGPUWorkers = 80 * 10, numCycles = -1;
     std::optional<std::string> secretKey;
     bool quiet = false;
-    std::optional<std::string> dumpEveryClock;
+    std::optional<std::string> dumpPrefix;
 };
 
 template <class Func>
@@ -1447,7 +1447,7 @@ int processCycles(int numCycles, std::ostream &os, Func func)
         os << "#" << (i + 1) << std::flush;
 
         auto begin = std::chrono::high_resolution_clock::now();
-        bool shouldBreak = func(i == 0);
+        bool shouldBreak = func(i);
         auto end = std::chrono::high_resolution_clock::now();
 
         os << "\tdone. ("

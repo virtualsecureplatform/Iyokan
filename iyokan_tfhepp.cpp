@@ -84,10 +84,10 @@ private:
         return task;
     }
 
-    TFHEPacket makeResPacket()
+    TFHEPacket makeResPacket(int numCycles)
     {
         TFHEPacket resPacket;
-        resPacket.numCycles = opt_.numCycles;
+        resPacket.numCycles = numCycles;
 
         // Get values of output @port
         for (auto &&[key, port] : opt_.blueprint->atPorts()) {
@@ -129,6 +129,17 @@ private:
                     ram.set(addr, init.at(addr * 8 + bit));
             }
         }
+    }
+
+    void mayDumpPacket(int currentCycle)
+    {
+        if (!opt_.dumpPrefix)
+            return;
+        auto sk = std::make_shared<TFHEpp::SecretKey>();
+        readFromArchive(*sk, opt_.secretKey.value());
+        PlainPacket packet = makeResPacket(currentCycle).decrypt(*sk);
+        writeToArchive(utility::fok(*opt_.dumpPrefix, "-", currentCycle),
+                       packet);
     }
 
 public:
@@ -219,23 +230,16 @@ public:
         }
 
         // Go computing
-        std::optional<std::ofstream> dumpOS;
-        if (opt_.dumpEveryClock) {
-            dumpOS = std::ofstream{*opt_.dumpEveryClock};
-            assert(*dumpOS);
-        }
-
         {
             std::stringstream devnull;
             std::ostream &os = opt_.quiet ? devnull : std::cout;
 
-            processCycles(opt_.numCycles, os, [&](bool first) {
-                if (dumpOS)
-                    writeToArchive(*dumpOS, makeResPacket());
+            processCycles(opt_.numCycles, os, [&](int currentCycle) {
+                mayDumpPacket(currentCycle);
 
                 runner.tick();
 
-                if (first)
+                if (currentCycle == 0)
                     setInitialRAM();
 
                 runner.run();
@@ -245,9 +249,7 @@ public:
         }
 
         // Dump result packet
-        TFHEPacket resPacket = makeResPacket();
-        if (dumpOS)
-            writeToArchive(*dumpOS, resPacket);
+        TFHEPacket resPacket = makeResPacket(opt_.numCycles);
         writeToArchive(opt_.outputFile, resPacket);
     }
 };

@@ -79,17 +79,18 @@ test_iyokan [
   assert_regex r, /x0\t42/
 end
 
-#test_iyokan [
-#  "plain",
-#  "--blueprint", "test/cahp-diamond.toml",
-#  "-i", "_test_plain_req_packet00",
-#  "-o", "_test_plain_res_packet00",
-#  "--enable-dump-every-clock", "_test_dump",
-#] do |r|
-#  json = JSON.parse(open("_test_dump").read.lines[-1])
-#  assert_include json, { "type" => "flag", "addr" => 0, "byte" => true }
-#  assert_include json, { "type" => "reg", "addr" => 0, "byte" => 42 }
-#end
+test_iyokan [
+  "plain",
+  "--blueprint", "test/cahp-diamond.toml",
+  "-i", "_test_plain_req_packet00",
+  "-o", "_test_plain_res_packet00",
+  "--dump-prefix", "_test_dump",
+] do |r|
+  r = check_code "./kvsp-packet", ["plain-unpack", "_test_dump-7"]
+  assert_regex r, /#cycle\t7/
+  assert_regex r, /f0\t0/
+  assert_regex r, /x0\t42/
+end
 
 if $SLOW_MODE_ENABLED
   check_code "./kvsp-packet", ["genkey", "_test_sk"]
@@ -108,6 +109,21 @@ if $SLOW_MODE_ENABLED
     assert_regex r, /x0\t42/
   end
 
+  test_iyokan [
+    "tfhe",
+    "--blueprint", "test/cahp-diamond.toml",
+    "-i", "_test_req_packet00",
+    "-o", "_test_res_packet00",
+    "-c", "8",
+    "--dump-prefix", "_test_dump",
+    "--secret-key", "_test_sk",
+  ] do |r|
+    r = check_code "./kvsp-packet", ["plain-unpack", "_test_dump-7"]
+    assert_regex r, /#cycle\t7/
+    assert_regex r, /f0\t0/
+    assert_regex r, /x0\t42/
+  end
+
   if $CUDA_MODE_ENABLED
     test_iyokan [
       "tfhe",
@@ -120,6 +136,22 @@ if $SLOW_MODE_ENABLED
       r = check_code "./kvsp-packet", ["dec", "_test_sk", "_test_res_packet00"]
       assert_regex r, /#cycle\t8/
       assert_regex r, /f0\t1/
+      assert_regex r, /x0\t42/
+    end
+
+    test_iyokan [
+      "tfhe",
+      "--blueprint", "test/cahp-diamond.toml",
+      "-i", "_test_req_packet00",
+      "-o", "_test_res_packet00",
+      "-c", "8",
+      "--enable-gpu",
+      "--dump-prefix", "_test_dump",
+      "--secret-key", "_test_sk",
+    ] do |r|
+      r = check_code "./kvsp-packet", ["plain-unpack", "_test_dump-7"]
+      assert_regex r, /#cycle\t7/
+      assert_regex r, /f0\t0/
       assert_regex r, /x0\t42/
     end
   end

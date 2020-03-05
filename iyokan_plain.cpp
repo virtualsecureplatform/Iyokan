@@ -213,12 +213,6 @@ public:
         }
 
         // Go computing
-        std::optional<std::ofstream> dumpOS;
-        if (opt_.dumpEveryClock) {
-            dumpOS = std::ofstream{*opt_.dumpEveryClock};
-            assert(*dumpOS);
-        }
-
         {
             std::stringstream devnull;
             std::ostream &os = opt_.quiet ? devnull : std::cout;
@@ -226,13 +220,15 @@ public:
             auto finflag = get_at("output", "finflag");
             assert(finflag);
 
-            numCycles = processCycles(numCycles, os, [&](bool first) {
-                if (dumpOS)
-                    writeToArchive(*dumpOS, makeResPacket(opt_.numCycles));
+            numCycles = processCycles(numCycles, os, [&](int currentCycle) {
+                if (opt_.dumpPrefix)
+                    writeToArchive(
+                        utility::fok(*opt_.dumpPrefix, "-", currentCycle),
+                        makeResPacket(currentCycle));
 
                 runner.tick();
 
-                if (first)
+                if (currentCycle == 0)
                     setInitialRAM();
 
                 runner.run();
@@ -243,8 +239,6 @@ public:
 
         // Print the results
         PlainPacket resPacket = makeResPacket(numCycles);
-        if (dumpOS)
-            writeToArchive(*dumpOS, resPacket);
         writeToArchive(opt_.outputFile, resPacket);
     }
 };
