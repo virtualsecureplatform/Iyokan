@@ -4,18 +4,20 @@
 #include <fstream>
 #include <iomanip>
 #include <memory>
-
-#include <elfio/elfio.hpp>
+#include <regex>
 
 #include <cereal/archives/portable_binary.hpp>
 #include <cereal/cereal.hpp>
 #include <cereal/types/array.hpp>
 #include <cereal/types/memory.hpp>
+#include <cereal/types/optional.hpp>
+#include <cereal/types/unordered_map.hpp>
 #include <cereal/types/vector.hpp>
 
 #include <tfhe++.hpp>
 
-#include <picojson.h>
+#include "error.hpp"
+#include "utility.hpp"
 
 namespace TFHEpp {
 template <class Archive>
@@ -52,104 +54,6 @@ void serialize(Archive& ar, CircuitKey& src)
 }
 }  // namespace TFHEpp
 
-struct KVSPPlainReqPacket {
-    std::vector<uint8_t> rom, ram;
-
-    template <class Archive>
-    void serialize(Archive& ar)
-    {
-        ar(rom, ram);
-    }
-};
-
-struct KVSPPlainResPacket {
-    std::vector<uint8_t> flags;
-    std::vector<uint16_t> regs;
-    std::vector<uint8_t> ram;
-    int numCycles = -1;
-
-    void printAsJSON(std::ostream& os)
-    {
-        picojson::array root;
-
-        // Print flags.
-        for (int i = 0; i < flags.size(); i++) {
-            picojson::object item;
-            item["type"] = picojson::value("flag");
-            item["addr"] = picojson::value(static_cast<double>(i));
-            item["byte"] = picojson::value(static_cast<bool>(flags.at(i)));
-            root.emplace_back(item);
-        }
-
-        // Print regs.
-        for (int i = 0; i < regs.size(); i++) {
-            picojson::object item;
-            item["type"] = picojson::value("reg");
-            item["addr"] = picojson::value(static_cast<double>(i));
-            item["byte"] = picojson::value(static_cast<double>(regs.at(i)));
-            root.emplace_back(item);
-        }
-
-        // Print ram.
-        for (int i = 0; i < ram.size(); i++) {
-            picojson::object item;
-            item["type"] = picojson::value("ram");
-            item["addr"] = picojson::value(static_cast<double>(i));
-            item["byte"] = picojson::value(static_cast<double>(ram.at(i)));
-            root.emplace_back(item);
-        }
-
-        os << picojson::value(root) << std::endl;
-    }
-
-    void print(std::ostream& os)
-    {
-        assert(flags.size() == 1);
-        assert(regs.size() == 16);
-        assert(ram.size() == 512);
-
-        std::ios fmt{nullptr};
-        fmt.copyfmt(os);
-
-        // Print the number of cycles
-        os << "#cycle\t";
-        if (numCycles < 0)
-            os << "unknown";
-        else
-            os << numCycles;
-        os << std::endl << std::endl;
-
-        // Print values of flags
-        for (size_t i = 0; i < flags.size(); i++)
-            os << "f" << i << "\t" << static_cast<int>(flags[i]) << std::endl;
-        os << std::endl;
-
-        // Print values of registers
-        for (size_t reg = 0; reg < regs.size(); reg++)
-            os << "x" << reg << "\t" << regs[reg] << std::endl;
-        os << std::endl;
-
-        // Print values of RAM
-        const int WIDTH = 16;
-        os << "      ";
-        for (int i = 0; i < WIDTH; i++)
-            os << std::setw(3) << i;
-        os << std::endl;
-        for (size_t addr = 0; addr < ram.size(); addr++) {
-            if (addr % WIDTH == 0)
-                os << std::setw(6) << std::setfill('0') << std::hex << addr
-                   << " ";
-            os << std::setw(2) << std::setfill('0') << std::hex
-               << static_cast<int>(ram[addr]) << " ";
-            if (addr % WIDTH == WIDTH - 1)
-                os << std::endl;
-        }
-
-        os << std::endl;
-        os.copyfmt(fmt);
-    }
-};
-
 inline std::vector<TFHEpp::TLWElvl0> encrypt(const TFHEpp::SecretKey& key,
                                              const std::vector<uint8_t>& src)
 {
@@ -163,7 +67,7 @@ inline std::vector<TFHEpp::TLWElvl0> encrypt(const TFHEpp::SecretKey& key,
     return ret;
 }
 
-inline std::vector<TFHEpp::TRLWElvl1> encryptTRLWElvl1(
+inline std::vector<TFHEpp::TRLWElvl1> encryptROM(
     const TFHEpp::SecretKey& key, const std::vector<uint8_t>& src)
 {
     const TFHEpp::lweParams& params = key.params;
@@ -186,122 +90,24 @@ inline std::vector<TFHEpp::TRLWElvl1> encryptTRLWElvl1(
     return ret;
 }
 
-inline KVSPPlainReqPacket parseELF(std::istream& is)
+inline std::vector<TFHEpp::TRLWElvl1> encryptRAM(
+    const TFHEpp::SecretKey& key, const std::vector<uint8_t>& src)
 {
-    ELFIO::elfio reader;
-    reader.load(is);
-    assert(reader.segments.size() != 0);
+    const TFHEpp::lweParams& params = key.params;
+    std::vector<TFHEpp::TRLWElvl1> ret;
 
-    std::vector<uint8_t> rom(512, 0), ram(512, 0);
-    for (ELFIO::segment* pseg : reader.segments) {
-        ELFIO::segment& seg = *pseg;
-        auto size = seg.get_file_size();
-        if (size == 0)
-            continue;
-
-        auto addr = seg.get_virtual_address();
-        assert(0 <= addr && addr < rom.size() - size ||
-               0x10000 <= addr && addr < 0x10000 + ram.size() - size);
-
-        const char* src = seg.get_data();
-        std::copy(src, src + size,
-                  &(addr < 0x10000 ? rom.at(addr) : ram.at(addr - 0x10000)));
-    }
-
-    return KVSPPlainReqPacket{rom, ram};
-}
-
-inline KVSPPlainReqPacket parseELF(const std::string& path)
-{
-    std::ifstream ifs{path, std::ios::binary};
-    assert(ifs);
-    return parseELF(ifs);
-}
-
-struct KVSPReqPacket {
-    std::shared_ptr<TFHEpp::GateKey> gateKey;
-    std::vector<TFHEpp::TLWElvl0> rom, ram;
-
-    std::shared_ptr<TFHEpp::CircuitKey> circuitKey;
-    std::vector<TFHEpp::TRLWElvl1> romCk, ramCk;
-
-    template <class Archive>
-    void serialize(Archive& ar)
-    {
-        ar(gateKey, rom, ram, circuitKey, romCk, ramCk);
-    }
-
-    KVSPReqPacket()
-    {
-    }
-
-    KVSPReqPacket(std::shared_ptr<TFHEpp::GateKey> gateKey,
-                  std::vector<TFHEpp::TLWElvl0> rom,
-                  std::vector<TFHEpp::TLWElvl0> ram,
-                  std::shared_ptr<TFHEpp::CircuitKey> ck,
-                  std::vector<TFHEpp::TRLWElvl1> romCk)
-        : gateKey(std::move(gateKey)),
-          rom(std::move(rom)),
-          ram(std::move(ram)),
-          circuitKey(std::move(ck)),
-          romCk(std::move(romCk))
-    {
-    }
-
-    static KVSPReqPacket make(const TFHEpp::SecretKey& key,
-                              const KVSPPlainReqPacket& plain)
-    {
-        auto gk = std::make_shared<TFHEpp::GateKey>(key);
-        auto rom = encrypt(key, plain.rom);
-        auto ram = encrypt(key, plain.ram);
-        return KVSPReqPacket{gk, rom, ram, nullptr,
-                             std::vector<TFHEpp::TRLWElvl1>{}};
-    }
-
-    static KVSPReqPacket makeWithCk(const TFHEpp::SecretKey& key,
-                                    const KVSPPlainReqPacket& plain)
-    {
-        auto packet = make(key, plain);
-        packet.circuitKey = std::make_shared<TFHEpp::CircuitKey>(key);
-        packet.romCk = encryptTRLWElvl1(key, plain.rom);
-        packet.ramCk = encryptRAMCk(key, plain.ram);
-        return packet;
-    }
-
-private:
-    static std::vector<TFHEpp::TRLWElvl1> encryptRAMCk(
-        const TFHEpp::SecretKey& key, const std::vector<uint8_t>& src)
-    {
-        const TFHEpp::lweParams& params = key.params;
-        std::vector<TFHEpp::TRLWElvl1> ret;
-
-        for (size_t i = 0; i < src.size(); i++) {
-            for (size_t bit = 0; bit < 8; bit++) {
-                TFHEpp::Polynomiallvl1 pmu = {};
-                uint8_t val = (src[i] >> bit) & 1u;
-                pmu[0] = val ? params.μ : -params.μ;
-                ret.push_back(
-                    TFHEpp::trlweSymEncryptlvl1(pmu, params.α, key.key.lvl1));
-            }
+    for (size_t i = 0; i < src.size(); i++) {
+        for (size_t bit = 0; bit < 8; bit++) {
+            TFHEpp::Polynomiallvl1 pmu = {};
+            uint8_t val = (src[i] >> bit) & 1u;
+            pmu[0] = val ? params.μ : -params.μ;
+            ret.push_back(
+                TFHEpp::trlweSymEncryptlvl1(pmu, params.α, key.key.lvl1));
         }
-
-        return ret;
     }
-};
 
-struct KVSPResPacket {
-    std::vector<TFHEpp::TLWElvl0> flags;
-    std::vector<std::vector<TFHEpp::TLWElvl0>> regs;
-    std::vector<TFHEpp::TLWElvl0> ram;
-    std::vector<TFHEpp::TRLWElvl1> ramCk;
-    int numCycles = -1;
-
-    template <class Archive>
-    void serialize(Archive& ar)
-    {
-        ar(flags, regs, ram, numCycles, ramCk);
-    }
-};
+    return ret;
+}
 
 inline std::vector<uint8_t> decrypt(const TFHEpp::SecretKey& key,
                                     const std::vector<TFHEpp::TLWElvl0>& src)
@@ -319,8 +125,8 @@ inline std::vector<uint8_t> decrypt(const TFHEpp::SecretKey& key,
     return ret;
 }
 
-inline std::vector<uint8_t> decrypt(const TFHEpp::SecretKey& key,
-                                    const std::vector<TFHEpp::TRLWElvl1>& src)
+inline std::vector<uint8_t> decryptRAM(
+    const TFHEpp::SecretKey& key, const std::vector<TFHEpp::TRLWElvl1>& src)
 {
     std::vector<uint8_t> ret;
     for (auto it = src.begin(); it != src.end();) {
@@ -335,25 +141,88 @@ inline std::vector<uint8_t> decrypt(const TFHEpp::SecretKey& key,
     return ret;
 }
 
-inline KVSPPlainResPacket decrypt(const TFHEpp::SecretKey& key,
-                                  const KVSPResPacket& src)
-{
-    std::vector<uint8_t> flags;
-    for (auto&& encFlag : src.flags)
-        flags.push_back(
-            TFHEpp::bootsSymDecrypt(std::vector{encFlag}, key).at(0));
+struct TFHEPacket;
 
-    std::vector<uint16_t> regs;
-    for (auto&& encReg : src.regs) {
-        std::vector<uint8_t> bytes = decrypt(key, encReg);
-        assert(bytes.size() == 2);
-        regs.push_back(bytes[0] | (bytes[1] << 8u));
+struct PlainPacket {
+    std::unordered_map<std::string, std::vector<uint8_t>> ram;  // byte by byte
+    std::unordered_map<std::string, std::vector<uint8_t>> rom;  // byte by byte
+    std::unordered_map<std::string, std::vector<uint8_t>> bits;
+    std::optional<int> numCycles;
+
+    template <class Archive>
+    void serialize(Archive& ar)
+    {
+        ar(ram, rom, bits, numCycles);
     }
 
-    std::vector<uint8_t> ram =
-        src.ramCk.empty() ? decrypt(key, src.ram) : decrypt(key, src.ramCk);
+    inline TFHEPacket encrypt(const TFHEpp::SecretKey& key) const;
+};
 
-    return KVSPPlainResPacket{flags, regs, ram, src.numCycles};
+struct TFHEPacket {
+    std::shared_ptr<TFHEpp::GateKey> gk;
+    std::shared_ptr<TFHEpp::CircuitKey> ck;
+    std::unordered_map<std::string, std::vector<TFHEpp::TRLWElvl1>> ram;
+    std::unordered_map<std::string, std::vector<TFHEpp::TRLWElvl1>> rom;
+    std::unordered_map<std::string, std::vector<TFHEpp::TLWElvl0>> bits;
+    std::optional<int> numCycles;
+
+    template <class Archive>
+    void serialize(Archive& ar)
+    {
+        ar(gk, ck, ram, rom, bits, numCycles);
+    }
+
+    inline PlainPacket decrypt(const TFHEpp::SecretKey& key) const;
+};
+
+TFHEPacket PlainPacket::encrypt(const TFHEpp::SecretKey& key) const
+{
+    TFHEPacket tfhe{std::make_shared<TFHEpp::GateKey>(key),
+                    std::make_shared<TFHEpp::CircuitKey>(key),
+                    {},
+                    {},
+                    {}};
+    // Encrypt RAM
+    for (auto&& [name, src] : ram) {
+        auto [it, inserted] = tfhe.ram.emplace(name, encryptRAM(key, src));
+        if (!inserted)
+            error::die("Invalid PlainPacket. Duplicate ram's key: ", name);
+    }
+
+    // Encrypt ROM
+    for (auto&& [name, src] : rom) {
+        auto [it, inserted] = tfhe.rom.emplace(name, encryptROM(key, src));
+        if (!inserted)
+            error::die("Invalid PlainPacket. Duplicate rom's key: ", name);
+    }
+
+    // FIXME: Encrypt bits
+
+    return tfhe;
+}
+
+PlainPacket TFHEPacket::decrypt(const TFHEpp::SecretKey& key) const
+{
+    PlainPacket plain{{}, {}, {}, numCycles};
+
+    // Decrypt RAM
+    for (auto&& [name, trlwes] : ram) {
+        auto [it, inserted] = plain.ram.emplace(name, decryptRAM(key, trlwes));
+        if (!inserted)
+            error::die("Invalid TFHEPacket. Duplicate trlweData's key: ", name);
+    }
+
+    // FIXME: Decrypt ROM
+
+    // Decrypt bits
+    for (auto&& [name, tlwes] : bits) {
+        auto pbits = TFHEpp::bootsSymDecrypt(tlwes, key);
+        auto [it, inserted] = plain.bits.emplace(name, pbits);
+        if (!inserted)
+            error::die("Invalid TFHEPacket. Duplicate tlweData's key: ", name);
+    }
+
+    return plain;
 }
 
 template <class T>

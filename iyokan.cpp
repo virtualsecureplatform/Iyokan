@@ -34,6 +34,7 @@ int main(int argc, char **argv)
         plain->fallthrough();
         plain->parse_complete_callback([&] { type = TYPE::PLAIN; });
         plain->add_option("-c", opt.numCycles, "");
+        plain->add_option("-o", opt.outputFile, "")->required();
         plain->add_option("--enable-dump-every-clock", opt.dumpEveryClock, "");
     }
 
@@ -60,7 +61,7 @@ int main(int argc, char **argv)
 
     switch (type) {
     case TYPE::PLAIN:
-        doPlain(opt).print(std::cout);
+        doPlain(opt);
         break;
     case TYPE::TFHE:
 #ifdef IYOKAN_CUDA_ENABLED

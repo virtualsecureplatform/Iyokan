@@ -422,6 +422,11 @@ public:
     {
     }
 
+    size_t size() const
+    {
+        return 1 << ADDRESS_BIT;
+    }
+
     const cufhe::cuFHETRLWElvl1& get(size_t addr) const
     {
         return data_.at(addr);

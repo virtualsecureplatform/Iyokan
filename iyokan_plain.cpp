@@ -52,7 +52,7 @@ class PlainFrontend {
 private:
     Name2NetMap name2net_;
     const Options &opt_;
-    KVSPPlainReqPacket reqPacket_;
+    PlainPacket reqPacket_;
 
 private:
     template <class T = TaskPlainGate>
@@ -84,31 +84,28 @@ private:
         return task;
     }
 
-    KVSPPlainResPacket makeResPacket(int numCycles)
+    PlainPacket makeResPacket(int numCycles)
     {
-        KVSPPlainResPacket resPacket;
+        PlainPacket resPacket;
         resPacket.numCycles = numCycles;
-        // Get values of flags
-        resPacket.flags.emplace_back(get_at("output", "finflag")->get());
-        // Get values of registers
-        for (int reg = 0; reg < 16; reg++) {
-            uint16_t &val = resPacket.regs.emplace_back(0);
-            for (int bit = 0; bit < 16; bit++) {
-                int n = get_at("output", detail::fok("reg_x", reg), bit)->get();
-                val |= (n & 1u) << bit;
-            }
+        // Get values of output @port
+        for (auto &&[key, port] : opt_.blueprint->atPorts()) {
+            if (port.portLabel.kind != "output")
+                continue;
+            auto &[atPortName, atPortBit] = key;
+            auto &bits = resPacket.bits[atPortName];
+            if (bits.size() < atPortBit + 1)
+                bits.resize(atPortBit + 1);
+            bits.at(atPortBit) = get<TaskPlainGateMem>(port)->get();
         }
         // Get values of RAM
-        if (auto atRAMOpt = opt_.blueprint->atRAM(); atRAMOpt) {
-            using namespace blueprint;
-            const RAM_AB *atRAM = std::get_if<RAM_AB>(&*atRAMOpt);
-            assert(atRAM);
-            auto &ramA = *get<TaskPlainRAM>({atRAM->nodeAName, {"ram", "", 0}}),
-                 &ramB = *get<TaskPlainRAM>({atRAM->nodeBName, {"ram", "", 0}});
-            for (int addr = 0; addr < 512; addr++) {
-                resPacket.ram.push_back(
-                    (addr % 2 == 1 ? ramA : ramB).get(addr / 2));
-            }
+        // FIXME: subset of RAMs?
+        for (auto &&bp : opt_.blueprint->builtinRAMs()) {
+            auto &ram = *get<TaskPlainRAM>({bp.name, {"ram", "", 0}});
+            std::vector<uint8_t> &dst = resPacket.ram[bp.name];
+            assert(dst.size() == 0);
+            for (size_t addr = 0; addr < ram.size(); addr++)
+                dst.push_back(ram.get(addr));
         }
 
         return resPacket;
@@ -116,30 +113,25 @@ private:
 
     void setInitialRAM()
     {
-        if (auto atRAMOpt = opt_.blueprint->atRAM(); atRAMOpt) {
-            using namespace blueprint;
-            const RAM_AB *atRAM = std::get_if<RAM_AB>(&*atRAMOpt);
-            assert(atRAM);
-            auto &ramA = *get<TaskPlainRAM>({atRAM->nodeAName, {"ram", "", 0}}),
-                 &ramB = *get<TaskPlainRAM>({atRAM->nodeBName, {"ram", "", 0}});
-            for (int addr = 0; addr < 512; addr++) {
-                (addr % 2 == 1 ? ramA : ramB)
-                    .set(addr / 2, reqPacket_.ram.at(addr));
-            }
+        for (auto &&[name, init] : reqPacket_.ram) {
+            auto &ram = *get<TaskPlainRAM>({name, {"ram", "", 0}});
+            if (ram.size() != init.size())
+                error::die("Invalid request packet: wrong length of RAM");
+            for (size_t addr = 0; addr < ram.size(); addr++)
+                ram.set(addr, init[addr]);
         }
     }
 
 public:
     PlainFrontend(const Options &opt)
-        : opt_(opt),
-          reqPacket_(readFromArchive<KVSPPlainReqPacket>(opt.inputFile))
+        : opt_(opt), reqPacket_(readFromArchive<PlainPacket>(opt.inputFile))
     {
         assert(opt.blueprint);
     }
 
-    KVSPPlainResPacket go()
+    void go()
     {
-        // Create network according to blueprint
+        // Create network according to blueprint and request packet
         const NetworkBlueprint &bp = *opt_.blueprint;
 
         // [[file]]
@@ -163,10 +155,32 @@ public:
         }
 
         // [[builtin]] type = rom
-        for (const auto &rom : bp.builtinROMs()) {
-            assert(rom.inAddrWidth == 7 && rom.outRdataWidth == 32);
+        for (const auto &bprom : bp.builtinROMs()) {
+            assert(bprom.inAddrWidth == 7 && bprom.outRdataWidth == 32);
             auto net = std::make_shared<PlainNetwork>(makePlainROMNetwork());
-            name2net_.emplace(rom.name, net);
+            name2net_.emplace(bprom.name, net);
+
+            // Set initial data
+            if (auto it = reqPacket_.rom.find(bprom.name);
+                it != reqPacket_.rom.end()) {
+                std::vector<uint8_t> &init = it->second;
+                auto &rom = *get<TaskPlainROM>({bprom.name, {"rom", "all", 0}});
+
+                if (rom.size() != init.size())
+                    error::die("Invalid request packet: wrong length of ROM");
+                if (rom.size() % 4 != 0)
+                    error::die("Invalid ROM size: must be a multiple of 4");
+
+                for (size_t i = 0; i < rom.size() / 4; i++) {
+                    int val = 0;
+                    for (int j = 3; j >= 0; j--) {
+                        size_t offset = i * 4 + j;
+                        val = (val << 8) |
+                              (offset < init.size() ? init[offset] : 0x00);
+                    }
+                    rom.set4le(i << 2, val);
+                }
+            }
         }
 
         // [connect]
@@ -177,26 +191,6 @@ public:
             auto dstTask = get(dst);
             dstTask->acceptOneMoreInput();
             NetworkBuilderBase<uint8_t>::connectTasks(srcTask, dstTask);
-        }
-
-        // Set initial ROM data
-        if (auto atROMOpt = bp.atROM(); atROMOpt) {
-            using namespace blueprint;
-            const SingleROM *atROM = std::get_if<SingleROM>(&atROMOpt.value());
-            assert(atROM);
-            auto &rom =
-                *get<TaskPlainROM>({atROM->nodeName, {"rom", "all", 0}});
-
-            for (int i = 0; i < 512 / 4; i++) {
-                int val = 0;
-                for (int j = 3; j >= 0; j--) {
-                    size_t offset = i * 4 + j;
-                    val = (val << 8) | (offset < reqPacket_.rom.size()
-                                            ? reqPacket_.rom[offset]
-                                            : 0x00);
-                }
-                rom.set4le(i << 2, val);
-            }
         }
 
         // Make runner
@@ -234,7 +228,7 @@ public:
 
             numCycles = processCycles(numCycles, os, [&](bool first) {
                 if (dumpOS)
-                    makeResPacket(opt_.numCycles).printAsJSON(*dumpOS);
+                    writeToArchive(*dumpOS, makeResPacket(opt_.numCycles));
 
                 runner.tick();
 
@@ -248,10 +242,10 @@ public:
         }
 
         // Print the results
-        KVSPPlainResPacket resPacket = makeResPacket(numCycles);
+        PlainPacket resPacket = makeResPacket(numCycles);
         if (dumpOS)
-            resPacket.printAsJSON(*dumpOS);
-        return resPacket;
+            writeToArchive(*dumpOS, resPacket);
+        writeToArchive(opt_.outputFile, resPacket);
     }
 };
 
@@ -283,7 +277,7 @@ void processAllGates(PlainNetwork &net, int numWorkers,
     assert(readyQueue.empty());
 }
 
-KVSPPlainResPacket doPlain(const Options &opt)
+void doPlain(const Options &opt)
 {
-    return PlainFrontend{opt}.go();
+    PlainFrontend{opt}.go();
 }

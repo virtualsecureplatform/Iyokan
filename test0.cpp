@@ -1,6 +1,6 @@
 #include "iyokan.hpp"
 
-#include "packet.hpp"
+#include "kvsp-packet.hpp"
 
 //
 #include <fstream>
@@ -691,18 +691,24 @@ void testProgressGraphMaker()
 
 void testDoPlainWithRAMROM()
 {
+    using namespace utility;
+
     // Prepare request packet
     writeToArchive("_test_plain_req_packet00", parseELF("test/test00.elf"));
 
     Options opt;
     opt.blueprint = NetworkBlueprint{"test/cahp-diamond.toml"};
     opt.inputFile = "_test_plain_req_packet00";
+    opt.outputFile = "_test_plain_res_packet00";
     opt.numCycles = 8;
     opt.quiet = true;
 
-    KVSPPlainResPacket resPacket = doPlain(opt);
-    assert(resPacket.flags.at(0) == 1);
-    assert(resPacket.regs.at(0) == 42);
+    doPlain(opt);
+
+    auto resPacket = readFromArchive<PlainPacket>("_test_plain_res_packet00");
+    assert(u8vec2i(resPacket.bits.at("finflag")) == 1);
+    assert(u8vec2i(resPacket.bits.at("reg_x0")) == 42);
+    assert(resPacket.ram.at("ramB").at(12) == 42);
 }
 
 #include "iyokan_tfhepp.hpp"
@@ -758,19 +764,7 @@ public:
     std::string getELFAsPacketFile(const std::string& elfFilePath) const
     {
         // Read packet
-        const auto reqPacket =
-            KVSPReqPacket::make(*sk(), parseELF(elfFilePath));
-        // Write packet into temporary file
-        static const std::string outFilePath = "_test_req_packet00";
-        writeToArchive(outFilePath, reqPacket);
-        return outFilePath;
-    }
-
-    std::string getELFAsPacketFileWithCk(const std::string& elfFilePath) const
-    {
-        // Read packet
-        const auto reqPacket =
-            KVSPReqPacket::makeWithCk(*sk(), parseELF(elfFilePath));
+        auto reqPacket = parseELF(elfFilePath).encrypt(*sk());
         // Write packet into temporary file
         static const std::string outFilePath = "_test_req_packet00";
         writeToArchive(outFilePath, reqPacket);
@@ -899,21 +893,24 @@ void testTFHEppSerialization()
 
 void testDoTFHEWithRAMROM()
 {
+    using namespace utility;
     auto& h = TFHEppTestHelper::instance();
 
     Options opt;
     opt.blueprint = NetworkBlueprint{"test/cahp-diamond.toml"};
-    opt.inputFile = h.getELFAsPacketFileWithCk("test/test00.elf");
+    opt.inputFile = h.getELFAsPacketFile("test/test00.elf");
     opt.outputFile = "_test_res_packet00";
     opt.numCycles = 8;
 
     doTFHE(opt);
 
     writeToArchive("_test_sk", *h.sk());
-    auto resPacket = readFromArchive<KVSPResPacket>("_test_res_packet00");
-    auto plainResPacket = decrypt(*h.sk(), resPacket);
-    assert(plainResPacket.flags.at(0) == 1);
-    assert(plainResPacket.regs.at(0) == 42);
+    auto resPacket = readFromArchive<TFHEPacket>("_test_res_packet00");
+    auto plainResPacket = resPacket.decrypt(*h.sk());
+
+    assert(u8vec2i(plainResPacket.bits.at("finflag")) == 1);
+    assert(u8vec2i(plainResPacket.bits.at("reg_x0")) == 42);
+    assert(plainResPacket.ram.at("ramB").at(12) == 42);
 }
 
 #ifdef IYOKAN_CUDA_ENABLED
@@ -999,21 +996,23 @@ int getOutput(std::shared_ptr<TaskCUFHEGateMem> task)
 
 void testDoCUFHEWithRAMROM()
 {
+    using namespace utility;
     auto& h = TFHEppTestHelper::instance();
 
     Options opt;
     opt.blueprint = NetworkBlueprint{"test/cahp-diamond.toml"};
-    opt.inputFile = h.getELFAsPacketFileWithCk("test/test00.elf");
+    opt.inputFile = h.getELFAsPacketFile("test/test00.elf");
     opt.outputFile = "_test_res_packet00";
     opt.numCycles = 8;
 
     doCUFHE(opt);
 
     writeToArchive("_test_sk", *h.sk());
-    auto resPacket = readFromArchive<KVSPResPacket>("_test_res_packet00");
-    auto plainResPacket = decrypt(*h.sk(), resPacket);
-    assert(plainResPacket.flags.at(0) == 1);
-    assert(plainResPacket.regs.at(0) == 42);
+    auto resPacket = readFromArchive<TFHEPacket>("_test_res_packet00");
+    auto plainResPacket = resPacket.decrypt(*h.sk());
+    assert(u8vec2i(plainResPacket.bits.at("finflag")) == 1);
+    assert(u8vec2i(plainResPacket.bits.at("reg_x0")) == 42);
+    assert(plainResPacket.ram.at("ramB").at(12) == 42);
 }
 
 void testBridgeBetweenCUFHEAndTFHEpp()
@@ -1137,25 +1136,11 @@ void testBlueprint()
     for (int ireg = 0; ireg < 16; ireg++) {
         for (int ibit = 0; ibit < 16; ibit++) {
             const Port& port =
-                blueprint.at(detail::fok("reg_x", ireg), ibit).value();
+                blueprint.at(utility::fok("reg_x", ireg), ibit).value();
             assert(port.nodeName == "core");
-            assert(port.portLabel.portName == detail::fok("io_regOut_x", ireg));
+            assert(port.portLabel.portName == utility::fok("io_regOut_x", ireg));
             assert(port.portLabel.portBit == ibit);
         }
-    }
-
-    {
-        const SingleROM* rom =
-            std::get_if<SingleROM>(&blueprint.atROM().value());
-        assert(rom);
-        assert(rom->nodeName == "rom");
-    }
-
-    {
-        const RAM_AB* ram = std::get_if<RAM_AB>(&blueprint.atRAM().value());
-        assert(ram);
-        assert(ram->nodeAName == "ramA");
-        assert(ram->nodeBName == "ramB");
     }
 }
 

@@ -130,6 +130,11 @@ public:
     {
     }
 
+    size_t size() const
+    {
+        return data_.size() * 4;
+    }
+
     void set4le(size_t addr, uint32_t val)
     {
         assert((addr & 0b11) == 0);
@@ -203,6 +208,11 @@ public:
     {
     }
 
+    size_t size() const
+    {
+        return (1 << ADDRESS_BIT);
+    }
+
     void set(size_t addr, uint8_t val)
     {
         data_.at(addr) = val;
@@ -245,7 +255,7 @@ inline TaskNetwork<uint8_t> makePlainRAMNetwork(const std::string &ramPortName)
     for (size_t i = 0; i < 8; i++) {
         auto taskSplitter = std::make_shared<TaskPlainSplitter>(i);
         builder.addTask(
-            NodeLabel{detail::genid(), "SPLITTER", detail::fok("RAM[", i, "]")},
+            NodeLabel{detail::genid(), "SPLITTER", utility::fok("RAM[", i, "]")},
             0, taskSplitter);
         builder.connectTasks(taskRAM, taskSplitter);
 
@@ -301,7 +311,7 @@ inline TaskNetwork<uint8_t> makePlainROMNetwork()
     for (int i = 0; i < 32; i++) {
         auto taskSplitter = std::make_shared<TaskPlainSplitter>(i);
         builder.addTask(
-            NodeLabel{detail::genid(), "SPLITTER", detail::fok("ROM[", i, "]")},
+            NodeLabel{detail::genid(), "SPLITTER", utility::fok("ROM[", i, "]")},
             0, taskSplitter);
         taskSplitters.push_back(taskSplitter);
 
@@ -319,7 +329,7 @@ inline TaskNetwork<uint8_t> makePlainROMNetwork()
     return TaskNetwork<uint8_t>(std::move(builder));
 }
 
-KVSPPlainResPacket doPlain(const Options &opt);
+void doPlain(const Options &opt);
 void processAllGates(PlainNetwork &net, int numWorkers,
                      std::shared_ptr<ProgressGraphMaker> graph = nullptr);
 

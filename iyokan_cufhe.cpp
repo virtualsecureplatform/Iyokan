@@ -8,14 +8,6 @@ using Name2TFHEppNetMap =
 using Name2CUFHENetMap =
     std::unordered_map<std::string, std::shared_ptr<CUFHENetwork>>;
 
-void dumpResultAsJSON(std::ostream& os, const KVSPResPacket& resPacket,
-                      const std::string& fileSecretKey)
-{
-    auto sk = std::make_shared<TFHEpp::SecretKey>();
-    readFromArchive(*sk, fileSecretKey);
-    decrypt(*sk, resPacket).printAsJSON(os);
-}
-
 template <class T>
 void merge(std::vector<T>& dst, const std::vector<T>& src)
 {
@@ -272,7 +264,7 @@ void makeTFHEppRAMNetworkForCUFHEImpl(
         auto taskINPUT = bt.getTask<TaskTFHEppGateWIRE>("input", "addr", i);
         auto taskCB = std::make_shared<TaskTFHEppCBWithInv>();
         bt.addTask(
-            NodeLabel{detail::genid(), "CBWithInv", detail::fok("[", i, "]")},
+            NodeLabel{detail::genid(), "CBWithInv", utility::fok("[", i, "]")},
             0, taskCB);
         bt.connectTasks(taskINPUT, taskCB);
         cbs.push_back(taskCB);
@@ -314,14 +306,14 @@ void makeTFHEppRAMNetworkForCUFHEImpl(
     for (int i = 0; i < (1 << TaskCUFHERAMUX::ADDRESS_BIT); i++) {
         // Create components...
         auto taskCMUXs = bt.emplaceTask<TaskTFHEppRAMCMUXsForCUFHE>(
-            NodeLabel{detail::genid(), "CMUXs", detail::fok("[", i, "]")}, 0,
+            NodeLabel{detail::genid(), "CMUXs", utility::fok("[", i, "]")}, 0,
             taskRAMUX->get(i).trlwehost, i);
 
         auto taskSEIAndKS = bc.emplaceTask<TaskCUFHERAMSEIAndKS>(
-            NodeLabel{detail::genid(), "SEI&KS", detail::fok("[", i, "]")}, 0);
+            NodeLabel{detail::genid(), "SEI&KS", utility::fok("[", i, "]")}, 0);
 
         auto taskGB = bc.emplaceTask<TaskCUFHERAMGateBootstrapping>(
-            NodeLabel{detail::genid(), "GB", detail::fok("[", i, "]")}, 0,
+            NodeLabel{detail::genid(), "GB", utility::fok("[", i, "]")}, 0,
             taskRAMUX->get(i));
 
         // ... and connect them.
@@ -385,7 +377,7 @@ private:
     std::vector<std::shared_ptr<CUFHE2TFHEppBridge>> bridges0_;
     std::vector<std::shared_ptr<TFHEpp2CUFHEBridge>> bridges1_;
     const Options& opt_;
-    KVSPReqPacket reqPacket_;
+    TFHEPacket reqPacket_;
 
 private:
     template <class T = TaskCUFHEGate>
@@ -433,34 +425,35 @@ private:
         return task;
     }
 
-    KVSPResPacket makeResPacket()
+    TFHEPacket makeResPacket()
     {
-        KVSPResPacket resPacket;
+        TFHEPacket resPacket;
         resPacket.numCycles = opt_.numCycles;
-        // Get values of flags
-        resPacket.flags.push_back(
-            cufhe2tfhepp(get_at("output", "finflag")->get()));
-        // Get values of registers
-        for (int reg = 0; reg < 16; reg++) {
-            resPacket.regs.emplace_back();
-            for (int bit = 0; bit < 16; bit++)
-                resPacket.regs[reg].push_back(cufhe2tfhepp(
-                    get_at("output", detail::fok("reg_x", reg), bit)->get()));
+
+        // Get values of output @port
+        for (auto&& [key, port] : opt_.blueprint->atPorts()) {
+            if (port.portLabel.kind != "output")
+                continue;
+            auto& [atPortName, atPortBit] = key;
+            auto& bits = resPacket.bits[atPortName];
+            if (bits.size() < atPortBit + 1)
+                bits.resize(atPortBit + 1);
+            bits.at(atPortBit) =
+                cufhe2tfhepp(get<TaskCUFHEGateMem>(port)->get());
         }
         // Get values of RAM
-        if (auto atRAMOpt = opt_.blueprint->atRAM(); atRAMOpt) {
-            using namespace blueprint;
-            const RAM_AB* atRAM = std::get_if<RAM_AB>(&*atRAMOpt);
-            assert(atRAM);
-            for (int addr = 0; addr < 512; addr++) {
-                for (int bit = 0; bit < 8; bit++) {
-                    auto& ram = addr % 2 == 1
-                                    ? *get<TaskCUFHERAMUX>(
-                                          {atRAM->nodeAName, {"ram", "", bit}})
-                                    : *get<TaskCUFHERAMUX>(
-                                          {atRAM->nodeBName, {"ram", "", bit}});
-                    resPacket.ramCk.push_back(ram.get(addr / 2).trlwehost);
-                }
+        // FIXME: subset of RAMs?
+        for (auto&& bp : opt_.blueprint->builtinRAMs()) {
+            std::vector<TFHEpp::TRLWElvl1>& dst = resPacket.ram[bp.name];
+            assert(dst.size() == 0);
+            for (int bit = 0; bit < 8; bit++) {
+                auto& ram = *get<TaskCUFHERAMUX>({bp.name, {"ram", "", bit}});
+                if (dst.size() == 0)
+                    dst.resize(ram.size() * 8);
+                else
+                    assert(ram.size() == dst.size() / 8);
+                for (size_t addr = 0; addr < ram.size(); addr++)
+                    dst.at(addr * 8 + bit) = ram.get(addr).trlwehost;
             }
         }
 
@@ -469,26 +462,20 @@ private:
 
     void setInitialRAM()
     {
-        if (auto atRAMOpt = opt_.blueprint->atRAM(); atRAMOpt) {
-            using namespace blueprint;
-            const RAM_AB* atRAM = std::get_if<RAM_AB>(&*atRAMOpt);
-            assert(atRAM);
-            for (int addr = 0; addr < 512; addr++) {
-                for (int bit = 0; bit < 8; bit++) {
-                    auto& ram = addr % 2 == 1
-                                    ? *get<TaskCUFHERAMUX>(
-                                          {atRAM->nodeAName, {"ram", "", bit}})
-                                    : *get<TaskCUFHERAMUX>(
-                                          {atRAM->nodeBName, {"ram", "", bit}});
-                    ram.set(addr / 2, reqPacket_.ramCk.at(addr * 8 + bit));
-                }
+        for (auto&& [name, init] : reqPacket_.ram) {
+            for (int bit = 0; bit < 8; bit++) {
+                auto& ram = *get<TaskCUFHERAMUX>({name, {"ram", "", bit}});
+                if (ram.size() != init.size() / 8)
+                    error::die("Invalid request packet: wrong length of RAM");
+                for (size_t addr = 0; addr < ram.size(); addr++)
+                    ram.set(addr, init.at(addr * 8 + bit));
             }
         }
     }
 
 public:
     CUFHEFrontend(const Options& opt)
-        : opt_(opt), reqPacket_(readFromArchive<KVSPReqPacket>(opt.inputFile))
+        : opt_(opt), reqPacket_(readFromArchive<TFHEPacket>(opt.inputFile))
     {
         assert(opt.blueprint);
     }
@@ -500,7 +487,7 @@ public:
         // Prepare cuFHE
         cufhe::SetGPUNum(1);
         cufhe::SetSeed();
-        cufhe::Initialize(*tfhepp2cufhe(*reqPacket_.gateKey));
+        cufhe::Initialize(*tfhepp2cufhe(*reqPacket_.gk));
 
         // [[file]]
         for (const auto& file : bp.files()) {
@@ -516,7 +503,7 @@ public:
 
         // [[builtin]] type = ram
         for (const auto& ram : bp.builtinRAMs()) {
-            assert(reqPacket_.circuitKey);
+            assert(reqPacket_.ck);
             assert(ram.inAddrWidth == 8 && ram.inWdataWidth == 8 &&
                    ram.outRdataWidth == 8);
 
@@ -528,15 +515,29 @@ public:
         }
 
         // [[builtin]] type = rom
-        for (const auto& rom : bp.builtinROMs()) {
-            assert(reqPacket_.circuitKey);
-            assert(rom.inAddrWidth == 7 && rom.outRdataWidth == 32);
+        for (const auto& bprom : bp.builtinROMs()) {
+            assert(reqPacket_.ck);
+            assert(bprom.inAddrWidth == 7 && bprom.outRdataWidth == 32);
 
             auto net = makeTFHEppROMNetworkForCUFHE();
-            name2cnet_.emplace(rom.name, net.cufheNet);
-            name2tnet_.emplace(rom.name, net.tfheppNet);
+            name2cnet_.emplace(bprom.name, net.cufheNet);
+            name2tnet_.emplace(bprom.name, net.tfheppNet);
             merge(bridges0_, net.bridges0);
             merge(bridges1_, net.bridges1);
+
+            // Set initial ROM data
+            if (auto it = reqPacket_.rom.find(bprom.name);
+                it != reqPacket_.rom.end()) {
+                std::vector<TFHEpp::TRLWElvl1>& init = it->second;
+                auto& rom =
+                    *get<TaskTFHEppROMUX>({bprom.name, {"rom", "all", 0}});
+
+                if (rom.size() != init.size())
+                    error::die("Invalid request packet: wrong length of ROM");
+
+                for (size_t i = 0; i < rom.size(); i++)
+                    rom.set(i, init.at(i));
+            }
         }
 
         // [connect]
@@ -549,27 +550,11 @@ public:
             NetworkBuilderBase<cufhe::Ctxt>::connectTasks(srcTask, dstTask);
         }
 
-        // Set initial ROM data
-        if (auto atROMOpt = bp.atROM(); atROMOpt) {
-            using namespace blueprint;
-            const SingleROM* atROM = std::get_if<SingleROM>(&atROMOpt.value());
-            assert(atROM);
-            auto& rom =
-                *get<TaskTFHEppROMUX>({atROM->nodeName, {"rom", "all", 0}});
-
-            const int ROM_UNIT = 1024 / 8;
-            assert(reqPacket_.romCk.size() == 512 / ROM_UNIT);
-            for (int i = 0; i < 512 / ROM_UNIT; i++) {
-                int offset = ROM_UNIT * i;
-                rom.set128le(offset, reqPacket_.romCk[i]);
-            }
-        }
-
         // Make runner
         CUFHENetworkRunner runner{
             opt_.numGPUWorkers, opt_.numCPUWorkers,
-            TFHEppWorkerInfo{TFHEpp::lweParams{}, reqPacket_.gateKey,
-                             reqPacket_.circuitKey}};
+            TFHEppWorkerInfo{TFHEpp::lweParams{}, reqPacket_.gk,
+                             reqPacket_.ck}};
         for (auto&& p : name2cnet_)
             runner.addNetwork(p.second);
         for (auto&& p : name2tnet_)
@@ -605,8 +590,7 @@ public:
 
             processCycles(opt_.numCycles, os, [&](bool first) {
                 if (dumpOS)
-                    dumpResultAsJSON(*dumpOS, makeResPacket(),
-                                     opt_.secretKey.value());
+                    writeToArchive(*dumpOS, makeResPacket());
 
                 runner.tick();
 
@@ -619,9 +603,9 @@ public:
         }
 
         // Dump result packet
-        KVSPResPacket resPacket = makeResPacket();
+        TFHEPacket resPacket = makeResPacket();
         if (dumpOS)
-            dumpResultAsJSON(*dumpOS, resPacket, opt_.secretKey.value());
+            writeToArchive(*dumpOS, resPacket);
         writeToArchive(opt_.outputFile, resPacket);
 
         // Clean cuFHE up

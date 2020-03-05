@@ -230,6 +230,16 @@ public:
     {
     }
 
+    size_t size() const
+    {
+        return data_.size();
+    }
+
+    void set(size_t index, TFHEpp::TRLWElvl1 val)
+    {
+        data_.at(index) = val;
+    }
+
     void set128le(size_t addr, TFHEpp::TRLWElvl1 val)
     {
         assert((addr & 0b1111111) == 0);
@@ -331,6 +341,11 @@ public:
               ADDRESS_BIT),
           data_(1 << ADDRESS_BIT)
     {
+    }
+
+    size_t size() const
+    {
+        return 1 << ADDRESS_BIT;
     }
 
     const TFHEpp::TRLWElvl1 &get(size_t addr) const
@@ -543,7 +558,7 @@ inline void makeTFHEppRAMNetworkImpl(
             builder.getTask<TaskTFHEppGateWIRE>("input", "addr", i);
         auto taskCB = std::make_shared<TaskTFHEppCBWithInv>();
         builder.addTask(
-            NodeLabel{detail::genid(), "CBWithInv", detail::fok("[", i, "]")},
+            NodeLabel{detail::genid(), "CBWithInv", utility::fok("[", i, "]")},
             0, taskCB);
         builder.connectTasks(taskINPUT, taskCB);
         cbs.push_back(taskCB);
@@ -587,18 +602,18 @@ inline void makeTFHEppRAMNetworkImpl(
         auto taskCMUXs =
             std::make_shared<TaskTFHEppRAMCMUXs>(taskRAMUX->get(i), i);
         builder.addTask(
-            NodeLabel{detail::genid(), "CMUXs", detail::fok("[", i, "]")}, 0,
+            NodeLabel{detail::genid(), "CMUXs", utility::fok("[", i, "]")}, 0,
             taskCMUXs);
 
         auto taskSEI = std::make_shared<TaskTFHEppSEI>(0);
         builder.addTask(
-            NodeLabel{detail::genid(), "SEI", detail::fok("[", i, "]")}, 0,
+            NodeLabel{detail::genid(), "SEI", utility::fok("[", i, "]")}, 0,
             taskSEI);
 
         auto taskGB =
             std::make_shared<TaskTFHEppRAMGateBootstrapping>(taskRAMUX->get(i));
         builder.addTask(
-            NodeLabel{detail::genid(), "GB", detail::fok("[", i, "]")}, 0,
+            NodeLabel{detail::genid(), "GB", utility::fok("[", i, "]")}, 0,
             taskGB);
 
         // ... and connect them.
@@ -666,7 +681,7 @@ inline TaskNetwork<TFHEppWorkerInfo> makeTFHEppROMNetwork()
             detail::genid(), 0, "addr", i, false);
         auto taskCB = std::make_shared<TaskTFHEppCB>();
         builder.addTask(
-            NodeLabel{detail::genid(), "CB", detail::fok("[", i, "]")}, 0,
+            NodeLabel{detail::genid(), "CB", utility::fok("[", i, "]")}, 0,
             taskCB);
         builder.connectTasks(taskINPUT, taskCB);
         cbs.push_back(taskCB);
@@ -685,7 +700,7 @@ inline TaskNetwork<TFHEppWorkerInfo> makeTFHEppROMNetwork()
     for (int i = 0; i < 32; i++) {
         auto taskSEI = std::make_shared<TaskTFHEppSEI>(i);
         builder.addTask(
-            NodeLabel{detail::genid(), "SEI", detail::fok("[", i, "]")}, 0,
+            NodeLabel{detail::genid(), "SEI", utility::fok("[", i, "]")}, 0,
             taskSEI);
         builder.connectTasks(taskROMUX, taskSEI);
 

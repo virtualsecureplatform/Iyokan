@@ -33,6 +33,7 @@
 #include <toml.hpp>
 
 #include "error.hpp"
+#include "utility.hpp"
 
 // Forward declarations
 template <class WorkerInfo>
@@ -47,31 +48,11 @@ class TaskNetwork;
 class ProgressGraphMaker;
 
 namespace detail {
-template <class... Args>
-std::string fok(Args... args)
-{
-    std::stringstream ss;
-    (ss << ... << args);
-    return ss.str();
-}
-
 inline int genid()
 {
     // FIXME: Assume that ids over (1 << 16) will not be passed by the user.
     static int id = (1 << 16);
     return id++;
-}
-
-inline std::vector<std::string> regexMatch(const std::string &text,
-                                           const std::regex &re)
-{
-    std::vector<std::string> ret;
-    std::smatch m;
-    if (!std::regex_match(text, m, re))
-        return ret;
-    for (auto &&elm : m)
-        ret.push_back(elm.str());
-    return ret;
 }
 
 }  // namespace detail
@@ -768,7 +749,7 @@ public:
                                 const std::string &portName, int portBit,
                                 Args &&... args)
     {
-        NodeLabel label{id, "INPUT", detail::fok(portName, "[", portBit, "]")};
+        NodeLabel label{id, "INPUT", utility::fok(portName, "[", portBit, "]")};
         auto task = std::make_shared<T>(std::forward<Args>(args)...);
         addTask(label, priority, task);
         registerTask("input", portName, portBit, task);
@@ -780,7 +761,7 @@ public:
                                  const std::string &portName, int portBit,
                                  Args &&... args)
     {
-        NodeLabel label{id, "OUTPUT", detail::fok(portName, "[", portBit, "]")};
+        NodeLabel label{id, "OUTPUT", utility::fok(portName, "[", portBit, "]")};
         auto task = std::make_shared<T>(std::forward<Args>(args)...);
         addTask(label, priority, task);
         registerTask("output", portName, portBit, task);
@@ -822,7 +803,7 @@ private:
     {
         auto task = std::make_shared<TaskTypeWIRE>(inputNeeded);
         this->addTask(
-            NodeLabel{id, "WIRE", detail::fok(portName, "[", portBit, "]")},
+            NodeLabel{id, "WIRE", utility::fok(portName, "[", portBit, "]")},
             priority, task);
         this->registerTask(kind, portName, portBit, task);
     }
@@ -1262,15 +1243,6 @@ struct Port {
         return nodeName == rhs.nodeName && portLabel == rhs.portLabel;
     }
 };
-struct SingleROM {
-    std::string nodeName;
-};
-struct RAM_AB {
-    std::string nodeAName, nodeBName;
-};
-
-using ROM = std::variant<std::monostate, SingleROM>;
-using RAM = std::variant<std::monostate, RAM_AB>;
 }  // namespace blueprint
 
 class NetworkBlueprint {
@@ -1281,8 +1253,6 @@ private:
     std::vector<std::pair<blueprint::Port, blueprint::Port>> edges_;
 
     std::map<std::tuple<std::string, int>, blueprint::Port> atPorts_;
-    std::optional<blueprint::ROM> rom_;
-    std::optional<blueprint::RAM> ram_;
 
 private:
     std::vector<blueprint::Port> parsePortString(const std::string &src,
@@ -1291,7 +1261,7 @@ private:
         std::string nodeName, portName;
         int portBitFrom, portBitTo;
 
-        auto match = detail::regexMatch(
+        auto match = utility::regexMatch(
             src, std::regex(
                      R"(^@?(?:([^/]+)/)?([^[]+)(?:\[([0-9]+):([0-9]+)\])?$)"));
         if (match.empty())
@@ -1378,29 +1348,13 @@ public:
             for (const auto &[srcKey, srcValue] : srcConnect) {
                 std::string srcTo = srcKey,
                             srcFrom = toml::get<std::string>(srcValue),
-                            errMsg = detail::fok("Invalid connect: ", srcTo,
+                            errMsg = utility::fok("Invalid connect: ", srcTo,
                                                  " = ", srcFrom);
 
                 // Check if input is correct.
                 if (srcTo.empty() || srcFrom.empty() ||
                     (srcTo[0] == '@' && srcFrom[0] == '@'))
                     error::die(errMsg);
-
-                // @rom = ...
-                if (srcTo == "@rom") {
-                    rom_ = blueprint::SingleROM{srcFrom};
-                    continue;
-                }
-
-                // @ram = ...
-                if (srcTo == "@ram") {
-                    auto match = detail::regexMatch(
-                        srcFrom, std::regex("^AB:([^:]+):(.+)$"));
-                    if (match.size() != 1 + 2)
-                        error::die(errMsg);
-                    ram_ = blueprint::RAM_AB{match[1], match[2]};
-                    continue;
-                }
 
                 // Others.
                 std::vector<blueprint::Port> portsTo = parsePortString(srcTo,
@@ -1459,6 +1413,12 @@ public:
         return edges_;
     }
 
+    const std::map<std::tuple<std::string, int>, blueprint::Port> &atPorts()
+        const
+    {
+        return atPorts_;
+    }
+
     std::optional<blueprint::Port> at(const std::string &portName,
                                       int portBit = 0) const
     {
@@ -1466,16 +1426,6 @@ public:
         if (it == atPorts_.end())
             return std::nullopt;
         return it->second;
-    }
-
-    const std::optional<blueprint::ROM> &atROM() const
-    {
-        return rom_;
-    }
-
-    const std::optional<blueprint::RAM> &atRAM() const
-    {
-        return ram_;
     }
 };
 

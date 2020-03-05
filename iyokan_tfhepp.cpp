@@ -6,14 +6,6 @@ namespace {
 using Name2NetMap =
     std::unordered_map<std::string, std::shared_ptr<TFHEppNetwork>>;
 
-void dumpResultAsJSON(std::ostream &os, const KVSPResPacket &resPacket,
-                      const std::string &fileSecretKey)
-{
-    auto sk = std::make_shared<TFHEpp::SecretKey>();
-    readFromArchive(*sk, fileSecretKey);
-    decrypt(*sk, resPacket).printAsJSON(os);
-}
-
 class TFHEppNetworkRunner {
 private:
     NetworkRunner<TFHEppWorkerInfo, TFHEppWorker> tfhepp_;
@@ -60,7 +52,7 @@ class TFHEppFrontend {
 private:
     Name2NetMap name2net_;
     const Options &opt_;
-    KVSPReqPacket reqPacket_;
+    TFHEPacket reqPacket_;
 
 private:
     template <class T = TaskTFHEppGate>
@@ -92,33 +84,34 @@ private:
         return task;
     }
 
-    KVSPResPacket makeResPacket()
+    TFHEPacket makeResPacket()
     {
-        KVSPResPacket resPacket;
+        TFHEPacket resPacket;
         resPacket.numCycles = opt_.numCycles;
-        // Get values of flags
-        resPacket.flags.push_back(get_at("output", "finflag")->get());
-        // Get values of registers
-        for (int reg = 0; reg < 16; reg++) {
-            resPacket.regs.emplace_back();
-            for (int bit = 0; bit < 16; bit++)
-                resPacket.regs[reg].push_back(
-                    get_at("output", detail::fok("reg_x", reg), bit)->get());
+
+        // Get values of output @port
+        for (auto &&[key, port] : opt_.blueprint->atPorts()) {
+            if (port.portLabel.kind != "output")
+                continue;
+            auto &[atPortName, atPortBit] = key;
+            auto &bits = resPacket.bits[atPortName];
+            if (bits.size() < atPortBit + 1)
+                bits.resize(atPortBit + 1);
+            bits.at(atPortBit) = get<TaskTFHEppGateMem>(port)->get();
         }
         // Get values of RAM
-        if (auto atRAMOpt = opt_.blueprint->atRAM(); atRAMOpt) {
-            using namespace blueprint;
-            const RAM_AB *atRAM = std::get_if<RAM_AB>(&*atRAMOpt);
-            assert(atRAM);
-            for (int addr = 0; addr < 512; addr++) {
-                for (int bit = 0; bit < 8; bit++) {
-                    auto &ram = addr % 2 == 1
-                                    ? *get<TaskTFHEppRAMUX>(
-                                          {atRAM->nodeAName, {"ram", "", bit}})
-                                    : *get<TaskTFHEppRAMUX>(
-                                          {atRAM->nodeBName, {"ram", "", bit}});
-                    resPacket.ramCk.push_back(ram.get(addr / 2));
-                }
+        // FIXME: subset of RAMs?
+        for (auto &&bp : opt_.blueprint->builtinRAMs()) {
+            std::vector<TFHEpp::TRLWElvl1> &dst = resPacket.ram[bp.name];
+            assert(dst.size() == 0);
+            for (int bit = 0; bit < 8; bit++) {
+                auto &ram = *get<TaskTFHEppRAMUX>({bp.name, {"ram", "", bit}});
+                if (dst.size() == 0)
+                    dst.resize(ram.size() * 8);
+                else
+                    assert(ram.size() == dst.size() / 8);
+                for (size_t addr = 0; addr < ram.size(); addr++)
+                    dst.at(addr * 8 + bit) = ram.get(addr);
             }
         }
 
@@ -127,26 +120,20 @@ private:
 
     void setInitialRAM()
     {
-        if (auto atRAMOpt = opt_.blueprint->atRAM(); atRAMOpt) {
-            using namespace blueprint;
-            const RAM_AB *atRAM = std::get_if<RAM_AB>(&*atRAMOpt);
-            assert(atRAM);
-            for (int addr = 0; addr < 512; addr++) {
-                for (int bit = 0; bit < 8; bit++) {
-                    auto &ram = addr % 2 == 1
-                                    ? *get<TaskTFHEppRAMUX>(
-                                          {atRAM->nodeAName, {"ram", "", bit}})
-                                    : *get<TaskTFHEppRAMUX>(
-                                          {atRAM->nodeBName, {"ram", "", bit}});
-                    ram.set(addr / 2, reqPacket_.ramCk.at(addr * 8 + bit));
-                }
+        for (auto &&[name, init] : reqPacket_.ram) {
+            for (int bit = 0; bit < 8; bit++) {
+                auto &ram = *get<TaskTFHEppRAMUX>({name, {"ram", "", bit}});
+                if (ram.size() != init.size() / 8)
+                    error::die("Invalid request packet: wrong length of RAM");
+                for (size_t addr = 0; addr < ram.size(); addr++)
+                    ram.set(addr, init.at(addr * 8 + bit));
             }
         }
     }
 
 public:
     TFHEppFrontend(const Options &opt)
-        : opt_(opt), reqPacket_(readFromArchive<KVSPReqPacket>(opt.inputFile))
+        : opt_(opt), reqPacket_(readFromArchive<TFHEPacket>(opt.inputFile))
     {
         assert(opt.blueprint);
     }
@@ -170,20 +157,36 @@ public:
 
         // [[builtin]] type = ram
         for (const auto &ram : bp.builtinRAMs()) {
-            assert(reqPacket_.circuitKey);
+            assert(reqPacket_.ck);
             assert(ram.inAddrWidth == 8 && ram.inWdataWidth == 8 &&
                    ram.outRdataWidth == 8);
+
             auto net =
                 std::make_shared<TFHEppNetwork>(makeTFHEppRAMNetwork(""));
             name2net_.emplace(ram.name, net);
         }
 
         // [[builtin]] type = rom
-        for (const auto &rom : bp.builtinROMs()) {
-            assert(reqPacket_.circuitKey);
-            assert(rom.inAddrWidth == 7 && rom.outRdataWidth == 32);
+        for (const auto &bprom : bp.builtinROMs()) {
+            assert(reqPacket_.ck);
+            assert(bprom.inAddrWidth == 7 && bprom.outRdataWidth == 32);
+
             auto net = std::make_shared<TFHEppNetwork>(makeTFHEppROMNetwork());
-            name2net_.emplace(rom.name, net);
+            name2net_.emplace(bprom.name, net);
+
+            // Set initial ROM data
+            if (auto it = reqPacket_.rom.find(bprom.name);
+                it != reqPacket_.rom.end()) {
+                std::vector<TFHEpp::TRLWElvl1> &init = it->second;
+                auto &rom =
+                    *get<TaskTFHEppROMUX>({bprom.name, {"rom", "all", 0}});
+
+                if (rom.size() != init.size())
+                    error::die("Invalid request packet: wrong length of ROM");
+
+                for (size_t i = 0; i < rom.size(); i++)
+                    rom.set(i, init.at(i));
+            }
         }
 
         // [connect]
@@ -197,25 +200,8 @@ public:
                                                                dstTask);
         }
 
-        // Set initial ROM data
-        if (auto atROMOpt = bp.atROM(); atROMOpt) {
-            using namespace blueprint;
-            const SingleROM *atROM = std::get_if<SingleROM>(&atROMOpt.value());
-            assert(atROM);
-            auto &rom =
-                *get<TaskTFHEppROMUX>({atROM->nodeName, {"rom", "all", 0}});
-
-            const int ROM_UNIT = 1024 / 8;
-            assert(reqPacket_.romCk.size() == 512 / ROM_UNIT);
-            for (int i = 0; i < 512 / ROM_UNIT; i++) {
-                int offset = ROM_UNIT * i;
-                rom.set128le(offset, reqPacket_.romCk[i]);
-            }
-        }
-
         // Make runner
-        TFHEppWorkerInfo wi{TFHEpp::lweParams{}, reqPacket_.gateKey,
-                            reqPacket_.circuitKey};
+        TFHEppWorkerInfo wi{TFHEpp::lweParams{}, reqPacket_.gk, reqPacket_.ck};
         TFHEppNetworkRunner runner{opt_.numCPUWorkers, wi};
         for (auto &&p : name2net_)
             runner.addNetwork(p.second);
@@ -245,8 +231,7 @@ public:
 
             processCycles(opt_.numCycles, os, [&](bool first) {
                 if (dumpOS)
-                    dumpResultAsJSON(*dumpOS, makeResPacket(),
-                                     opt_.secretKey.value());
+                    writeToArchive(*dumpOS, makeResPacket());
 
                 runner.tick();
 
@@ -260,9 +245,9 @@ public:
         }
 
         // Dump result packet
-        KVSPResPacket resPacket = makeResPacket();
+        TFHEPacket resPacket = makeResPacket();
         if (dumpOS)
-            dumpResultAsJSON(*dumpOS, resPacket, opt_.secretKey.value());
+            writeToArchive(*dumpOS, resPacket);
         writeToArchive(opt_.outputFile, resPacket);
     }
 };

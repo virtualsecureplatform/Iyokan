@@ -56,6 +56,3 @@ out_rdata_width = 8
 "@reg_x13[0:15]" = "core/io_regOut_x13[0:15]"
 "@reg_x14[0:15]" = "core/io_regOut_x14[0:15]"
 "@reg_x15[0:15]" = "core/io_regOut_x15[0:15]"
-
-"@ram" = "AB:ramA:ramB"
-"@rom" = "rom"
