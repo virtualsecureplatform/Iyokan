@@ -1301,7 +1301,7 @@ public:
         const auto src = toml::parse(fileName);
 
         // Find working directory of config
-        fs::path wd = fileName;
+        fs::path wd = fs::absolute(fileName);
         wd.remove_filename();
 
         // [[file]]
