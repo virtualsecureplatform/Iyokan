@@ -104,9 +104,9 @@ void capTFHEppNetWithCUFHEWIRE(CUFHENetworkWithTFHEpp& net)
             auto tfheppINPUT = std::dynamic_pointer_cast<TaskTFHEppGate>(mem);
             assert(tfheppINPUT);
             auto cufheINPUT = bc.addINPUT<TaskCUFHEGateWIRE>(
-                detail::genid(), /* FIXME */ 0, portName, portBit, false);
+                detail::genid(), portName, portBit, false);
             auto cufhe2tfhepp = bt.emplaceTask<TaskCUFHE2TFHEpp>(
-                NodeLabel{detail::genid(), "cufhe2tfhepp", ""}, 0);
+                NodeLabel{detail::genid(), "cufhe2tfhepp", ""});
             // Connect nodes
             brs0.push_back(connectWithBridge(cufheINPUT, cufhe2tfhepp));
             tfheppINPUT->acceptOneMoreInput();
@@ -120,9 +120,9 @@ void capTFHEppNetWithCUFHEWIRE(CUFHENetworkWithTFHEpp& net)
             auto tfheppOUTPUT = std::dynamic_pointer_cast<TaskTFHEppGate>(mem);
             assert(tfheppOUTPUT);
             auto cufheOUTPUT = bc.addOUTPUT<TaskCUFHEGateWIRE>(
-                detail::genid(), /* FIXME */ 0, portName, portBit, true);
+                detail::genid(), portName, portBit, true);
             auto tfhepp2cufhe = bt.emplaceTask<TaskTFHEpp2CUFHE>(
-                NodeLabel{detail::genid(), "tfhepp2cufhe", ""}, 0);
+                NodeLabel{detail::genid(), "tfhepp2cufhe", ""});
             // Connect nodes
             bt.connectTasks(tfheppOUTPUT, tfhepp2cufhe);
             brs1.push_back(connectWithBridge(tfhepp2cufhe, cufheOUTPUT));
@@ -160,8 +160,7 @@ void connectCUFHENetWithTFHEppNet(
         // Add the task cufhe2tfhepp to the network tfhepp.
         NetworkBuilderBase<TFHEppWorkerInfo> b;
         auto cufhe2tfhepp = std::make_shared<TaskCUFHE2TFHEpp>();
-        b.addTask(NodeLabel{detail::genid(), "cufhe2tfhepp", ""}, 0,
-                  cufhe2tfhepp);
+        b.addTask(NodeLabel{detail::genid(), "cufhe2tfhepp", ""}, cufhe2tfhepp);
         TFHEppNetwork net = std::move(b);
         tfhepp = tfhepp.merge(net);
 
@@ -185,8 +184,7 @@ void connectCUFHENetWithTFHEppNet(
         // Add the task tfhepp2cufhe to the network tfhepp.
         NetworkBuilderBase<TFHEppWorkerInfo> b;
         auto tfhepp2cufhe = std::make_shared<TaskTFHEpp2CUFHE>();
-        b.addTask(NodeLabel{detail::genid(), "tfhepp2cufhe", ""}, 0,
-                  tfhepp2cufhe);
+        b.addTask(NodeLabel{detail::genid(), "tfhepp2cufhe", ""}, tfhepp2cufhe);
         TFHEppNetwork net = std::move(b);
         tfhepp = tfhepp.merge(net);
 
@@ -265,14 +263,14 @@ void makeTFHEppRAMNetworkForCUFHEImpl(
         auto taskCB = std::make_shared<TaskTFHEppCBWithInv>();
         bt.addTask(
             NodeLabel{detail::genid(), "CBWithInv", utility::fok("[", i, "]")},
-            0, taskCB);
+            taskCB);
         bt.connectTasks(taskINPUT, taskCB);
         cbs.push_back(taskCB);
     }
 
     // Create RAMUX.
-    auto taskRAMUX = bt.emplaceTask<TaskCUFHERAMUX>(
-        NodeLabel{detail::genid(), "RAMUX", ""}, 0);
+    auto taskRAMUX =
+        bt.emplaceTask<TaskCUFHERAMUX>(NodeLabel{detail::genid(), "RAMUX", ""});
     bt.registerTask("ram", ramPortName, indexByte, taskRAMUX);
 
     // Connect CBs and RAMUX.
@@ -281,7 +279,7 @@ void makeTFHEppRAMNetworkForCUFHEImpl(
 
     // Create SEIs and connect with CBs.
     auto taskSEI0 = std::make_shared<TaskTFHEppSEI>(0);
-    bt.addTask(NodeLabel{detail::genid(), "SEI", "[0]"}, 0, taskSEI0);
+    bt.addTask(NodeLabel{detail::genid(), "SEI", "[0]"}, taskSEI0);
     bt.connectTasks(taskRAMUX, taskSEI0);
 
     // Create output for read-out data and connect.
@@ -297,7 +295,7 @@ void makeTFHEppRAMNetworkForCUFHEImpl(
 
     // Create MUXWoSE and connect.
     auto taskMUXWoSE = std::make_shared<TaskTFHEppGateMUXWoSE>();
-    bt.addTask(NodeLabel{detail::genid(), "MUXWoSE", ""}, 0, taskMUXWoSE);
+    bt.addTask(NodeLabel{detail::genid(), "MUXWoSE", ""}, taskMUXWoSE);
     bt.connectTasks(taskSEI0, taskMUXWoSE);
     bt.connectTasks(taskInputWriteData, taskMUXWoSE);
     bt.connectTasks(taskInputWriteEnabled, taskMUXWoSE);
@@ -306,14 +304,14 @@ void makeTFHEppRAMNetworkForCUFHEImpl(
     for (int i = 0; i < (1 << TaskCUFHERAMUX::ADDRESS_BIT); i++) {
         // Create components...
         auto taskCMUXs = bt.emplaceTask<TaskTFHEppRAMCMUXsForCUFHE>(
-            NodeLabel{detail::genid(), "CMUXs", utility::fok("[", i, "]")}, 0,
+            NodeLabel{detail::genid(), "CMUXs", utility::fok("[", i, "]")},
             taskRAMUX->get(i).trlwehost, i);
 
         auto taskSEIAndKS = bc.emplaceTask<TaskCUFHERAMSEIAndKS>(
-            NodeLabel{detail::genid(), "SEI&KS", utility::fok("[", i, "]")}, 0);
+            NodeLabel{detail::genid(), "SEI&KS", utility::fok("[", i, "]")});
 
         auto taskGB = bc.emplaceTask<TaskCUFHERAMGateBootstrapping>(
-            NodeLabel{detail::genid(), "GB", utility::fok("[", i, "]")}, 0,
+            NodeLabel{detail::genid(), "GB", utility::fok("[", i, "]")},
             taskRAMUX->get(i));
 
         // ... and connect them.
@@ -335,17 +333,17 @@ CUFHENetworkWithTFHEpp makeTFHEppRAMNetworkForCUFHE(
 
     // Inputs for address.
     for (size_t i = 0; i < TaskCUFHERAMUX::ADDRESS_BIT; i++)
-        bt.addINPUT<TaskTFHEppGateWIRE>(detail::genid(), 0, "addr", i, false);
+        bt.addINPUT<TaskTFHEppGateWIRE>(detail::genid(), "addr", i, false);
 
     // Input for write-in flag.
-    bt.addINPUT<TaskTFHEppGateWIRE>(detail::genid(), 0, "wren", 0, false);
+    bt.addINPUT<TaskTFHEppGateWIRE>(detail::genid(), "wren", 0, false);
 
     for (int indexByte = 0; indexByte < 8; indexByte++) {
         // Input for data to write into RAM.
-        bt.addINPUT<TaskTFHEppGateWIRE>(detail::genid(), 0, "wdata", indexByte,
+        bt.addINPUT<TaskTFHEppGateWIRE>(detail::genid(), "wdata", indexByte,
                                         false);
         // Output for data to be read from RAM.
-        bt.addOUTPUT<TaskTFHEppGateWIRE>(detail::genid(), 0, "rdata", indexByte,
+        bt.addOUTPUT<TaskTFHEppGateWIRE>(detail::genid(), "rdata", indexByte,
                                          true);
 
         makeTFHEppRAMNetworkForCUFHEImpl(bc, bt, bridge0, bridge1, ramPortName,

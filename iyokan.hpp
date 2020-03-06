@@ -212,8 +212,7 @@ private:
     NodeLabel label_;
 
 public:
-    DepNodeBase(int priority, NodeLabel label)
-        : priority_(priority), label_(std::move(label))
+    DepNodeBase(NodeLabel label) : priority_(-1), label_(std::move(label))
     {
     }
 
@@ -403,9 +402,8 @@ private:
     std::vector<std::weak_ptr<DepNode>> dependents_;
 
 public:
-    DepNode(int priority, std::shared_ptr<TaskBase<WorkerInfo>> task,
-            NodeLabel label)
-        : DepNodeBase(priority, std::move(label)),
+    DepNode(std::shared_ptr<TaskBase<WorkerInfo>> task, NodeLabel label)
+        : DepNodeBase(std::move(label)),
           hasQueued_(false),
           task_(std::move(task))
     {
@@ -917,22 +915,19 @@ public:
             namedMems_.at(TaskLabel{kind, portName, portBit}));
     }
 
-    void addTask(NodeLabel label, int priority,
-                 std::shared_ptr<TaskBase<WorkerInfo>> task)
+    void addTask(NodeLabel label, std::shared_ptr<TaskBase<WorkerInfo>> task)
     {
-        auto depnode =
-            std::make_shared<DepNode<WorkerInfo>>(priority, task, label);
+        auto depnode = std::make_shared<DepNode<WorkerInfo>>(task, label);
         depnode->prepareTaskBase();
         auto [it, inserted] = id2node_.emplace(label.id, depnode);
         assert(inserted);
     }
 
     template <class T, class... Args>
-    std::shared_ptr<T> emplaceTask(NodeLabel label, int priority,
-                                   Args &&... args)
+    std::shared_ptr<T> emplaceTask(NodeLabel label, Args &&... args)
     {
         auto task = std::make_shared<T>(std::forward<Args>(args)...);
-        addTask(label, priority, task);
+        addTask(label, task);
         return task;
     }
 
@@ -946,26 +941,24 @@ public:
     }
 
     template <class T, class... Args>
-    std::shared_ptr<T> addINPUT(int id, int priority,
-                                const std::string &portName, int portBit,
-                                Args &&... args)
+    std::shared_ptr<T> addINPUT(int id, const std::string &portName,
+                                int portBit, Args &&... args)
     {
         NodeLabel label{id, "INPUT", utility::fok(portName, "[", portBit, "]")};
         auto task = std::make_shared<T>(std::forward<Args>(args)...);
-        addTask(label, priority, task);
+        addTask(label, task);
         registerTask("input", portName, portBit, task);
         return task;
     }
 
     template <class T, class... Args>
-    std::shared_ptr<T> addOUTPUT(int id, int priority,
-                                 const std::string &portName, int portBit,
-                                 Args &&... args)
+    std::shared_ptr<T> addOUTPUT(int id, const std::string &portName,
+                                 int portBit, Args &&... args)
     {
         NodeLabel label{id, "OUTPUT",
                         utility::fok(portName, "[", portBit, "]")};
         auto task = std::make_shared<T>(std::forward<Args>(args)...);
-        addTask(label, priority, task);
+        addTask(label, task);
         registerTask("output", portName, portBit, task);
         return task;
     }
@@ -987,57 +980,53 @@ public:
     using ParamTaskTypeMem = TaskTypeMem;
 
 private:
-    std::shared_ptr<TaskTypeDFF> addDFF(int id, int priority = 0)
+    std::shared_ptr<TaskTypeDFF> addDFF(int id)
     {
         auto task = std::make_shared<TaskTypeDFF>();
-        this->addTask(NodeLabel{id, "DFF", ""}, priority, task);
+        this->addTask(NodeLabel{id, "DFF", ""}, task);
         return task;
     }
 
     void addNamedDFF(int id, const std::string &kind,
-                     const std::string &portName, int portBit, int priority)
+                     const std::string &portName, int portBit)
     {
-        this->registerTask(kind, portName, portBit, addDFF(id, priority));
+        this->registerTask(kind, portName, portBit, addDFF(id));
     }
 
     void addNamedWIRE(bool inputNeeded, int id, const std::string &kind,
-                      const std::string &portName, int portBit, int priority)
+                      const std::string &portName, int portBit)
     {
         auto task = std::make_shared<TaskTypeWIRE>(inputNeeded);
         this->addTask(
             NodeLabel{id, "WIRE", utility::fok(portName, "[", portBit, "]")},
-            priority, task);
+            task);
         this->registerTask(kind, portName, portBit, task);
     }
 
 public:
-    void DFF(int id, int priority = 0)
+    void DFF(int id)
     {
-        addDFF(id, priority);
+        addDFF(id);
     }
 
-    void ROM(int id, const std::string &portName, int portBit, int priority = 0)
+    void ROM(int id, const std::string &portName, int portBit)
     {
-        addNamedWIRE(false, id, "rom", portName, portBit, priority);
+        addNamedWIRE(false, id, "rom", portName, portBit);
     }
 
-    void RAM(int id, const std::string &portName, int portBit, int priority = 0)
+    void RAM(int id, const std::string &portName, int portBit)
     {
-        addNamedDFF(id, "ram", portName, portBit, priority);
+        addNamedDFF(id, "ram", portName, portBit);
     }
 
-    void INPUT(int id, const std::string &portName, int portBit,
-               int priority = 0)
+    void INPUT(int id, const std::string &portName, int portBit)
     {
-        this->template addINPUT<TaskTypeWIRE>(id, priority, portName, portBit,
-                                              false);
+        this->template addINPUT<TaskTypeWIRE>(id, portName, portBit, false);
     }
 
-    void OUTPUT(int id, const std::string &portName, int portBit,
-                int priority = 0)
+    void OUTPUT(int id, const std::string &portName, int portBit)
     {
-        this->template addOUTPUT<TaskTypeWIRE>(id, priority, portName, portBit,
-                                               true);
+        this->template addOUTPUT<TaskTypeWIRE>(id, portName, portBit, true);
     }
 
     void connect(int from, int to)
@@ -1047,15 +1036,15 @@ public:
             std::dynamic_pointer_cast<TaskType>(this->node(to)->task()));
     }
 
-#define DEFINE_GATE(name)                                        \
-protected:                                                       \
-    virtual std::shared_ptr<TaskType> name##Impl() = 0;          \
-                                                                 \
-public:                                                          \
-    void name(int id, int priority = 0)                          \
-    {                                                            \
-        auto task = name##Impl();                                \
-        this->addTask(NodeLabel{id, #name, ""}, priority, task); \
+#define DEFINE_GATE(name)                               \
+protected:                                              \
+    virtual std::shared_ptr<TaskType> name##Impl() = 0; \
+                                                        \
+public:                                                 \
+    void name(int id)                                   \
+    {                                                   \
+        auto task = name##Impl();                       \
+        this->addTask(NodeLabel{id, #name, ""}, task);  \
     }
     DEFINE_GATE(AND);
     DEFINE_GATE(NAND);
@@ -1105,39 +1094,37 @@ void readNetworkFromJSONImpl(NetworkBuilder &builder, picojson::value &v)
         int id = static_cast<int>(port.at("id").get<double>());
         std::string portName = port.at("portName").get<std::string>();
         int portBit = static_cast<int>(port.at("portBit").get<double>());
-        int priority = static_cast<int>(port.at("priority").get<double>());
         if (type == "input")
-            builder.INPUT(id, portName, portBit, priority);
+            builder.INPUT(id, portName, portBit);
         else if (type == "output")
-            builder.OUTPUT(id, portName, portBit, priority);
+            builder.OUTPUT(id, portName, portBit);
     }
     for (const auto &e : cells) {
         picojson::object cell = e.get<picojson::object>();
         std::string type = cell.at("type").get<std::string>();
         int id = static_cast<int>(cell.at("id").get<double>());
-        int priority = static_cast<int>(cell.at("priority").get<double>());
         if (type == "AND")
-            builder.AND(id, priority);
+            builder.AND(id);
         else if (type == "NAND")
-            builder.NAND(id, priority);
+            builder.NAND(id);
         else if (type == "ANDNOT")
-            builder.ANDNOT(id, priority);
+            builder.ANDNOT(id);
         else if (type == "XOR")
-            builder.XOR(id, priority);
+            builder.XOR(id);
         else if (type == "XNOR")
-            builder.XNOR(id, priority);
+            builder.XNOR(id);
         else if (type == "DFFP")
-            builder.DFF(id, priority);
+            builder.DFF(id);
         else if (type == "NOT")
-            builder.NOT(id, priority);
+            builder.NOT(id);
         else if (type == "NOR")
-            builder.NOR(id, priority);
+            builder.NOR(id);
         else if (type == "OR")
-            builder.OR(id, priority);
+            builder.OR(id);
         else if (type == "ORNOT")
-            builder.ORNOT(id, priority);
+            builder.ORNOT(id);
         else if (type == "MUX")
-            builder.MUX(id, priority);
+            builder.MUX(id);
         else
             error::die("Invalid JSON of network. Invalid type: ", type);
     }
@@ -1382,7 +1369,7 @@ private:
 public:
     BridgeDepNode(std::shared_ptr<DepNode<OutWorkerInfo>> src)
         : DepNode<InWorkerInfo>(
-              0, std::make_shared<TaskBlackHole<InWorkerInfo>>(1),
+              std::make_shared<TaskBlackHole<InWorkerInfo>>(1),
               NodeLabel{detail::genid(), "bridge", ""}),
           src_(src)
     {
