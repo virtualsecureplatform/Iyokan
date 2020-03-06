@@ -193,6 +193,16 @@ public:
             NetworkBuilderBase<uint8_t>::connectTasks(srcTask, dstTask);
         }
 
+        // Set priority to each DepNode
+        {
+            GraphVisitor grvis;
+            for (auto &&p : name2net_)
+                p.second->visit(grvis);
+            PrioritySetVisitor privis{graph::doTopologicalSort(grvis.getMap())};
+            for (auto &&p : name2net_)
+                p.second->visit(privis);
+        }
+
         // Make runner
         PlainNetworkRunner runner{opt_.numCPUWorkers};
         for (auto &&p : name2net_)

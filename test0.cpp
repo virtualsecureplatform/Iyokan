@@ -605,6 +605,30 @@ void testFromJSONdiamond_core_wo_ram_rom(RAMNetwork ramA, RAMNetwork ramB,
     ASSERT_OUTPUT_EQ("io_regOut_x0", 0x0e, 0);
     ASSERT_OUTPUT_EQ("io_regOut_x0", 0x0f, 0);
 }
+
+template <class NetworkBuilder>
+void testPrioritySetVisitor()
+{
+    NetworkBuilder builder;
+    builder.INPUT(0, "A", 0);
+    builder.NOT(1);
+    builder.OUTPUT(2, "out", 0);
+    builder.connect(0, 1);
+    builder.connect(1, 2);
+
+    TaskNetwork net = std::move(builder);
+    auto depnode = get<NetworkBuilder>(net, "output", "out", 0)->depnode();
+    assert(depnode->priority() == 0);
+
+    // Set priority to each DepNode
+    GraphVisitor grvis;
+    net.visit(grvis);
+    PrioritySetVisitor privis{graph::doTopologicalSort(grvis.getMap())};
+    net.visit(privis);
+
+    assert(depnode->priority() == 2);
+}
+
 //
 #include "iyokan_plain.hpp"
 
@@ -1165,6 +1189,7 @@ int main(int argc, char** argv)
                                         uint8_t>(makePlainRAMNetwork("A"),
                                                  makePlainRAMNetwork("B"),
                                                  makePlainROMNetwork());
+    testPrioritySetVisitor<PlainNetworkBuilder>();
     testDoPlainWithRAMROM();
 
     testNOT<TFHEppNetworkBuilder>();
@@ -1179,6 +1204,7 @@ int main(int argc, char** argv)
     testFromJSONtest_register_4bit<TFHEppNetworkBuilder>();
     testSequentialCircuit<TFHEppNetworkBuilder>();
     testFromJSONtest_counter_4bit<TFHEppNetworkBuilder>();
+    testPrioritySetVisitor<TFHEppNetworkBuilder>();
     testTFHEppSerialization();
 
 #ifdef IYOKAN_CUDA_ENABLED
@@ -1196,6 +1222,7 @@ int main(int argc, char** argv)
         testFromJSONtest_register_4bit<CUFHENetworkBuilder>();
         testSequentialCircuit<CUFHENetworkBuilder>();
         testFromJSONtest_counter_4bit<CUFHENetworkBuilder>();
+        testPrioritySetVisitor<CUFHENetworkBuilder>();
         testBridgeBetweenCUFHEAndTFHEpp();
     }
 #endif

@@ -206,29 +206,208 @@ struct NodeLabel {
     std::string kind, desc;
 };
 
+class DepNodeBase {
+private:
+    int priority_;
+    NodeLabel label_;
+
+public:
+    DepNodeBase(int priority, NodeLabel label)
+        : priority_(priority), label_(std::move(label))
+    {
+    }
+
+    int priority() const noexcept
+    {
+        return priority_;
+    }
+
+    void priority(int newPri) noexcept
+    {
+        priority_ = newPri;
+    }
+
+    const NodeLabel &label() const noexcept
+    {
+        return label_;
+    }
+};
+
+namespace graph {
+struct Node {
+    NodeLabel label;
+    std::set<int> parents, children;
+    bool hasNoInputsToWaitFor;
+};
+using NodePtr = std::shared_ptr<graph::Node>;
+
+inline std::unordered_map<int, int> doTopologicalSort(
+    const std::unordered_map<int, graph::NodePtr> &id2node)
+{
+    // Make a map from id to the number of ready parents of the node
+    std::unordered_map<NodePtr, int> numReadyParents;
+    for (auto &&[id, node] : id2node)
+        numReadyParents[node] = 0;
+
+    // Make the initial queue for sorting
+    std::queue<NodePtr> que;
+    for (auto &&[id, node] : id2node)
+        if (node->hasNoInputsToWaitFor)
+            que.push(node);
+
+    // Do topological sort
+    std::unordered_map<NodePtr, int> node2index;
+    while (!que.empty()) {
+        auto node = que.front();
+        que.pop();
+
+        // Get the index for node
+        int index = -1;
+        if (!node->hasNoInputsToWaitFor) {
+            for (auto &&parentId : node->parents) {
+                NodePtr parent = id2node.at(parentId);
+                index = std::max(index, node2index.at(parent));
+            }
+        }
+        node2index[node] = index + 1;
+
+        for (auto &&childId : node->children) {
+            NodePtr child = id2node.at(childId);
+            if (child->hasNoInputsToWaitFor)  // false parent-child relationship
+                continue;
+            numReadyParents.at(child)++;
+            assert(child->parents.size() >= numReadyParents.at(child));
+            if (child->parents.size() == numReadyParents.at(child))
+                que.push(child);
+        }
+    }
+    assert(id2node.size() == node2index.size());
+
+    std::unordered_map<int, int> id2index;
+    for (auto &&[node, index] : node2index)
+        id2index[node->label.id] = index;
+
+    return id2index;
+}
+
+}  // namespace graph
+
+class GraphVisitor {
+private:
+    std::stack<graph::NodePtr> nodeStack_;
+    std::unordered_map<int, graph::NodePtr> id2node_;
+
+private:
+    template <class WorkerInfo>
+    std::pair<graph::NodePtr, bool> depnode2node(
+        const DepNode<WorkerInfo> &depnode)
+    {
+        auto it = id2node_.find(depnode.label().id);
+        if (it != id2node_.end())
+            return std::make_pair(it->second, false);
+
+        auto node = std::make_shared<graph::Node>();
+        assert(node);
+        node->label = depnode.label();
+        node->hasNoInputsToWaitFor = depnode.task()->areInputsReady();
+
+        id2node_.emplace(depnode.label().id, node);
+
+        return std::make_pair(node, true);
+    }
+
+protected:
+    virtual void onStart(DepNodeBase &)
+    {
+    }
+
+    virtual void onEnd()
+    {
+    }
+
+public:
+    GraphVisitor()
+    {
+    }
+
+    virtual ~GraphVisitor()
+    {
+    }
+
+    const std::unordered_map<int, graph::NodePtr> &getMap() const
+    {
+        return id2node_;
+    }
+
+    template <class WorkerInfo>
+    bool start(DepNode<WorkerInfo> &curNode)
+    {
+        auto [node, isNew] = depnode2node(curNode);
+
+        if (!nodeStack_.empty()) {
+            graph::NodePtr parent = nodeStack_.top();
+            parent->children.insert(node->label.id);
+            node->parents.insert(parent->label.id);
+        }
+
+        if (!isNew)
+            return false;
+
+        onStart(curNode);
+
+        nodeStack_.push(node);
+        return true;
+    }
+
+    void end()
+    {
+        assert(!nodeStack_.empty());
+        nodeStack_.pop();
+        onEnd();
+    }
+};
+
+class PrioritySetVisitor : public GraphVisitor {
+private:
+    std::unordered_map<int, int> id2index_;
+
+public:
+    PrioritySetVisitor(std::unordered_map<int, int> id2index)
+        : id2index_(std::move(id2index))
+    {
+    }
+
+private:
+    void onStart(DepNodeBase &depnode) override
+    {
+        depnode.priority(id2index_.at(depnode.label().id));
+    }
+
+    void onEnd() override
+    {
+    }
+};
+
 template <class WorkerInfo>
-class DepNode : public std::enable_shared_from_this<DepNode<WorkerInfo>> {
+class DepNode : public DepNodeBase,
+                public std::enable_shared_from_this<DepNode<WorkerInfo>> {
     friend TaskNetwork<WorkerInfo>;
     friend void ReadyQueue<WorkerInfo>::push(
         const std::shared_ptr<DepNode<WorkerInfo>> &);
 
 private:
     bool hasQueued_;
-    int priority_;
     std::shared_ptr<TaskBase<WorkerInfo>> task_;
 
     // Use weak_ptr here in order to avoid circular references.
     std::vector<std::weak_ptr<DepNode>> dependents_;
 
-    const NodeLabel label_;
-
 public:
     DepNode(int priority, std::shared_ptr<TaskBase<WorkerInfo>> task,
             NodeLabel label)
-        : hasQueued_(false),
-          priority_(priority),
-          task_(std::move(task)),
-          label_(std::move(label))
+        : DepNodeBase(priority, std::move(label)),
+          hasQueued_(false),
+          task_(std::move(task))
     {
     }
 
@@ -248,9 +427,9 @@ public:
         return hasQueued_;
     }
 
-    int priority() const
+    std::shared_ptr<const TaskBase<WorkerInfo>> task() const
     {
-        return priority_;
+        return task_;
     }
 
     std::shared_ptr<TaskBase<WorkerInfo>> task()
@@ -283,6 +462,20 @@ public:
     {
         hasQueued_ = false;
         task_->tick();
+    }
+
+    virtual void visit(GraphVisitor &visitor)
+    {
+        if (!visitor.start(*this))
+            return;
+
+        for (auto &&dep : dependents_) {
+            auto next = dep.lock();
+            assert(next);
+            next->visit(visitor);
+        }
+
+        visitor.end();
     }
 };
 
@@ -436,7 +629,7 @@ template <class WorkerInfo>
 void DepNode<WorkerInfo>::start(WorkerInfo wi, ProgressGraphMaker &graph)
 {
     task_->startAsync(std::move(wi));
-    graph.startNode(label_);
+    graph.startNode(label());
 }
 
 template <class WorkerInfo>
@@ -458,13 +651,13 @@ template <class WorkerInfo>
 void DepNode<WorkerInfo>::propagate(ReadyQueue<WorkerInfo> &readyQueue,
                                     ProgressGraphMaker &graph)
 {
-    graph.finishNode(label_);
+    graph.finishNode(label());
 
     propagate(readyQueue);
 
     for (auto &&dep_weak : dependents_) {
         auto dep = dep_weak.lock();
-        graph.notify(label_, dep->label_);
+        graph.notify(label(), dep->label());
     }
 }
 
@@ -687,6 +880,13 @@ public:
         }
 
         return ret;
+    }
+
+    void visit(GraphVisitor &visitor)
+    {
+        for (auto &&[id, node] : id2node_)
+            if (node->task()->areInputsReady())
+                node->visit(visitor);
     }
 };
 
@@ -1204,6 +1404,14 @@ public:
             assert(que);
             que->push(src_);
         }
+    }
+
+    void visit(GraphVisitor &visitor) override
+    {
+        if (!visitor.start(*this))
+            return;
+        src_->visit(visitor);
+        visitor.end();
     }
 };
 

@@ -561,6 +561,20 @@ public:
             NetworkBuilderBase<cufhe::Ctxt>::connectTasks(srcTask, dstTask);
         }
 
+        // Set priority to each DepNode
+        {
+            GraphVisitor grvis;
+            for (auto&& p : name2tnet_)
+                p.second->visit(grvis);
+            for (auto&& p : name2cnet_)
+                p.second->visit(grvis);
+            PrioritySetVisitor privis{graph::doTopologicalSort(grvis.getMap())};
+            for (auto&& p : name2tnet_)
+                p.second->visit(privis);
+            for (auto&& p : name2cnet_)
+                p.second->visit(privis);
+        }
+
         // Make runner
         CUFHENetworkRunner runner{
             opt_.numGPUWorkers, opt_.numCPUWorkers,

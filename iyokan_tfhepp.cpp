@@ -211,6 +211,16 @@ public:
                                                                dstTask);
         }
 
+        // Set priority to each DepNode
+        {
+            GraphVisitor grvis;
+            for (auto &&p : name2net_)
+                p.second->visit(grvis);
+            PrioritySetVisitor privis{graph::doTopologicalSort(grvis.getMap())};
+            for (auto &&p : name2net_)
+                p.second->visit(privis);
+        }
+
         // Make runner
         TFHEppWorkerInfo wi{TFHEpp::lweParams{}, reqPacket_.gk, reqPacket_.ck};
         TFHEppNetworkRunner runner{opt_.numCPUWorkers, wi};
