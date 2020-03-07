@@ -155,6 +155,7 @@ public:
 
         // [[builtin]] type = ram
         for (const auto &ram : bp.builtinRAMs()) {
+            // FIXME: relax this constraint
             assert(ram.inAddrWidth == 8 && ram.inWdataWidth == 8 &&
                    ram.outRdataWidth == 8);
             auto net = std::make_shared<PlainNetwork>(makePlainRAMNetwork(""));
@@ -163,26 +164,27 @@ public:
 
         // [[builtin]] type = rom
         for (const auto &bprom : bp.builtinROMs()) {
-            assert(bprom.inAddrWidth == 7 && bprom.outRdataWidth == 32);
-            auto net = std::make_shared<PlainNetwork>(makePlainROMNetwork());
+            auto net = std::make_shared<PlainNetwork>(
+                makePlainROMNetwork(bprom.inAddrWidth, bprom.outRdataWidth));
             name2net_.emplace(bprom.name, net);
 
             // Set initial data
             if (auto it = reqPacket_.rom.find(bprom.name);
                 it != reqPacket_.rom.end()) {
+                const size_t inAddrSpaceSize = 1 << bprom.inAddrWidth;
+
                 std::vector<Bit> &init = it->second;
-                auto &rom = *get<TaskPlainROM>({bprom.name, {"rom", "all", 0}});
+                if (init.size() != inAddrSpaceSize * bprom.outRdataWidth)
+                    error::die("Invalid request packet: wrong length of RAM");
 
-                if (rom.size() * 8 != init.size())
-                    error::die("Invalid request packet: wrong length of ROM");
-                if (rom.size() % 4 != 0)
-                    error::die("Invalid ROM size: must be a multiple of 4");
-
-                for (size_t i = 0; i < rom.size() / 4; i++) {
-                    uint32_t val = 0;
-                    for (int j = 0; j < 32; j++)
-                        val |= static_cast<uint32_t>(init[i * 32 + j]) << j;
-                    rom.set4le(i << 2, val);
+                for (int addr = 0; addr < inAddrSpaceSize; addr++) {
+                    for (int ibit = 0; ibit < bprom.outRdataWidth; ibit++) {
+                        auto &rom = *get<TaskPlainROMUX>(
+                            {bprom.name, {"rom", "all", ibit}});
+                        assert(rom.size() == inAddrSpaceSize);
+                        rom.set(addr,
+                                init.at(addr * bprom.outRdataWidth + ibit));
+                    }
                 }
             }
         }

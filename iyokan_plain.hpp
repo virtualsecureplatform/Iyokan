@@ -115,39 +115,41 @@ public:
     }
 };
 
-class TaskPlainROM : public Task<Bit, uint32_t, PlainWorkerInfo> {
+class TaskPlainROMUX : public Task<Bit, Bit, PlainWorkerInfo> {
 private:
-    std::vector<uint32_t> data_;
+    size_t inAddrWidth_;
+    std::vector<Bit> data_;
 
 private:
     void startAsyncImpl(PlainWorkerInfo) override
     {
         size_t addr = 0;
-        for (int i = 6; i >= 0; i--)
-            addr = (addr << 1) | static_cast<size_t>(input(i));
+        for (int i = 0; i < inAddrWidth_; i++)
+            addr |= (input(i) == 1_b ? 1u : 0u) << i;
         output() = data_.at(addr);
     }
 
 public:
-    TaskPlainROM() : Task<Bit, uint32_t, PlainWorkerInfo>(7), data_(1 << 7)
+    TaskPlainROMUX(size_t inAddrWidth)
+        : Task<Bit, Bit, PlainWorkerInfo>(inAddrWidth),
+          inAddrWidth_(inAddrWidth),
+          data_(1 << inAddrWidth)
     {
     }
 
     size_t size() const
     {
-        return data_.size() * 4;
+        return data_.size();
     }
 
-    void set4le(size_t addr, uint32_t val)
+    void set(size_t addr, Bit val)
     {
-        assert((addr & 0b11) == 0);
-        data_.at(addr >> 2) = val;
+        data_.at(addr) = val;
     }
 
-    uint32_t get4le(size_t addr)
+    Bit get(size_t addr)
     {
-        assert((addr & 0b11) == 0);
-        return data_.at(addr >> 2);
+        return data_.at(addr);
     }
 
     bool hasFinished() const override
@@ -270,63 +272,44 @@ inline TaskNetwork<PlainWorkerInfo> makePlainRAMNetwork(
     return TaskNetwork<PlainWorkerInfo>(std::move(builder));
 }
 
-inline TaskNetwork<PlainWorkerInfo> makePlainROMNetwork()
+inline TaskNetwork<PlainWorkerInfo> makePlainROMNetwork(size_t inAddrWidth,
+                                                        size_t outRdataWidth)
 {
     /*
-       INPUT (addr[0]) ---+-----+  +-- SPLITTER --- OUTPUT (rdata[0])
-                          |     |  |
-       INPUT (addr[1]) ---+ ROM +--+-- SPLITTER --- OUTPUT (rdata[1])
-                          |     |  |
-       INPUT (addr[2]) ---+     +  +-- SPLITTER --- OUTPUT (rdata[2])
-                          |     |  |
-                            ...       ...
-                          |     |  |
-       INPUT (addr[6]) ---+-----+  +-- SPLITTER --- OUTPUT (rdata[6])
-                                   |
-                                   +-- SPLITTER --- OUTPUT (rdata[7])
-                                   |
+       INPUT (addr[0])  ------------+-----+
+                                    |  R  |
+       INPUT (addr[1])  ------------+  O  +----- OUTPUT (rdata[i])
+                                    |  M  |
+       INPUT (addr[2])  ------------+  U  +
+                                    |  X  |
+                                    | [i] |
                                       ...
-                                   |
-                                   +-- SPLITTER --- OUTPUT (rdata[31])
+                                    |     |
+       INPUT (addr[inAddrWidth]) ---+-----+
     */
 
     NetworkBuilderBase<PlainWorkerInfo> builder;
 
     // Create inputs.
     std::vector<std::shared_ptr<TaskPlainGateWIRE>> inputs;
-    for (int i = 0; i < 7; i++) {
+    for (int i = 0; i < inAddrWidth; i++) {
         auto taskINPUT = builder.addINPUT<TaskPlainGateWIRE>(detail::genid(),
                                                              "addr", i, false);
         inputs.push_back(taskINPUT);
     }
 
-    // Create ROM.
-    auto taskROM = std::make_shared<TaskPlainROM>();
-    builder.addTask(NodeLabel{detail::genid(), "ROM", "body"}, taskROM);
-    builder.registerTask("rom", "all", 0, taskROM);
+    // Create and connect ROMUX for each rdata's bit.
+    for (int i = 0; i < outRdataWidth; i++) {
+        auto taskROMUX = builder.emplaceTask<TaskPlainROMUX>(
+            NodeLabel{detail::genid(), "ROM", "body"}, inAddrWidth);
+        builder.registerTask("rom", "all", i, taskROMUX);
 
-    // Connect inputs and ROM.
-    for (auto &&in : inputs)
-        builder.connectTasks(in, taskROM);
+        auto output = builder.addOUTPUT<TaskPlainGateWIRE>(detail::genid(),
+                                                           "rdata", i, true);
 
-    // Create splitters and connect ROM to each of them.
-    std::vector<std::shared_ptr<TaskPlainSplitter>> taskSplitters;
-    for (int i = 0; i < 32; i++) {
-        auto taskSplitter = std::make_shared<TaskPlainSplitter>(i);
-        builder.addTask(NodeLabel{detail::genid(), "SPLITTER",
-                                  utility::fok("ROM[", i, "]")},
-                        taskSplitter);
-        taskSplitters.push_back(taskSplitter);
-
-        builder.connectTasks(taskROM, taskSplitter);
-    }
-
-    // Create outputs and connect corresponding splitter to it.
-    for (int i = 0; i < 32; i++) {
-        auto taskOUTPUT = builder.addOUTPUT<TaskPlainGateWIRE>(
-            detail::genid(), "rdata", i, true);
-        auto &&splitter = taskSplitters[i];
-        builder.connectTasks(splitter, taskOUTPUT);
+        for (auto &&in : inputs)
+            builder.connectTasks(in, taskROMUX);
+        builder.connectTasks(taskROMUX, output);
     }
 
     return TaskNetwork<PlainWorkerInfo>(std::move(builder));
