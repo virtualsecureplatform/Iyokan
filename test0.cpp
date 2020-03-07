@@ -439,173 +439,6 @@ void testFromJSONtest_counter_4bit()
     }
 }
 
-template <class NetworkBuilder, class TaskROM, class NormalT, class RAMNetwork,
-          class ROMNetwork>
-void testFromJSONdiamond_core_wo_ram_rom(RAMNetwork ramA, RAMNetwork ramB,
-                                         ROMNetwork rom)
-{
-    assert(rom.isValid());
-
-    const std::string fileName = "test/diamond-core-wo-ram-rom.json";
-    std::ifstream ifs{fileName};
-    assert(ifs);
-
-    auto core = readNetworkFromJSON<NetworkBuilder>(ifs);
-    assert(core.isValid());
-
-    auto net =
-        core.template merge<NormalT>(rom,
-                                     {
-                                         {"io_romAddr", 0, "addr", 0},
-                                         {"io_romAddr", 1, "addr", 1},
-                                         {"io_romAddr", 2, "addr", 2},
-                                         {"io_romAddr", 3, "addr", 3},
-                                         {"io_romAddr", 4, "addr", 4},
-                                         {"io_romAddr", 5, "addr", 5},
-                                         {"io_romAddr", 6, "addr", 6},
-                                     },
-                                     {
-                                         {"rdata", 0, "io_romData", 0},
-                                         {"rdata", 1, "io_romData", 1},
-                                         {"rdata", 2, "io_romData", 2},
-                                         {"rdata", 3, "io_romData", 3},
-                                         {"rdata", 4, "io_romData", 4},
-                                         {"rdata", 5, "io_romData", 5},
-                                         {"rdata", 6, "io_romData", 6},
-                                         {"rdata", 7, "io_romData", 7},
-                                         {"rdata", 8, "io_romData", 8},
-                                         {"rdata", 9, "io_romData", 9},
-                                         {"rdata", 10, "io_romData", 10},
-                                         {"rdata", 11, "io_romData", 11},
-                                         {"rdata", 12, "io_romData", 12},
-                                         {"rdata", 13, "io_romData", 13},
-                                         {"rdata", 14, "io_romData", 14},
-                                         {"rdata", 15, "io_romData", 15},
-                                         {"rdata", 16, "io_romData", 16},
-                                         {"rdata", 17, "io_romData", 17},
-                                         {"rdata", 18, "io_romData", 18},
-                                         {"rdata", 19, "io_romData", 19},
-                                         {"rdata", 20, "io_romData", 20},
-                                         {"rdata", 21, "io_romData", 21},
-                                         {"rdata", 22, "io_romData", 22},
-                                         {"rdata", 23, "io_romData", 23},
-                                         {"rdata", 24, "io_romData", 24},
-                                         {"rdata", 25, "io_romData", 25},
-                                         {"rdata", 26, "io_romData", 26},
-                                         {"rdata", 27, "io_romData", 27},
-                                         {"rdata", 28, "io_romData", 28},
-                                         {"rdata", 29, "io_romData", 29},
-                                         {"rdata", 30, "io_romData", 30},
-                                         {"rdata", 31, "io_romData", 31},
-                                     })
-            .template merge<NormalT>(ramA,
-                                     {
-                                         {"io_memA_writeEnable", 0, "wren", 0},
-                                         {"io_memA_address", 0, "addr", 0},
-                                         {"io_memA_address", 1, "addr", 1},
-                                         {"io_memA_address", 2, "addr", 2},
-                                         {"io_memA_address", 3, "addr", 3},
-                                         {"io_memA_address", 4, "addr", 4},
-                                         {"io_memA_address", 5, "addr", 5},
-                                         {"io_memA_address", 6, "addr", 6},
-                                         {"io_memA_address", 7, "addr", 7},
-                                         {"io_memA_in", 0, "wdata", 0},
-                                         {"io_memA_in", 1, "wdata", 1},
-                                         {"io_memA_in", 2, "wdata", 2},
-                                         {"io_memA_in", 3, "wdata", 3},
-                                         {"io_memA_in", 4, "wdata", 4},
-                                         {"io_memA_in", 5, "wdata", 5},
-                                         {"io_memA_in", 6, "wdata", 6},
-                                         {"io_memA_in", 7, "wdata", 7},
-                                     },
-                                     {
-                                         {"rdata", 0, "io_memA_out", 0},
-                                         {"rdata", 1, "io_memA_out", 1},
-                                         {"rdata", 2, "io_memA_out", 2},
-                                         {"rdata", 3, "io_memA_out", 3},
-                                         {"rdata", 4, "io_memA_out", 4},
-                                         {"rdata", 5, "io_memA_out", 5},
-                                         {"rdata", 6, "io_memA_out", 6},
-                                         {"rdata", 7, "io_memA_out", 7},
-                                     })
-            .template merge<NormalT>(ramB,
-                                     {
-                                         {"io_memB_writeEnable", 0, "wren", 0},
-                                         {"io_memB_address", 0, "addr", 0},
-                                         {"io_memB_address", 1, "addr", 1},
-                                         {"io_memB_address", 2, "addr", 2},
-                                         {"io_memB_address", 3, "addr", 3},
-                                         {"io_memB_address", 4, "addr", 4},
-                                         {"io_memB_address", 5, "addr", 5},
-                                         {"io_memB_address", 6, "addr", 6},
-                                         {"io_memB_address", 7, "addr", 7},
-                                         {"io_memB_in", 0, "wdata", 0},
-                                         {"io_memB_in", 1, "wdata", 1},
-                                         {"io_memB_in", 2, "wdata", 2},
-                                         {"io_memB_in", 3, "wdata", 3},
-                                         {"io_memB_in", 4, "wdata", 4},
-                                         {"io_memB_in", 5, "wdata", 5},
-                                         {"io_memB_in", 6, "wdata", 6},
-                                         {"io_memB_in", 7, "wdata", 7},
-                                     },
-                                     {
-                                         {"rdata", 0, "io_memB_out", 0},
-                                         {"rdata", 1, "io_memB_out", 1},
-                                         {"rdata", 2, "io_memB_out", 2},
-                                         {"rdata", 3, "io_memB_out", 3},
-                                         {"rdata", 4, "io_memB_out", 4},
-                                         {"rdata", 5, "io_memB_out", 5},
-                                         {"rdata", 6, "io_memB_out", 6},
-                                         {"rdata", 7, "io_memB_out", 7},
-                                     });
-    assert(net.isValid());
-
-    // 0: 74 80                        	lsi	ra, 24
-    // 2: 15 00 00                     	lw	ra, 0(ra)
-    // 5: 34 31                        	lsi	sp, 3
-    // 7: 1d 01 00                     	sw	sp, 0(ra)
-    // a: 15 00 00                     	lw	ra, 0(ra)
-    // d: 0e 00                        	js	0
-    setROM(*net.template get<TaskROM>("rom", "all", 0),
-           std::vector<uint8_t>{0x74, 0x80, 0x15, 0x00, 0x00, 0x34, 0x31, 0x1d,
-                                0x01, 0x00, 0x15, 0x00, 0x00, 0x0e, 0x00});
-
-    setRAM(net, std::vector<uint8_t>{
-                    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  //
-                    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  //
-                    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  //
-                    0x29, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  //
-                });
-
-    SET_INPUT("reset", 0, 1);
-    processAllGates(net);
-
-    SET_INPUT("reset", 0, 0);
-    for (int i = 0; i < 11; i++) {
-        net.tick();
-        processAllGates(net);
-    }
-
-    ASSERT_OUTPUT_EQ("io_finishFlag", 0, 1);
-
-    ASSERT_OUTPUT_EQ("io_regOut_x0", 0x00, 1);
-    ASSERT_OUTPUT_EQ("io_regOut_x0", 0x01, 1);
-    ASSERT_OUTPUT_EQ("io_regOut_x0", 0x02, 0);
-    ASSERT_OUTPUT_EQ("io_regOut_x0", 0x03, 0);
-    ASSERT_OUTPUT_EQ("io_regOut_x0", 0x04, 0);
-    ASSERT_OUTPUT_EQ("io_regOut_x0", 0x05, 0);
-    ASSERT_OUTPUT_EQ("io_regOut_x0", 0x06, 0);
-    ASSERT_OUTPUT_EQ("io_regOut_x0", 0x07, 0);
-    ASSERT_OUTPUT_EQ("io_regOut_x0", 0x08, 0);
-    ASSERT_OUTPUT_EQ("io_regOut_x0", 0x09, 0);
-    ASSERT_OUTPUT_EQ("io_regOut_x0", 0x0a, 0);
-    ASSERT_OUTPUT_EQ("io_regOut_x0", 0x0b, 0);
-    ASSERT_OUTPUT_EQ("io_regOut_x0", 0x0c, 0);
-    ASSERT_OUTPUT_EQ("io_regOut_x0", 0x0d, 0);
-    ASSERT_OUTPUT_EQ("io_regOut_x0", 0x0e, 0);
-    ASSERT_OUTPUT_EQ("io_regOut_x0", 0x0f, 0);
-}
-
 template <class NetworkBuilder>
 void testPrioritySetVisitor()
 {
@@ -641,26 +474,6 @@ void processAllGates(PlainNetwork& net,
 void setInput(std::shared_ptr<TaskPlainGateMem> task, int val)
 {
     task->set(val != 0 ? 1_b : 0_b);
-}
-
-void setROM(TaskPlainROM& rom, const std::vector<uint8_t>& src)
-{
-    for (int i = 0; i < 512 / 4; i++) {
-        int val = 0;
-        for (int j = 3; j >= 0; j--) {
-            size_t offset = i * 4 + j;
-            val = (val << 8) | (offset < src.size() ? src[offset] : 0x00);
-        }
-        rom.set4le(i << 2, val);
-    }
-}
-
-void setRAM(PlainNetwork& net, const std::vector<uint8_t>& src)
-{
-    auto ramA = net.get<TaskPlainRAM>("ram", "A", 0),
-         ramB = net.get<TaskPlainRAM>("ram", "B", 0);
-    for (size_t i = 0; i < src.size(); i++)
-        (i % 2 == 1 ? ramA : ramB)->set(i / 2, src[i]);
 }
 
 int getOutput(std::shared_ptr<TaskPlainGateMem> task)
@@ -805,46 +618,6 @@ void setInput(std::shared_ptr<TaskTFHEppGateMem> task, int val)
 {
     auto& h = TFHEppTestHelper::instance();
     task->set(val ? h.one() : h.zero());
-}
-
-void setROM(TaskTFHEppROMUX& rom, const std::vector<uint8_t>& src)
-{
-    auto& h = TFHEppTestHelper::instance();
-    auto params = h.wi().params;
-
-    for (size_t i = 0; i < 512 / (params.N / 8); i++) {
-        TFHEpp::Polynomiallvl1 pmu;
-        for (size_t j = 0; j < params.N; j++) {
-            size_t offset = i * params.N + j;
-            size_t byteOffset = offset / 8, bitOffset = offset % 8;
-            uint8_t val = byteOffset < src.size()
-                              ? (src[byteOffset] >> bitOffset) & 1u
-                              : 0;
-            pmu[j] = val ? params.μ : -params.μ;
-        }
-        rom.set128le(
-            i * (params.N / 8),
-            TFHEpp::trlweSymEncryptlvl1(pmu, params.αbk, h.sk()->key.lvl1));
-    }
-}
-
-void setRAM(TFHEppNetwork& net, const std::vector<uint8_t>& src)
-{
-    auto& h = TFHEppTestHelper::instance();
-    auto params = h.wi().params;
-
-    for (size_t i = 0; i < src.size(); i++) {
-        for (int bit = 0; bit < 8; bit++) {
-            TFHEpp::Polynomiallvl1 pmu = {};
-            uint8_t val = i < src.size() ? (src[i] >> bit) & 1u : 0;
-            pmu[0] = val ? params.μ : -params.μ;
-            TFHEpp::TRLWElvl1 trlwe =
-                TFHEpp::trlweSymEncryptlvl1(pmu, params.α, h.sk()->key.lvl1);
-
-            net.get<TaskTFHEppRAMUX>("ram", (i % 2 == 1 ? "A" : "B"), bit)
-                ->set(i / 2, trlwe);
-        }
-    }
 }
 
 int getOutput(std::shared_ptr<TaskTFHEppGateMem> task)
@@ -1179,9 +952,6 @@ int main(int argc, char** argv)
     testFromJSONtest_register_4bit<PlainNetworkBuilder>();
     testSequentialCircuit<PlainNetworkBuilder>();
     testFromJSONtest_counter_4bit<PlainNetworkBuilder>();
-    testFromJSONdiamond_core_wo_ram_rom<PlainNetworkBuilder, TaskPlainROM, Bit>(
-        makePlainRAMNetwork("A"), makePlainRAMNetwork("B"),
-        makePlainROMNetwork());
     testPrioritySetVisitor<PlainNetworkBuilder>();
     testDoPlainWithRAMROM();
 
@@ -1224,12 +994,8 @@ int main(int argc, char** argv)
     testBlueprint();
 
     if (argc >= 2 && strcmp(argv[1], "slow") == 0) {
-        TFHEppTestHelper::instance().prepareCircuitKey();
+        // TFHEppTestHelper::instance().prepareCircuitKey();
 
-        testFromJSONdiamond_core_wo_ram_rom<TFHEppNetworkBuilder,
-                                            TaskTFHEppROMUX, TFHEpp::TLWElvl0>(
-            makeTFHEppRAMNetwork("A"), makeTFHEppRAMNetwork("B"),
-            makeTFHEppROMNetwork());
         testDoTFHEWithRAMROM();
 
 #ifdef IYOKAN_CUDA_ENABLED
