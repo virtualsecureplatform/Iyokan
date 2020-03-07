@@ -96,17 +96,19 @@ private:
             auto &bits = resPacket.bits[atPortName];
             if (bits.size() < atPortBit + 1)
                 bits.resize(atPortBit + 1);
-            bits.at(atPortBit) =
-                static_cast<uint8_t>(get<TaskPlainGateMem>(port)->get());
+            bits.at(atPortBit) = get<TaskPlainGateMem>(port)->get();
         }
         // Get values of RAM
         // FIXME: subset of RAMs?
         for (auto &&bp : opt_.blueprint->builtinRAMs()) {
             auto &ram = *get<TaskPlainRAM>({bp.name, {"ram", "", 0}});
-            std::vector<uint8_t> &dst = resPacket.ram[bp.name];
+            std::vector<Bit> &dst = resPacket.ram[bp.name];
             assert(dst.size() == 0);
-            for (size_t addr = 0; addr < ram.size(); addr++)
-                dst.push_back(ram.get(addr));
+            for (size_t addr = 0; addr < ram.size(); addr++) {
+                uint8_t val = ram.get(addr);
+                for (int i = 0; i < 8; i++)
+                    dst.push_back(((val >> i) & 1u) != 0 ? 1_b : 0_b);
+            }
         }
 
         return resPacket;
@@ -116,10 +118,14 @@ private:
     {
         for (auto &&[name, init] : reqPacket_.ram) {
             auto &ram = *get<TaskPlainRAM>({name, {"ram", "", 0}});
-            if (ram.size() != init.size())
+            if (ram.size() * 8 != init.size())
                 error::die("Invalid request packet: wrong length of RAM");
-            for (size_t addr = 0; addr < ram.size(); addr++)
-                ram.set(addr, init[addr]);
+            for (size_t addr = 0; addr < ram.size(); addr++) {
+                uint8_t val = 0;
+                for (int i = 0; i < 8; i++)
+                    val |= static_cast<uint8_t>(init[addr * 8 + i]) << i;
+                ram.set(addr, val);
+            }
         }
     }
 
@@ -164,21 +170,18 @@ public:
             // Set initial data
             if (auto it = reqPacket_.rom.find(bprom.name);
                 it != reqPacket_.rom.end()) {
-                std::vector<uint8_t> &init = it->second;
+                std::vector<Bit> &init = it->second;
                 auto &rom = *get<TaskPlainROM>({bprom.name, {"rom", "all", 0}});
 
-                if (rom.size() != init.size())
+                if (rom.size() * 8 != init.size())
                     error::die("Invalid request packet: wrong length of ROM");
                 if (rom.size() % 4 != 0)
                     error::die("Invalid ROM size: must be a multiple of 4");
 
                 for (size_t i = 0; i < rom.size() / 4; i++) {
-                    int val = 0;
-                    for (int j = 3; j >= 0; j--) {
-                        size_t offset = i * 4 + j;
-                        val = (val << 8) |
-                              (offset < init.size() ? init[offset] : 0x00);
-                    }
+                    uint32_t val = 0;
+                    for (int j = 0; j < 32; j++)
+                        val |= static_cast<uint32_t>(init[i * 32 + j]) << j;
                     rom.set4le(i << 2, val);
                 }
             }

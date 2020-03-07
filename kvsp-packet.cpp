@@ -20,15 +20,14 @@ void print(const PlainPacket& packet, std::ostream& os)
     os << std::endl << std::endl;
 
     // Print flags
-    os << "f0\t" << utility::u8vec2i(packet.bits.at("finflag")) << std::endl;
+    os << "f0\t" << bitvec2i(packet.bits.at("finflag")) << std::endl;
 
     os << std::endl;
 
     // Print regs
     for (int i = 0; i < 16; i++)
         os << "x" << i << "\t"
-           << utility::u8vec2i(packet.bits.at(utility::fok("reg_x", i)))
-           << std::endl;
+           << bitvec2i(packet.bits.at(utility::fok("reg_x", i))) << std::endl;
 
     os << std::endl;
 
@@ -74,19 +73,19 @@ void printAsJSON(const PlainPacket& packet, std::ostream& os)
         item["type"] = picojson::value(type);
         item["addr"] = picojson::value(addr);
         item["byte"] = picojson::value(
-            static_cast<double>(utility::u8vec2i(packet.bits.at(byteSrc))));
+            static_cast<double>(bitvec2i(packet.bits.at(byteSrc))));
         root.emplace_back(item);
     }
 
     // Print ram.
     auto &ramA = packet.ram.at("ramA"), &ramB = packet.ram.at("ramB");
     assert(ramA.size() == ramB.size());
-    for (int i = 0; i < ramA.size() * 2; i++) {
+    for (int i = 0; i < ramA.size() / 8 * 2; i++) {
         picojson::object item;
         item["type"] = picojson::value("ram");
         item["addr"] = picojson::value(static_cast<double>(i));
-        item["byte"] = picojson::value(
-            static_cast<double>((i % 2 == 1 ? ramA : ramB).at(i / 2)));
+        item["byte"] = picojson::value(static_cast<double>(
+            bitvec2i(i % 2 == 1 ? ramA : ramB, i / 2 * 8, (i / 2 + 1) * 8)));
         root.emplace_back(item);
     }
 

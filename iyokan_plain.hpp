@@ -4,40 +4,6 @@
 #include "iyokan.hpp"
 #include "packet.hpp"
 
-enum class Bit : bool {};
-inline constexpr Bit operator~(Bit l) noexcept
-{
-    return Bit(~static_cast<int>(l));
-}
-inline constexpr Bit operator|(Bit l, Bit r) noexcept
-{
-    return Bit(static_cast<int>(l) | static_cast<int>(r));
-}
-inline constexpr Bit operator&(Bit l, Bit r) noexcept
-{
-    return Bit(static_cast<int>(l) & static_cast<int>(r));
-}
-inline constexpr Bit operator^(Bit l, Bit r) noexcept
-{
-    return Bit(static_cast<int>(l) ^ static_cast<int>(r));
-}
-inline constexpr Bit operator|=(Bit &l, Bit r) noexcept
-{
-    return l = l | r;
-}
-inline constexpr Bit operator&=(Bit &l, Bit r) noexcept
-{
-    return l = l & r;
-}
-inline constexpr Bit operator^=(Bit &l, Bit r) noexcept
-{
-    return l = l ^ r;
-}
-inline Bit operator"" _b(unsigned long long x)
-{
-    return Bit(x != 0);
-}
-
 struct PlainWorkerInfo {
 };
 

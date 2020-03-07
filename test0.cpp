@@ -715,8 +715,6 @@ void testProgressGraphMaker()
 
 void testDoPlainWithRAMROM()
 {
-    using namespace utility;
-
     // Prepare request packet
     writeToArchive("_test_plain_req_packet00", parseELF("test/test00.elf"));
 
@@ -730,9 +728,9 @@ void testDoPlainWithRAMROM()
     doPlain(opt);
 
     auto resPacket = readFromArchive<PlainPacket>("_test_plain_res_packet00");
-    assert(u8vec2i(resPacket.bits.at("finflag")) == 1);
-    assert(u8vec2i(resPacket.bits.at("reg_x0")) == 42);
-    assert(resPacket.ram.at("ramB").at(12) == 42);
+    assert(bitvec2i(resPacket.bits.at("finflag")) == 1);
+    assert(bitvec2i(resPacket.bits.at("reg_x0")) == 42);
+    assert(bitvec2i(resPacket.ram.at("ramB"), 12 * 8, 13 * 8) == 42);
 }
 
 #include "iyokan_tfhepp.hpp"
@@ -917,7 +915,6 @@ void testTFHEppSerialization()
 
 void testDoTFHEWithRAMROM()
 {
-    using namespace utility;
     auto& h = TFHEppTestHelper::instance();
 
     Options opt;
@@ -932,9 +929,9 @@ void testDoTFHEWithRAMROM()
     auto resPacket = readFromArchive<TFHEPacket>("_test_res_packet00");
     auto plainResPacket = resPacket.decrypt(*h.sk());
 
-    assert(u8vec2i(plainResPacket.bits.at("finflag")) == 1);
-    assert(u8vec2i(plainResPacket.bits.at("reg_x0")) == 42);
-    assert(plainResPacket.ram.at("ramB").at(12) == 42);
+    assert(bitvec2i(plainResPacket.bits.at("finflag")) == 1);
+    assert(bitvec2i(plainResPacket.bits.at("reg_x0")) == 42);
+    assert(bitvec2i(plainResPacket.ram.at("ramB"), 12 * 8, 13 * 8) == 42);
 }
 
 #ifdef IYOKAN_CUDA_ENABLED
@@ -1020,7 +1017,6 @@ int getOutput(std::shared_ptr<TaskCUFHEGateMem> task)
 
 void testDoCUFHEWithRAMROM()
 {
-    using namespace utility;
     auto& h = TFHEppTestHelper::instance();
 
     Options opt;
@@ -1034,9 +1030,9 @@ void testDoCUFHEWithRAMROM()
     writeToArchive("_test_sk", *h.sk());
     auto resPacket = readFromArchive<TFHEPacket>("_test_res_packet00");
     auto plainResPacket = resPacket.decrypt(*h.sk());
-    assert(u8vec2i(plainResPacket.bits.at("finflag")) == 1);
-    assert(u8vec2i(plainResPacket.bits.at("reg_x0")) == 42);
-    assert(plainResPacket.ram.at("ramB").at(12) == 42);
+    assert(bitvec2i(plainResPacket.bits.at("finflag")) == 1);
+    assert(bitvec2i(plainResPacket.bits.at("reg_x0")) == 42);
+    assert(bitvec2i(plainResPacket.ram.at("ramB"), 12 * 8, 13 * 8) == 42);
 }
 
 void testBridgeBetweenCUFHEAndTFHEpp()

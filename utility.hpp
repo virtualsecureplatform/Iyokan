@@ -27,18 +27,6 @@ inline std::vector<std::string> regexMatch(const std::string &text,
     return ret;
 }
 
-inline uint64_t u8vec2i(const std::vector<uint8_t> &src, int start = 0,
-                        int end = -1)
-{
-    if (end == -1)
-        end = src.size();
-    assert(end - start < 64);
-    uint64_t ret = 0;
-    for (size_t i = start; i < end; i++)
-        ret |= (src[i] << i);
-    return ret;
-}
-
 }  // namespace utility
 
 #endif

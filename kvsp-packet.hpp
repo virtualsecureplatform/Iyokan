@@ -27,16 +27,26 @@ inline PlainPacket parseELF(std::istream& is)
                   &(addr < 0x10000 ? rom.at(addr) : ram.at(addr - 0x10000)));
     }
 
-    std::vector<uint8_t> ramA, ramB;
+    std::vector<Bit> ramAbits, ramBbits;
     for (int i = 0; i < ram.size(); i++) {
-        if (i % 2 == 1)
-            ramA.push_back(ram[i]);
-        else
-            ramB.push_back(ram[i]);
+        for (int j = 0; j < 8; j++) {
+            if (i % 2 == 1)
+                ramAbits.push_back(Bit((ram[i] >> j) & 1u));
+            else
+                ramBbits.push_back(Bit((ram[i] >> j) & 1u));
+        }
     }
 
-    return PlainPacket{
-        {{"ramA", ramA}, {"ramB", ramB}}, {{"rom", rom}}, {}, std::nullopt};
+    std::vector<Bit> rombits;
+    for (auto&& byte : rom) {
+        for (int i = 0; i < 8; i++)
+            rombits.push_back(Bit((byte >> i) & 1u));
+    }
+
+    return PlainPacket{{{"ramA", ramAbits}, {"ramB", ramBbits}},
+                       {{"rom", rombits}},
+                       {},
+                       std::nullopt};
 }
 
 inline PlainPacket parseELF(const std::string& path)
