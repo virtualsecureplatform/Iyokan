@@ -4,10 +4,13 @@
 #include "iyokan.hpp"
 #include "packet.hpp"
 
-using TaskPlainGate = Task<uint8_t, uint8_t, uint8_t /*dummy*/>;
-using TaskPlainGateMem = TaskMem<uint8_t, uint8_t, uint8_t /* dummy */>;
+struct PlainWorkerInfo {
+};
 
-class TaskPlainGateDFF : public TaskDFF<uint8_t, uint8_t, uint8_t /* dummy */> {
+using TaskPlainGate = Task<uint8_t, uint8_t, PlainWorkerInfo>;
+using TaskPlainGateMem = TaskMem<uint8_t, uint8_t, PlainWorkerInfo>;
+
+class TaskPlainGateDFF : public TaskDFF<uint8_t, uint8_t, PlainWorkerInfo> {
 public:
     TaskPlainGateDFF()
     {
@@ -15,10 +18,9 @@ public:
     }
 };
 
-class TaskPlainGateWIRE
-    : public TaskMem<uint8_t, uint8_t, uint8_t /* dummy */> {
+class TaskPlainGateWIRE : public TaskMem<uint8_t, uint8_t, PlainWorkerInfo> {
 private:
-    void startAsyncImpl(uint8_t) override
+    void startAsyncImpl(PlainWorkerInfo) override
     {
         if (getInputSize() == 0) {
             // Nothing to do!
@@ -33,7 +35,7 @@ private:
 
 public:
     TaskPlainGateWIRE(bool inputNeeded)
-        : TaskMem<uint8_t, uint8_t, uint8_t /* dummy */>(inputNeeded ? 1 : 0)
+        : TaskMem<uint8_t, uint8_t, PlainWorkerInfo>(inputNeeded ? 1 : 0)
     {
     }
 
@@ -46,7 +48,7 @@ public:
 #define DEFINE_TASK_PLAIN_GATE(name, numInputs, expr)    \
     class TaskPlainGate##name : public TaskPlainGate {   \
     private:                                             \
-        void startAsyncImpl(uint8_t) override            \
+        void startAsyncImpl(PlainWorkerInfo) override    \
         {                                                \
             output() = (expr)&1;                         \
         }                                                \
@@ -75,7 +77,7 @@ DEFINE_TASK_PLAIN_GATE(NOT, 1, ~input(0));
 
 class PlainNetworkBuilder
     : public NetworkBuilder<TaskPlainGate, TaskPlainGateMem, TaskPlainGateDFF,
-                            TaskPlainGateWIRE, uint8_t /* dummy */> {
+                            TaskPlainGateWIRE, PlainWorkerInfo> {
 private:
 #define DEFINE_GATE_IMPL(name)                           \
     std::shared_ptr<TaskPlainGate> name##Impl() override \
@@ -97,27 +99,28 @@ private:
 
 using PlainNetwork = PlainNetworkBuilder::NetworkType;
 
-class PlainWorker : public Worker<uint8_t /* dummy */> {
+class PlainWorker : public Worker<PlainWorkerInfo> {
 private:
-    uint8_t getWorkerInfo()
+    PlainWorkerInfo getWorkerInfo()
     {
-        return 0;  // dummy
+        return {};
     }
 
 public:
-    PlainWorker(ReadyQueue<uint8_t> &readyQueue, size_t &numFinishedTargets,
+    PlainWorker(ReadyQueue<PlainWorkerInfo> &readyQueue,
+                size_t &numFinishedTargets,
                 std::shared_ptr<ProgressGraphMaker> graph)
         : Worker(readyQueue, numFinishedTargets, graph)
     {
     }
 };
 
-class TaskPlainROM : public Task<uint8_t, uint32_t, uint8_t /* dummy */> {
+class TaskPlainROM : public Task<uint8_t, uint32_t, PlainWorkerInfo> {
 private:
     std::vector<uint32_t> data_;
 
 private:
-    void startAsyncImpl(uint8_t) override
+    void startAsyncImpl(PlainWorkerInfo) override
     {
         size_t addr = 0;
         for (int i = 6; i >= 0; i--)
@@ -126,7 +129,7 @@ private:
     }
 
 public:
-    TaskPlainROM() : Task<uint8_t, uint32_t, uint8_t>(7), data_(1 << 7)
+    TaskPlainROM() : Task<uint8_t, uint32_t, PlainWorkerInfo>(7), data_(1 << 7)
     {
     }
 
@@ -153,19 +156,19 @@ public:
     }
 };
 
-class TaskPlainSplitter : public Task<uint32_t, uint8_t, uint8_t /* dummy */> {
+class TaskPlainSplitter : public Task<uint32_t, uint8_t, PlainWorkerInfo> {
 private:
     size_t index_;
 
 private:
-    void startAsyncImpl(uint8_t) override
+    void startAsyncImpl(PlainWorkerInfo) override
     {
         output() = (input(0) >> index_) & 1u;
     }
 
 public:
     TaskPlainSplitter(size_t index)
-        : Task<uint32_t, uint8_t, uint8_t>(1), index_(index)
+        : Task<uint32_t, uint8_t, PlainWorkerInfo>(1), index_(index)
     {
     }
 
@@ -177,7 +180,7 @@ public:
 
 class TaskPlainRAM
     : public Task<uint8_t /* only 1 bit used */, uint32_t /* only 8 bit used */,
-                  uint8_t /* dummy */> {
+                  PlainWorkerInfo> {
 public:
     const static size_t ADDRESS_BIT = 8;
 
@@ -185,7 +188,7 @@ private:
     std::vector<uint8_t> data_;
 
 private:
-    void startAsyncImpl(uint8_t) override
+    void startAsyncImpl(PlainWorkerInfo) override
     {
         size_t addr = 0;
         for (size_t i = 0; i < ADDRESS_BIT; i++)
@@ -202,8 +205,8 @@ private:
 
 public:
     TaskPlainRAM()
-        : Task<uint8_t, uint32_t, uint8_t>(ADDRESS_BIT /* addr */ +
-                                           1 /* wren */ + 8 /* wdata */),
+        : Task<uint8_t, uint32_t, PlainWorkerInfo>(
+              ADDRESS_BIT /* addr */ + 1 /* wren */ + 8 /* wdata */),
           data_(1 << ADDRESS_BIT)
     {
     }
@@ -229,9 +232,10 @@ public:
     }
 };
 
-inline TaskNetwork<uint8_t> makePlainRAMNetwork(const std::string &ramPortName)
+inline TaskNetwork<PlainWorkerInfo> makePlainRAMNetwork(
+    const std::string &ramPortName)
 {
-    NetworkBuilderBase<uint8_t> builder;
+    NetworkBuilderBase<PlainWorkerInfo> builder;
 
     // Create RAM
     auto taskRAM = std::make_shared<TaskPlainRAM>();
@@ -264,10 +268,10 @@ inline TaskNetwork<uint8_t> makePlainRAMNetwork(const std::string &ramPortName)
         builder.connectTasks(taskSplitter, taskOUTPUT);
     }
 
-    return TaskNetwork<uint8_t>(std::move(builder));
+    return TaskNetwork<PlainWorkerInfo>(std::move(builder));
 }
 
-inline TaskNetwork<uint8_t> makePlainROMNetwork()
+inline TaskNetwork<PlainWorkerInfo> makePlainROMNetwork()
 {
     /*
        INPUT (addr[0]) ---+-----+  +-- SPLITTER --- OUTPUT (rdata[0])
@@ -287,7 +291,7 @@ inline TaskNetwork<uint8_t> makePlainROMNetwork()
                                    +-- SPLITTER --- OUTPUT (rdata[31])
     */
 
-    NetworkBuilderBase<uint8_t> builder;
+    NetworkBuilderBase<PlainWorkerInfo> builder;
 
     // Create inputs.
     std::vector<std::shared_ptr<TaskPlainGateWIRE>> inputs;
@@ -326,7 +330,7 @@ inline TaskNetwork<uint8_t> makePlainROMNetwork()
         builder.connectTasks(splitter, taskOUTPUT);
     }
 
-    return TaskNetwork<uint8_t>(std::move(builder));
+    return TaskNetwork<PlainWorkerInfo>(std::move(builder));
 }
 
 void doPlain(const Options &opt);

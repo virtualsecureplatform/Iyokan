@@ -8,7 +8,7 @@ using Name2NetMap =
 
 class PlainNetworkRunner {
 private:
-    NetworkRunner<uint8_t, PlainWorker> plain_;
+    NetworkRunner<PlainWorkerInfo, PlainWorker> plain_;
     std::shared_ptr<ProgressGraphMaker> graph_;
 
 public:
@@ -258,7 +258,7 @@ public:
 void processAllGates(PlainNetwork &net, int numWorkers,
                      std::shared_ptr<ProgressGraphMaker> graph)
 {
-    ReadyQueue<uint8_t> readyQueue;
+    ReadyQueue<PlainWorkerInfo> readyQueue;
     net.pushReadyTasks(readyQueue);
 
     // Create workers.
