@@ -499,16 +499,9 @@ public:
         cufhe::Initialize(*tfhepp2cufhe(*reqPacket_.gk));
 
         // [[file]]
-        for (const auto& file : bp.files()) {
-            std::ifstream ifs{file.path, std::ios::binary};
-            if (!ifs)
-                error::die("Invalid [[file]] path: ", file.path);
-            auto net = std::make_shared<CUFHENetwork>(
-                readNetworkFromJSON<CUFHENetworkBuilder>(ifs));
-            if (!net->isValid())
-                error::die("Invalid network named: ", file.name);
-            name2cnet_.emplace(file.name, net);
-        }
+        for (const auto& file : bp.files())
+            name2cnet_.emplace(file.name,
+                               readNetwork<CUFHENetworkBuilder>(file));
 
         // [[builtin]] type = ram
         for (const auto& ram : bp.builtinRAMs()) {

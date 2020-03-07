@@ -20,11 +20,6 @@ public:
             plain_.addWorker(graph_);
     }
 
-    bool isValid()
-    {
-        return plain_.isValid();
-    }
-
     void addNetwork(std::shared_ptr<PlainNetwork> net)
     {
         plain_.addNetwork(net);
@@ -142,16 +137,9 @@ public:
         const NetworkBlueprint &bp = *opt_.blueprint;
 
         // [[file]]
-        for (const auto &file : bp.files()) {
-            std::ifstream ifs{file.path, std::ios::binary};
-            if (!ifs)
-                error::die("Invalid [[file]] path: ", file.path);
-            auto net = std::make_shared<PlainNetwork>(
-                readNetworkFromJSON<PlainNetworkBuilder>(ifs));
-            if (!net->isValid())
-                error::die("Invalid network named: ", file.name);
-            name2net_.emplace(file.name, net);
-        }
+        for (const auto &file : bp.files())
+            name2net_.emplace(file.name,
+                              readNetwork<PlainNetworkBuilder>(file));
 
         // [[builtin]] type = ram
         for (const auto &ram : bp.builtinRAMs()) {

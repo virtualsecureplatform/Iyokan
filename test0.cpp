@@ -5,6 +5,18 @@
 //
 #include <fstream>
 
+template <class Network>
+void assertNetValid(Network&& net)
+{
+    error::Stack err;
+    net.checkValid(err);
+    if (err.empty())
+        return;
+
+    std::cerr << err.str() << std::endl;
+    assert(0);
+}
+
 template <class NetworkBuilder, class TaskNetwork>
 auto get(TaskNetwork& net, const std::string& kind, const std::string& portName,
          int portBit)
@@ -146,7 +158,7 @@ void testFromJSONtest_pass_4bit()
     assert(ifs);
 
     auto net = readNetworkFromJSON<NetworkBuilder>(ifs);
-    assert(net.isValid());
+    assertNetValid(net);
 
     SET_INPUT("io_in", 0, 0);
     SET_INPUT("io_in", 1, 1);
@@ -169,7 +181,7 @@ void testFromJSONtest_and_4bit()
     assert(ifs);
 
     auto net = readNetworkFromJSON<NetworkBuilder>(ifs);
-    assert(net.isValid());
+    assertNetValid(net);
 
     SET_INPUT("io_inA", 0, 0);
     SET_INPUT("io_inA", 1, 0);
@@ -196,7 +208,7 @@ void testFromJSONtest_and_4_2bit()
     assert(ifs);
 
     auto net = readNetworkFromJSON<NetworkBuilder>(ifs);
-    assert(net.isValid());
+    assertNetValid(net);
 
     SET_INPUT("io_inA", 0, 1);
     SET_INPUT("io_inA", 1, 0);
@@ -221,7 +233,7 @@ void testFromJSONtest_mux_4bit()
     assert(ifs);
 
     auto net = readNetworkFromJSON<NetworkBuilder>(ifs);
-    assert(net.isValid());
+    assertNetValid(net);
 
     SET_INPUT("io_inA", 0, 0);
     SET_INPUT("io_inA", 1, 0);
@@ -256,7 +268,7 @@ void testFromJSONtest_addr_4bit()
     assert(ifs);
 
     auto net = readNetworkFromJSON<NetworkBuilder>(ifs);
-    assert(net.isValid());
+    assertNetValid(net);
 
     SET_INPUT("io_inA", 0, 0);
     SET_INPUT("io_inA", 1, 0);
@@ -283,7 +295,7 @@ void testFromJSONtest_register_4bit()
     assert(ifs);
 
     auto net = readNetworkFromJSON<NetworkBuilder>(ifs);
-    assert(net.isValid());
+    assertNetValid(net);
 
     SET_INPUT("io_in", 0, 0);
     SET_INPUT("io_in", 1, 0);
@@ -367,7 +379,7 @@ void testSequentialCircuit()
     builder.connect(0, 4);
 
     TaskNetwork net = std::move(builder);
-    assert(net.isValid());
+    assertNetValid(net);
 
     auto dff =
         std::dynamic_pointer_cast<typename NetworkBuilder::ParamTaskTypeMem>(
@@ -406,7 +418,7 @@ void testFromJSONtest_counter_4bit()
     assert(ifs);
 
     auto net = readNetworkFromJSON<NetworkBuilder>(ifs);
-    assert(net.isValid());
+    assertNetValid(net);
 
     std::vector<std::array<int, 4>> outvals{{{0, 0, 0, 0},
                                              {1, 0, 0, 0},
@@ -505,7 +517,7 @@ void testProgressGraphMaker()
     builder.connect(0, 4);
 
     PlainNetwork net = std::move(builder);
-    assert(net.isValid());
+    assertNetValid(net);
 
     auto graph = std::make_shared<ProgressGraphMaker>();
 

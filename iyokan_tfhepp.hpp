@@ -411,12 +411,15 @@ public:
         return TaskTFHEppRAMUX::ADDRESS_BIT + 1;
     }
 
-    bool isValid() override
+    void checkValid(error::Stack &err) override
     {
-        return this->depnode() &&
-               std::all_of(inputAddrs_.begin(), inputAddrs_.end(),
-                           [](auto &&in) { return in.use_count() != 0; }) &&
-               inputWritten_.use_count() != 0;
+        assert(this->depnode());
+
+        const NodeLabel &label = this->depnode()->label();
+        if (!std::all_of(inputAddrs_.begin(), inputAddrs_.end(),
+                         [](auto &&in) { return in.use_count() != 0; }) ||
+            inputWritten_.use_count() == 0)
+            err.add("Not enough inputs: ", label.str());
     }
 
     void tick() override

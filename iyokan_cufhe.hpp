@@ -291,12 +291,15 @@ public:
         return TaskTFHEppRAMUX::ADDRESS_BIT + 1;
     }
 
-    bool isValid() override
+    void checkValid(error::Stack& err) override
     {
-        return this->depnode() &&
-               std::all_of(inputAddrs_.begin(), inputAddrs_.end(),
-                           [](auto&& in) { return in.use_count() != 0; }) &&
-               inputWritten_.use_count() != 0;
+        assert(this->depnode());
+
+        const NodeLabel& label = this->depnode()->label();
+        if (!std::all_of(inputAddrs_.begin(), inputAddrs_.end(),
+                         [](auto&& in) { return in.use_count() != 0; }) ||
+            inputWritten_.use_count() == 0)
+            err.add("Not enough inputs: ", label.str());
     }
 
     void tick() override
@@ -513,21 +516,6 @@ public:
             cufhe_.addWorker(graph_);
         for (int i = 0; i < numTFHEppWorkers; i++)
             tfhepp_.addWorker(wi, graph_);
-    }
-
-    bool isValid()
-    {
-        if (!cufhe_.isValid())
-            return false;
-        if (!tfhepp_.isValid())
-            return false;
-        for (auto&& b : bridges0_)
-            if (!b->task()->isValid())
-                return false;
-        for (auto&& b : bridges1_)
-            if (!b->task()->isValid())
-                return false;
-        return true;
     }
 
     void addNetwork(std::shared_ptr<CUFHENetwork> net)

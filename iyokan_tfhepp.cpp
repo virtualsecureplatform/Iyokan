@@ -20,11 +20,6 @@ public:
             tfhepp_.addWorker(wi, graph_);
     }
 
-    bool isValid()
-    {
-        return tfhepp_.isValid();
-    }
-
     void addNetwork(std::shared_ptr<TFHEppNetwork> net)
     {
         tfhepp_.addNetwork(net);
@@ -155,16 +150,9 @@ public:
         const NetworkBlueprint &bp = *opt_.blueprint;
 
         // [[file]]
-        for (const auto &file : bp.files()) {
-            std::ifstream ifs{file.path, std::ios::binary};
-            if (!ifs)
-                error::die("Invalid [[file]] path: ", file.path);
-            auto net = std::make_shared<TFHEppNetwork>(
-                readNetworkFromJSON<TFHEppNetworkBuilder>(ifs));
-            if (!net->isValid())
-                error::die("Invalid network named: ", file.name);
-            name2net_.emplace(file.name, net);
-        }
+        for (const auto &file : bp.files())
+            name2net_.emplace(file.name,
+                              readNetwork<TFHEppNetworkBuilder>(file));
 
         // [[builtin]] type = ram
         for (const auto &ram : bp.builtinRAMs()) {

@@ -31,6 +31,7 @@
 #include <vector>
 
 #include <ThreadPool.h>
+#include <picojson.h>
 #include <toml.hpp>
 
 #include "error.hpp"
@@ -58,6 +59,42 @@ inline int genid()
 
 }  // namespace detail
 
+// NodeLabel is used to identify a DepNode in debugging/profiling.
+struct NodeLabel {
+    int id;
+    std::string kind, desc;
+
+    std::string str() const
+    {
+        return utility::fok("#", id, " ", kind, " ", desc);
+    }
+};
+
+class DepNodeBase {
+private:
+    int priority_;
+    NodeLabel label_;
+
+public:
+    DepNodeBase(NodeLabel label) : priority_(-1), label_(std::move(label))
+    {
+    }
+
+    int priority() const noexcept
+    {
+        return priority_;
+    }
+
+    void priority(int newPri) noexcept
+    {
+        priority_ = newPri;
+    }
+
+    const NodeLabel &label() const noexcept
+    {
+        return label_;
+    }
+};
 template <class WorkerInfo>
 class TaskBase {
     friend void DepNode<WorkerInfo>::prepareTaskBase();
@@ -79,7 +116,7 @@ public:
     }
 
     virtual size_t getInputSize() const = 0;
-    virtual bool isValid() = 0;
+    virtual void checkValid(error::Stack &err) = 0;
     virtual void notifyOneInputReady() = 0;
     virtual bool areInputsReady() const = 0;
     virtual void startAsync(WorkerInfo) = 0;
@@ -151,11 +188,14 @@ public:
         return output_;
     }
 
-    virtual bool isValid() override
+    void checkValid(error::Stack &err) override
     {
-        return this->depnode() &&
-               std::all_of(inputs_.begin(), inputs_.end(),
-                           [](auto &&in) { return in.use_count() != 0; });
+        assert(this->depnode());
+
+        const NodeLabel &label = this->depnode()->label();
+        if (!std::all_of(inputs_.begin(), inputs_.end(),
+                         [](auto &&in) { return in.use_count() != 0; }))
+            err.add("Not enough inputs: ", label.str());
     }
 
     virtual void tick() override
@@ -197,38 +237,6 @@ struct TaskLabel {
     {
         return std::make_tuple(kind, portName, portBit) <
                std::make_tuple(rhs.kind, rhs.portName, rhs.portBit);
-    }
-};
-
-// NodeLabel is used to identify a DepNode in debugging/profiling.
-struct NodeLabel {
-    int id;
-    std::string kind, desc;
-};
-
-class DepNodeBase {
-private:
-    int priority_;
-    NodeLabel label_;
-
-public:
-    DepNodeBase(NodeLabel label) : priority_(-1), label_(std::move(label))
-    {
-    }
-
-    int priority() const noexcept
-    {
-        return priority_;
-    }
-
-    void priority(int newPri) noexcept
-    {
-        priority_ = newPri;
-    }
-
-    const NodeLabel &label() const noexcept
-    {
-        return label_;
     }
 };
 
@@ -741,6 +749,16 @@ private:
         return true;
     }
 
+    void checkInputSizeIsExpected(error::Stack &err)
+    {
+        GraphVisitor visitor;
+        visit(visitor);
+        const auto &id2node = visitor.getMap();
+        for (auto &&[id, node] : id2node)
+            if (node->parents.size() != id2node_.at(id)->task()->getInputSize())
+                err.add("Incorrect connection: ", node->label.str());
+    }
+
 public:
     TaskNetwork(
         std::unordered_map<int, std::shared_ptr<DepNode<WorkerInfo>>> id2node,
@@ -803,16 +821,12 @@ public:
             node->tick();
     }
 
-    bool isValid()
+    void checkValid(error::Stack &err)
     {
         for (auto &&[key, node] : id2node_)
-            if (!node->task()->isValid())
-                return false;
+            node->task()->checkValid(err);
 
-        if (!verifyInputSizeExpected())
-            return false;
-
-        return true;
+        checkInputSizeIsExpected(err);
     }
 
     TaskNetwork<WorkerInfo> merge(const TaskNetwork<WorkerInfo> &rhs)
@@ -1066,118 +1080,6 @@ TaskNetwork<WorkerInfo>::TaskNetwork(NetworkBuilderBase<WorkerInfo> &&builder)
 {
 }
 
-#include <picojson.h>
-
-template <class NetworkBuilder>
-typename NetworkBuilder::NetworkType readNetworkFromJSON(std::istream &is)
-{
-    picojson::value v;
-    const std::string err = picojson::parse(v, is);
-    if (!err.empty())
-        error::die("Invalid JSON of network: ", err);
-
-    NetworkBuilder builder;
-    readNetworkFromJSONImpl(builder, v);
-
-    return typename NetworkBuilder::NetworkType{std::move(builder)};
-}
-
-template <class NetworkBuilder>
-void readNetworkFromJSONImpl(NetworkBuilder &builder, picojson::value &v)
-{
-    picojson::object &obj = v.get<picojson::object>();
-    picojson::array &cells = obj["cells"].get<picojson::array>();
-    picojson::array &ports = obj["ports"].get<picojson::array>();
-    for (const auto &e : ports) {
-        picojson::object port = e.get<picojson::object>();
-        std::string type = port.at("type").get<std::string>();
-        int id = static_cast<int>(port.at("id").get<double>());
-        std::string portName = port.at("portName").get<std::string>();
-        int portBit = static_cast<int>(port.at("portBit").get<double>());
-        if (type == "input")
-            builder.INPUT(id, portName, portBit);
-        else if (type == "output")
-            builder.OUTPUT(id, portName, portBit);
-    }
-    for (const auto &e : cells) {
-        picojson::object cell = e.get<picojson::object>();
-        std::string type = cell.at("type").get<std::string>();
-        int id = static_cast<int>(cell.at("id").get<double>());
-        if (type == "AND")
-            builder.AND(id);
-        else if (type == "NAND")
-            builder.NAND(id);
-        else if (type == "ANDNOT")
-            builder.ANDNOT(id);
-        else if (type == "XOR")
-            builder.XOR(id);
-        else if (type == "XNOR")
-            builder.XNOR(id);
-        else if (type == "DFFP")
-            builder.DFF(id);
-        else if (type == "NOT")
-            builder.NOT(id);
-        else if (type == "NOR")
-            builder.NOR(id);
-        else if (type == "OR")
-            builder.OR(id);
-        else if (type == "ORNOT")
-            builder.ORNOT(id);
-        else if (type == "MUX")
-            builder.MUX(id);
-        else
-            error::die("Invalid JSON of network. Invalid type: ", type);
-    }
-    for (const auto &e : ports) {
-        picojson::object port = e.get<picojson::object>();
-        std::string type = port.at("type").get<std::string>();
-        int id = static_cast<int>(port.at("id").get<double>());
-        picojson::array &bits = port.at("bits").get<picojson::array>();
-        if (type == "input") {
-            // nothing to do!
-        }
-        else if (type == "output") {
-            for (const auto &b : bits) {
-                int logic = static_cast<int>(b.get<double>());
-                builder.connect(logic, id);
-            }
-        }
-    }
-    for (const auto &e : cells) {
-        picojson::object cell = e.get<picojson::object>();
-        std::string type = cell.at("type").get<std::string>();
-        int id = static_cast<int>(cell.at("id").get<double>());
-        picojson::object input = cell.at("input").get<picojson::object>();
-        if (type == "AND" || type == "NAND" || type == "XOR" ||
-            type == "XNOR" || type == "NOR" || type == "ANDNOT" ||
-            type == "OR" || type == "ORNOT") {
-            int A = static_cast<int>(input.at("A").get<double>());
-            int B = static_cast<int>(input.at("B").get<double>());
-            builder.connect(A, id);
-            builder.connect(B, id);
-        }
-        else if (type == "DFFP") {
-            int D = static_cast<int>(input.at("D").get<double>());
-            builder.connect(D, id);
-        }
-        else if (type == "NOT") {
-            int A = static_cast<int>(input.at("A").get<double>());
-            builder.connect(A, id);
-        }
-        else if (type == "MUX") {
-            int A = static_cast<int>(input.at("A").get<double>());
-            int B = static_cast<int>(input.at("B").get<double>());
-            int S = static_cast<int>(input.at("S").get<double>());
-            builder.connect(A, id);
-            builder.connect(B, id);
-            builder.connect(S, id);
-        }
-        else {
-            error::die("Invalid JSON of network. Invalid type: ", type);
-        }
-    }
-}
-
 class AsyncThread {
 private:
     // The C++17 keyword 'inline' is necessary here to avoid duplicate
@@ -1311,9 +1213,9 @@ public:
         return numInputs_;
     }
 
-    bool isValid() override
+    void checkValid(error::Stack &) override
     {
-        return true;
+        assert(this->depnode());
     }
 
     void notifyOneInputReady() override
@@ -1685,14 +1587,6 @@ public:
     {
     }
 
-    bool isValid()
-    {
-        for (auto &&net : nets_)
-            if (!net->isValid())
-                return false;
-        return true;
-    }
-
     void addNetwork(const std::shared_ptr<TaskNetwork<WorkerInfo>> &net)
     {
         nets_.push_back(net);
@@ -1752,5 +1646,133 @@ public:
             net->tick();
     }
 };
+
+template <class NetworkBuilder>
+typename NetworkBuilder::NetworkType readNetworkFromJSON(std::istream &is)
+{
+    picojson::value v;
+    const std::string err = picojson::parse(v, is);
+    if (!err.empty())
+        error::die("Invalid JSON of network: ", err);
+
+    NetworkBuilder builder;
+    readNetworkFromJSONImpl(builder, v);
+
+    return typename NetworkBuilder::NetworkType{std::move(builder)};
+}
+
+template <class NetworkBuilder>
+void readNetworkFromJSONImpl(NetworkBuilder &builder, picojson::value &v)
+{
+    picojson::object &obj = v.get<picojson::object>();
+    picojson::array &cells = obj["cells"].get<picojson::array>();
+    picojson::array &ports = obj["ports"].get<picojson::array>();
+    for (const auto &e : ports) {
+        picojson::object port = e.get<picojson::object>();
+        std::string type = port.at("type").get<std::string>();
+        int id = static_cast<int>(port.at("id").get<double>());
+        std::string portName = port.at("portName").get<std::string>();
+        int portBit = static_cast<int>(port.at("portBit").get<double>());
+        if (type == "input")
+            builder.INPUT(id, portName, portBit);
+        else if (type == "output")
+            builder.OUTPUT(id, portName, portBit);
+    }
+    for (const auto &e : cells) {
+        picojson::object cell = e.get<picojson::object>();
+        std::string type = cell.at("type").get<std::string>();
+        int id = static_cast<int>(cell.at("id").get<double>());
+        if (type == "AND")
+            builder.AND(id);
+        else if (type == "NAND")
+            builder.NAND(id);
+        else if (type == "ANDNOT")
+            builder.ANDNOT(id);
+        else if (type == "XOR")
+            builder.XOR(id);
+        else if (type == "XNOR")
+            builder.XNOR(id);
+        else if (type == "DFFP")
+            builder.DFF(id);
+        else if (type == "NOT")
+            builder.NOT(id);
+        else if (type == "NOR")
+            builder.NOR(id);
+        else if (type == "OR")
+            builder.OR(id);
+        else if (type == "ORNOT")
+            builder.ORNOT(id);
+        else if (type == "MUX")
+            builder.MUX(id);
+        else
+            error::die("Invalid JSON of network. Invalid type: ", type);
+    }
+    for (const auto &e : ports) {
+        picojson::object port = e.get<picojson::object>();
+        std::string type = port.at("type").get<std::string>();
+        int id = static_cast<int>(port.at("id").get<double>());
+        picojson::array &bits = port.at("bits").get<picojson::array>();
+        if (type == "input") {
+            // nothing to do!
+        }
+        else if (type == "output") {
+            for (const auto &b : bits) {
+                int logic = static_cast<int>(b.get<double>());
+                builder.connect(logic, id);
+            }
+        }
+    }
+    for (const auto &e : cells) {
+        picojson::object cell = e.get<picojson::object>();
+        std::string type = cell.at("type").get<std::string>();
+        int id = static_cast<int>(cell.at("id").get<double>());
+        picojson::object input = cell.at("input").get<picojson::object>();
+        if (type == "AND" || type == "NAND" || type == "XOR" ||
+            type == "XNOR" || type == "NOR" || type == "ANDNOT" ||
+            type == "OR" || type == "ORNOT") {
+            int A = static_cast<int>(input.at("A").get<double>());
+            int B = static_cast<int>(input.at("B").get<double>());
+            builder.connect(A, id);
+            builder.connect(B, id);
+        }
+        else if (type == "DFFP") {
+            int D = static_cast<int>(input.at("D").get<double>());
+            builder.connect(D, id);
+        }
+        else if (type == "NOT") {
+            int A = static_cast<int>(input.at("A").get<double>());
+            builder.connect(A, id);
+        }
+        else if (type == "MUX") {
+            int A = static_cast<int>(input.at("A").get<double>());
+            int B = static_cast<int>(input.at("B").get<double>());
+            int S = static_cast<int>(input.at("S").get<double>());
+            builder.connect(A, id);
+            builder.connect(B, id);
+            builder.connect(S, id);
+        }
+        else {
+            error::die("Invalid JSON of network. Invalid type: ", type);
+        }
+    }
+}
+
+template <class NetworkBuilder>
+std::shared_ptr<typename NetworkBuilder::NetworkType> readNetwork(
+    const blueprint::File &file)
+{
+    std::ifstream ifs{file.path, std::ios::binary};
+    if (!ifs)
+        error::die("Invalid [[file]] path: ", file.path);
+    auto net = std::make_shared<typename NetworkBuilder::NetworkType>(
+        readNetworkFromJSON<NetworkBuilder>(ifs));
+
+    error::Stack err;
+    net->checkValid(err);
+    if (!err.empty())
+        error::die("Invalid network named \"", file.name, "\":\n", err.str());
+
+    return net;
+}
 
 #endif

@@ -2,6 +2,8 @@
 #define VIRTUALSECUREPLATFORM_IYOKAN_ERROR_HPP
 
 #include <iostream>
+#include <sstream>
+#include <vector>
 
 #include <backward.hpp>
 
@@ -25,6 +27,34 @@ template <class... Args>
     // Abort
     std::exit(EXIT_FAILURE);
 }
+
+class Stack {
+private:
+    std::vector<std::string> msgs_;
+
+public:
+    template <class... Args>
+    void add(Args... args)
+    {
+        std::stringstream ss;
+        (ss << ... << args);
+        msgs_.push_back(ss.str());
+    }
+
+    bool empty() const
+    {
+        return msgs_.empty();
+    }
+
+    std::string str() const
+    {
+        std::stringstream ss;
+        for (auto&& msg : msgs_)
+            ss << msg << std::endl;
+        return ss.str();
+    }
+};
+
 }  // namespace error
 
 #endif
