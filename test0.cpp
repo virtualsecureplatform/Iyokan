@@ -640,7 +640,7 @@ void processAllGates(PlainNetwork& net,
 
 void setInput(std::shared_ptr<TaskPlainGateMem> task, int val)
 {
-    task->set(val);
+    task->set(val != 0 ? 1_b : 0_b);
 }
 
 void setROM(TaskPlainROM& rom, const std::vector<uint8_t>& src)
@@ -665,7 +665,7 @@ void setRAM(PlainNetwork& net, const std::vector<uint8_t>& src)
 
 int getOutput(std::shared_ptr<TaskPlainGateMem> task)
 {
-    return task->get();
+    return task->get() == 1_b ? 1 : 0;
 }
 
 void testProgressGraphMaker()
@@ -1183,10 +1183,9 @@ int main(int argc, char** argv)
     testFromJSONtest_register_4bit<PlainNetworkBuilder>();
     testSequentialCircuit<PlainNetworkBuilder>();
     testFromJSONtest_counter_4bit<PlainNetworkBuilder>();
-    testFromJSONdiamond_core_wo_ram_rom<PlainNetworkBuilder, TaskPlainROM,
-                                        uint8_t>(makePlainRAMNetwork("A"),
-                                                 makePlainRAMNetwork("B"),
-                                                 makePlainROMNetwork());
+    testFromJSONdiamond_core_wo_ram_rom<PlainNetworkBuilder, TaskPlainROM, Bit>(
+        makePlainRAMNetwork("A"), makePlainRAMNetwork("B"),
+        makePlainROMNetwork());
     testPrioritySetVisitor<PlainNetworkBuilder>();
     testDoPlainWithRAMROM();
 

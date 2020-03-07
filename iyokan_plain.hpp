@@ -4,21 +4,55 @@
 #include "iyokan.hpp"
 #include "packet.hpp"
 
+enum class Bit : bool {};
+inline constexpr Bit operator~(Bit l) noexcept
+{
+    return Bit(~static_cast<int>(l));
+}
+inline constexpr Bit operator|(Bit l, Bit r) noexcept
+{
+    return Bit(static_cast<int>(l) | static_cast<int>(r));
+}
+inline constexpr Bit operator&(Bit l, Bit r) noexcept
+{
+    return Bit(static_cast<int>(l) & static_cast<int>(r));
+}
+inline constexpr Bit operator^(Bit l, Bit r) noexcept
+{
+    return Bit(static_cast<int>(l) ^ static_cast<int>(r));
+}
+inline constexpr Bit operator|=(Bit &l, Bit r) noexcept
+{
+    return l = l | r;
+}
+inline constexpr Bit operator&=(Bit &l, Bit r) noexcept
+{
+    return l = l & r;
+}
+inline constexpr Bit operator^=(Bit &l, Bit r) noexcept
+{
+    return l = l ^ r;
+}
+inline Bit operator"" _b(unsigned long long x)
+{
+    return Bit(x != 0);
+}
+
 struct PlainWorkerInfo {
 };
 
-using TaskPlainGate = Task<uint8_t, uint8_t, PlainWorkerInfo>;
-using TaskPlainGateMem = TaskMem<uint8_t, uint8_t, PlainWorkerInfo>;
+using TaskPlainGate = Task<Bit, Bit, PlainWorkerInfo>;
+using TaskPlainGateMem = TaskMem<Bit, Bit, PlainWorkerInfo>;
 
-class TaskPlainGateDFF : public TaskDFF<uint8_t, uint8_t, PlainWorkerInfo> {
+class TaskPlainGateDFF : public TaskDFF<Bit, Bit, PlainWorkerInfo> {
 public:
     TaskPlainGateDFF()
     {
-        output() = 0;
+        output() = 0_b;
     }
 };
 
-class TaskPlainGateWIRE : public TaskMem<uint8_t, uint8_t, PlainWorkerInfo> {
+class TaskPlainGateWIRE : public TaskMem<Bit, Bit, PlainWorkerInfo> {
 private:
     void startAsyncImpl(PlainWorkerInfo) override
     {
@@ -35,7 +69,7 @@ private:
 
 public:
     TaskPlainGateWIRE(bool inputNeeded)
-        : TaskMem<uint8_t, uint8_t, PlainWorkerInfo>(inputNeeded ? 1 : 0)
+        : TaskMem<Bit, Bit, PlainWorkerInfo>(inputNeeded ? 1 : 0)
     {
     }
 
@@ -50,7 +84,7 @@ public:
     private:                                             \
         void startAsyncImpl(PlainWorkerInfo) override    \
         {                                                \
-            output() = (expr)&1;                         \
+            output() = (expr);                           \
         }                                                \
                                                          \
     public:                                              \
@@ -71,7 +105,7 @@ DEFINE_TASK_PLAIN_GATE(NOR, 2, ~(input(0) | input(1)));
 DEFINE_TASK_PLAIN_GATE(ORNOT, 2, (input(0) | ~input(1)));
 DEFINE_TASK_PLAIN_GATE(XOR, 2, (input(0) ^ input(1)));
 DEFINE_TASK_PLAIN_GATE(XNOR, 2, ~(input(0) ^ input(1)));
-DEFINE_TASK_PLAIN_GATE(MUX, 3, input(2) == 0 ? input(0) : input(1));
+DEFINE_TASK_PLAIN_GATE(MUX, 3, input(2) == 0_b ? input(0) : input(1));
 DEFINE_TASK_PLAIN_GATE(NOT, 1, ~input(0));
 #undef DEFINE_TASK_PLAIN_GATE
 
@@ -115,7 +149,7 @@ public:
     }
 };
 
-class TaskPlainROM : public Task<uint8_t, uint32_t, PlainWorkerInfo> {
+class TaskPlainROM : public Task<Bit, uint32_t, PlainWorkerInfo> {
 private:
     std::vector<uint32_t> data_;
 
@@ -124,12 +158,12 @@ private:
     {
         size_t addr = 0;
         for (int i = 6; i >= 0; i--)
-            addr = (addr << 1) | (input(i) & 1u);
+            addr = (addr << 1) | static_cast<size_t>(input(i));
         output() = data_.at(addr);
     }
 
 public:
-    TaskPlainROM() : Task<uint8_t, uint32_t, PlainWorkerInfo>(7), data_(1 << 7)
+    TaskPlainROM() : Task<Bit, uint32_t, PlainWorkerInfo>(7), data_(1 << 7)
     {
     }
 
@@ -156,19 +190,19 @@ public:
     }
 };
 
-class TaskPlainSplitter : public Task<uint32_t, uint8_t, PlainWorkerInfo> {
+class TaskPlainSplitter : public Task<uint32_t, Bit, PlainWorkerInfo> {
 private:
     size_t index_;
 
 private:
     void startAsyncImpl(PlainWorkerInfo) override
     {
-        output() = (input(0) >> index_) & 1u;
+        output() = Bit((input(0) >> index_) & 1u);
     }
 
 public:
     TaskPlainSplitter(size_t index)
-        : Task<uint32_t, uint8_t, PlainWorkerInfo>(1), index_(index)
+        : Task<uint32_t, Bit, PlainWorkerInfo>(1), index_(index)
     {
     }
 
@@ -179,8 +213,7 @@ public:
 };
 
 class TaskPlainRAM
-    : public Task<uint8_t /* only 1 bit used */, uint32_t /* only 8 bit used */,
-                  PlainWorkerInfo> {
+    : public Task<Bit, uint32_t /* only 8 Bit used */, PlainWorkerInfo> {
 public:
     const static size_t ADDRESS_BIT = 8;
 
@@ -192,21 +225,21 @@ private:
     {
         size_t addr = 0;
         for (size_t i = 0; i < ADDRESS_BIT; i++)
-            addr |= (input(i) & 1u) << i;
+            addr |= static_cast<size_t>(input(i)) << i;
         output() = data_.at(addr);
 
-        if (input(ADDRESS_BIT)) {
+        if (input(ADDRESS_BIT) == 1_b) {
             uint8_t val = 0;
             for (int i = 0; i < 8; i++)
-                val |= (input(ADDRESS_BIT + 1 + i) & 1u) << i;
+                val |= static_cast<uint8_t>(input(ADDRESS_BIT + 1 + i)) << i;
             data_.at(addr) = val;
         }
     }
 
 public:
     TaskPlainRAM()
-        : Task<uint8_t, uint32_t, PlainWorkerInfo>(
-              ADDRESS_BIT /* addr */ + 1 /* wren */ + 8 /* wdata */),
+        : Task<Bit, uint32_t, PlainWorkerInfo>(ADDRESS_BIT /* addr */ +
+                                               1 /* wren */ + 8 /* wdata */),
           data_(1 << ADDRESS_BIT)
     {
     }

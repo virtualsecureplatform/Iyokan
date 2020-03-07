@@ -96,7 +96,8 @@ private:
             auto &bits = resPacket.bits[atPortName];
             if (bits.size() < atPortBit + 1)
                 bits.resize(atPortBit + 1);
-            bits.at(atPortBit) = get<TaskPlainGateMem>(port)->get();
+            bits.at(atPortBit) =
+                static_cast<uint8_t>(get<TaskPlainGateMem>(port)->get());
         }
         // Get values of RAM
         // FIXME: subset of RAMs?
@@ -217,9 +218,9 @@ public:
         {
             auto reset = get_at("input", "reset");
             assert(reset);
-            reset->set(1);
+            reset->set(1_b);
             runner.run();
-            reset->set(0);
+            reset->set(0_b);
         }
 
         // Go computing
@@ -243,7 +244,7 @@ public:
 
                 runner.run();
 
-                return finflag->get();
+                return finflag->get() == 1_b;
             });
         }
 
