@@ -247,26 +247,26 @@ inline TaskNetwork<PlainWorkerInfo> makePlainRAMNetwork(
     for (size_t i = 0; i < TaskPlainRAM::ADDRESS_BIT; i++) {
         auto taskINPUT = builder.addINPUT<TaskPlainGateWIRE>(detail::genid(),
                                                              "addr", i, false);
-        builder.connectTasks(taskINPUT, taskRAM);
+        connectTasks(taskINPUT, taskRAM);
     }
     auto taskWriteEnabled =
         builder.addINPUT<TaskPlainGateWIRE>(detail::genid(), "wren", 0, false);
-    builder.connectTasks(taskWriteEnabled, taskRAM);
+    connectTasks(taskWriteEnabled, taskRAM);
     for (size_t i = 0; i < 8; i++) {
         auto taskINPUT = builder.addINPUT<TaskPlainGateWIRE>(detail::genid(),
                                                              "wdata", i, false);
-        builder.connectTasks(taskINPUT, taskRAM);
+        connectTasks(taskINPUT, taskRAM);
     }
     for (size_t i = 0; i < 8; i++) {
         auto taskSplitter = std::make_shared<TaskPlainSplitter>(i);
         builder.addTask(NodeLabel{detail::genid(), "SPLITTER",
                                   utility::fok("RAM[", i, "]")},
                         taskSplitter);
-        builder.connectTasks(taskRAM, taskSplitter);
+        connectTasks(taskRAM, taskSplitter);
 
         auto taskOUTPUT = builder.addOUTPUT<TaskPlainGateWIRE>(
             detail::genid(), "rdata", i, true);
-        builder.connectTasks(taskSplitter, taskOUTPUT);
+        connectTasks(taskSplitter, taskOUTPUT);
     }
 
     return TaskNetwork<PlainWorkerInfo>(std::move(builder));
@@ -308,8 +308,8 @@ inline TaskNetwork<PlainWorkerInfo> makePlainROMNetwork(size_t inAddrWidth,
                                                            "rdata", i, true);
 
         for (auto &&in : inputs)
-            builder.connectTasks(in, taskROMUX);
-        builder.connectTasks(taskROMUX, output);
+            connectTasks(in, taskROMUX);
+        connectTasks(taskROMUX, output);
     }
 
     return TaskNetwork<PlainWorkerInfo>(std::move(builder));

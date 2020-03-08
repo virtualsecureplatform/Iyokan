@@ -110,7 +110,7 @@ void capTFHEppNetWithCUFHEWIRE(CUFHENetworkWithTFHEpp& net)
             // Connect nodes
             brs0.push_back(connectWithBridge(cufheINPUT, cufhe2tfhepp));
             tfheppINPUT->acceptOneMoreInput();
-            bt.connectTasks(cufhe2tfhepp, tfheppINPUT);
+            connectTasks(cufhe2tfhepp, tfheppINPUT);
         }
         else if (kind == "output") {
             /*
@@ -124,7 +124,7 @@ void capTFHEppNetWithCUFHEWIRE(CUFHENetworkWithTFHEpp& net)
             auto tfhepp2cufhe = bt.emplaceTask<TaskTFHEpp2CUFHE>(
                 NodeLabel{detail::genid(), "tfhepp2cufhe", ""});
             // Connect nodes
-            bt.connectTasks(tfheppOUTPUT, tfhepp2cufhe);
+            connectTasks(tfheppOUTPUT, tfhepp2cufhe);
             brs1.push_back(connectWithBridge(tfhepp2cufhe, cufheOUTPUT));
         }
     }
@@ -169,7 +169,7 @@ void connectCUFHENetWithTFHEppNet(
 
         // CUFHE2TFHEpp --> TFHEpp INPUT
         out->acceptOneMoreInput();
-        NetworkBuilderBase<TFHEppWorkerInfo>::connectTasks(cufhe2tfhepp, out);
+        connectTasks(cufhe2tfhepp, out);
     }
 
     for (auto&& [rPortName, rPortBit, lPortName, lPortBit] : rhs2lhs) {
@@ -189,7 +189,7 @@ void connectCUFHENetWithTFHEppNet(
         tfhepp = tfhepp.merge(net);
 
         // TFHEpp OUTPUT --> TFHEpp2CUFHE
-        NetworkBuilderBase<TFHEppWorkerInfo>::connectTasks(in, tfhepp2cufhe);
+        connectTasks(in, tfhepp2cufhe);
 
         // TFHEpp2CUFHE --> Bridge --> CUFHE INPUT
         out->acceptOneMoreInput();
@@ -264,7 +264,7 @@ void makeTFHEppRAMNetworkForCUFHEImpl(
         bt.addTask(
             NodeLabel{detail::genid(), "CBWithInv", utility::fok("[", i, "]")},
             taskCB);
-        bt.connectTasks(taskINPUT, taskCB);
+        connectTasks(taskINPUT, taskCB);
         cbs.push_back(taskCB);
     }
 
@@ -275,17 +275,17 @@ void makeTFHEppRAMNetworkForCUFHEImpl(
 
     // Connect CBs and RAMUX.
     for (auto&& cb : cbs)
-        bt.connectTasks(cb, taskRAMUX);
+        connectTasks(cb, taskRAMUX);
 
     // Create SEIs and connect with CBs.
     auto taskSEI0 = std::make_shared<TaskTFHEppSEI>(0);
     bt.addTask(NodeLabel{detail::genid(), "SEI", "[0]"}, taskSEI0);
-    bt.connectTasks(taskRAMUX, taskSEI0);
+    connectTasks(taskRAMUX, taskSEI0);
 
     // Create output for read-out data and connect.
     auto taskOutputReadData =
         bt.getTask<TaskTFHEppGateWIRE>("output", "rdata", indexByte);
-    bt.connectTasks(taskSEI0, taskOutputReadData);
+    connectTasks(taskSEI0, taskOutputReadData);
 
     // Create input for write-in data.
     auto taskInputWriteData =
@@ -296,9 +296,9 @@ void makeTFHEppRAMNetworkForCUFHEImpl(
     // Create MUXWoSE and connect.
     auto taskMUXWoSE = std::make_shared<TaskTFHEppGateMUXWoSE>();
     bt.addTask(NodeLabel{detail::genid(), "MUXWoSE", ""}, taskMUXWoSE);
-    bt.connectTasks(taskSEI0, taskMUXWoSE);
-    bt.connectTasks(taskInputWriteData, taskMUXWoSE);
-    bt.connectTasks(taskInputWriteEnabled, taskMUXWoSE);
+    connectTasks(taskSEI0, taskMUXWoSE);
+    connectTasks(taskInputWriteData, taskMUXWoSE);
+    connectTasks(taskInputWriteEnabled, taskMUXWoSE);
 
     // Create links of CMUXs -> SEI -> GateBootstrapping.
     for (int i = 0; i < (1 << TaskCUFHERAMUX::ADDRESS_BIT); i++) {
@@ -315,11 +315,11 @@ void makeTFHEppRAMNetworkForCUFHEImpl(
             taskRAMUX->get(i));
 
         // ... and connect them.
-        bt.connectTasks(taskMUXWoSE, taskCMUXs);
+        connectTasks(taskMUXWoSE, taskCMUXs);
         for (auto&& cb : cbs)
-            bt.connectTasks(cb, taskCMUXs);
+            connectTasks(cb, taskCMUXs);
         bridge1.push_back(connectWithBridge(taskCMUXs, taskSEIAndKS));
-        bc.connectTasks(taskSEIAndKS, taskGB);
+        connectTasks(taskSEIAndKS, taskGB);
     }
 }
 
@@ -555,7 +555,7 @@ public:
             auto srcTask = get(src);
             auto dstTask = get(dst);
             dstTask->acceptOneMoreInput();
-            NetworkBuilderBase<cufhe::Ctxt>::connectTasks(srcTask, dstTask);
+            connectTasks(srcTask, dstTask);
         }
 
         // Set priority to each DepNode

@@ -199,8 +199,7 @@ public:
             auto srcTask = get(src);
             auto dstTask = get(dst);
             dstTask->acceptOneMoreInput();
-            NetworkBuilderBase<TFHEpp::TLWElvl0>::connectTasks(srcTask,
-                                                               dstTask);
+            connectTasks(srcTask, dstTask);
         }
 
         // Set priority to each DepNode

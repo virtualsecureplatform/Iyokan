@@ -220,6 +220,14 @@ public:
     }
 };
 
+template <class T0, class T1>
+void connectTasks(const std::shared_ptr<T0> &from,
+                  const std::shared_ptr<T1> &to)
+{
+    to->addInputPtr(from->getOutputPtr());
+    from->depnode()->addDependent(to->depnode());
+}
+
 // TaskLabel is used to find a certain task. Not all tasks need to have
 // TaskLabel, because many tasks don't have to be modified (e.g. set initial
 // value) once networks are organized.
@@ -869,7 +877,7 @@ public:
             ret.namedMems_.erase(inkey);
             ret.namedMems_.erase(outkey);
             out->acceptOneMoreInput();
-            NetworkBuilderBase<WorkerInfo>::connectTasks(in, out);
+            connectTasks(in, out);
         }
 
         for (auto &&[rPortName, rPortBit, lPortName, lPortBit] : rhs2lhs) {
@@ -888,7 +896,7 @@ public:
             ret.namedMems_.erase(inkey);
             ret.namedMems_.erase(outkey);
             out->acceptOneMoreInput();
-            NetworkBuilderBase<WorkerInfo>::connectTasks(in, out);
+            connectTasks(in, out);
         }
 
         return ret;
@@ -976,14 +984,6 @@ public:
         registerTask("output", portName, portBit, task);
         return task;
     }
-
-    template <class T0, class T1>
-    static void connectTasks(const std::shared_ptr<T0> &from,
-                             const std::shared_ptr<T1> &to)
-    {
-        to->addInputPtr(from->getOutputPtr());
-        from->depnode()->addDependent(to->depnode());
-    }
 };
 
 template <class TaskType, class TaskTypeMem, class TaskTypeDFF,
@@ -1045,7 +1045,7 @@ public:
 
     void connect(int from, int to)
     {
-        this->connectTasks(
+        connectTasks(
             std::dynamic_pointer_cast<TaskType>(this->node(from)->task()),
             std::dynamic_pointer_cast<TaskType>(this->node(to)->task()));
     }

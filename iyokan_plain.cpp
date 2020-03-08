@@ -184,7 +184,7 @@ public:
             auto srcTask = get(src);
             auto dstTask = get(dst);
             dstTask->acceptOneMoreInput();
-            NetworkBuilderBase<uint8_t>::connectTasks(srcTask, dstTask);
+            connectTasks(srcTask, dstTask);
         }
 
         // Set priority to each DepNode

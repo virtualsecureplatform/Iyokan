@@ -589,7 +589,7 @@ inline void makeTFHEppRAMNetworkImpl(
         builder.addTask(
             NodeLabel{detail::genid(), "CBWithInv", utility::fok("[", i, "]")},
             taskCB);
-        builder.connectTasks(taskINPUT, taskCB);
+        connectTasks(taskINPUT, taskCB);
         cbs.push_back(taskCB);
     }
 
@@ -600,17 +600,17 @@ inline void makeTFHEppRAMNetworkImpl(
 
     // Connect CBs and RAMUX.
     for (auto &&cb : cbs)
-        builder.connectTasks(cb, taskRAMUX);
+        connectTasks(cb, taskRAMUX);
 
     // Create SEIs and connect with CBs.
     auto taskSEI0 = std::make_shared<TaskTFHEppSEI>(0);
     builder.addTask(NodeLabel{detail::genid(), "SEI", "[0]"}, taskSEI0);
-    builder.connectTasks(taskRAMUX, taskSEI0);
+    connectTasks(taskRAMUX, taskSEI0);
 
     // Create output for read-out data and connect.
     auto taskOutputReadData =
         builder.getTask<TaskTFHEppGateWIRE>("output", "rdata", indexByte);
-    builder.connectTasks(taskSEI0, taskOutputReadData);
+    connectTasks(taskSEI0, taskOutputReadData);
 
     // Create input for write-in data.
     auto taskInputWriteData =
@@ -621,9 +621,9 @@ inline void makeTFHEppRAMNetworkImpl(
     // Create MUXWoSE and connect.
     auto taskMUXWoSE = std::make_shared<TaskTFHEppGateMUXWoSE>();
     builder.addTask(NodeLabel{detail::genid(), "MUXWoSE", ""}, taskMUXWoSE);
-    builder.connectTasks(taskSEI0, taskMUXWoSE);
-    builder.connectTasks(taskInputWriteData, taskMUXWoSE);
-    builder.connectTasks(taskInputWriteEnabled, taskMUXWoSE);
+    connectTasks(taskSEI0, taskMUXWoSE);
+    connectTasks(taskInputWriteData, taskMUXWoSE);
+    connectTasks(taskInputWriteEnabled, taskMUXWoSE);
 
     // Create links of CMUXs -> SEI -> GateBootstrapping.
     for (int i = 0; i < (1 << TaskTFHEppRAMUX::ADDRESS_BIT); i++) {
@@ -646,11 +646,11 @@ inline void makeTFHEppRAMNetworkImpl(
             taskGB);
 
         // ... and connect them.
-        builder.connectTasks(taskMUXWoSE, taskCMUXs);
+        connectTasks(taskMUXWoSE, taskCMUXs);
         for (auto &&cb : cbs)
-            builder.connectTasks(cb, taskCMUXs);
-        builder.connectTasks(taskCMUXs, taskSEI);
-        builder.connectTasks(taskSEI, taskGB);
+            connectTasks(cb, taskCMUXs);
+        connectTasks(taskCMUXs, taskSEI);
+        connectTasks(taskSEI, taskGB);
     }
 }
 
@@ -725,16 +725,16 @@ inline TaskNetwork<TFHEppWorkerInfo> makeTFHEppROMNetwork(
                                                               "addr", i, false);
         auto taskCB = builder.emplaceTask<TaskTFHEppCB>(
             NodeLabel{detail::genid(), "CB", utility::fok("[", i, "]")});
-        builder.connectTasks(taskINPUT, taskCB);
-        builder.connectTasks(taskCB, taskROMUX);
+        connectTasks(taskINPUT, taskCB);
+        connectTasks(taskCB, taskROMUX);
     }
     for (int i = log2NumWordsPerTRLWE; i < inAddrWidth; i++) {
         auto taskINPUT = builder.addINPUT<TaskTFHEppGateWIRE>(detail::genid(),
                                                               "addr", i, false);
         auto taskCBInv = builder.emplaceTask<TaskTFHEppCBInv>(
             NodeLabel{detail::genid(), "CBInv", utility::fok("[", i, "]")});
-        builder.connectTasks(taskINPUT, taskCBInv);
-        builder.connectTasks(taskCBInv, taskROMUX);
+        connectTasks(taskINPUT, taskCBInv);
+        connectTasks(taskCBInv, taskROMUX);
     }
 
     // Create SEIs and outputs, and connect them properly
@@ -743,11 +743,11 @@ inline TaskNetwork<TFHEppWorkerInfo> makeTFHEppROMNetwork(
         builder.addTask(
             NodeLabel{detail::genid(), "SEI", utility::fok("[", i, "]")},
             taskSEI);
-        builder.connectTasks(taskROMUX, taskSEI);
+        connectTasks(taskROMUX, taskSEI);
 
         auto taskOUTPUT = builder.addOUTPUT<TaskTFHEppGateWIRE>(
             detail::genid(), "rdata", i, true);
-        builder.connectTasks(taskSEI, taskOUTPUT);
+        connectTasks(taskSEI, taskOUTPUT);
     }
 
     return TaskNetwork<TFHEppWorkerInfo>(std::move(builder));
