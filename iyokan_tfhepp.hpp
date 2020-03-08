@@ -186,9 +186,15 @@ private:
         uint32_t log2NumTRLWE = inAddrWidth_ - log2NumWordsPerTRLWE_;
         assert(data_.size() == (1 << log2NumTRLWE));
 
+        if (log2NumTRLWE == 0)  // data_.size() == 1
+            return data_[0];
+
         for (int index = 0; index < data_.size() / 2; index++)
             TFHEpp::CMUXFFTlvl1(temp[index], input(log2NumWordsPerTRLWE_),
                                 data_[2 * index], data_[2 * index + 1]);
+
+        if (log2NumTRLWE == 1)  // data_.size() == 2
+            return temp[0];
 
         for (uint32_t bit = 0; bit < log2NumTRLWE - 2; bit++) {
             uint32_t stride = 1 << bit;
