@@ -163,7 +163,7 @@ public:
 
                 std::vector<Bit> &init = it->second;
                 if (init.size() != inAddrSpaceSize * bprom.outRdataWidth)
-                    error::die("Invalid request packet: wrong length of RAM");
+                    error::die("Invalid request packet: wrong length of ROM");
 
                 for (int addr = 0; addr < inAddrSpaceSize; addr++) {
                     for (int ibit = 0; ibit < bprom.outRdataWidth; ibit++) {
