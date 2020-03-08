@@ -95,6 +95,8 @@ test_iyokan [
   assert_regex r, /#cycle\t346/
   assert_regex r, /f0\t1/
   assert_regex r, /x8\t5/
+  assert_regex r, /0001e0 02 00 27 00 01 00 02 00 27 00 01 00 03 00 27 00/
+  assert_regex r, /0001f0 03 00 05 00 27 00 00 00 00 00 3b 00 05 00 00 00/
 
   r = check_code "./kvsp-packet", ["plain-unpack-json", "_test_plain_res_packet01"]
   json = JSON.parse(r)
@@ -204,6 +206,8 @@ if $SLOW_MODE_ENABLED
       assert_regex r, /#cycle\t346/
       assert_regex r, /f0\t1/
       assert_regex r, /x8\t5/
+      assert_regex r, /0001e0 02 00 27 00 01 00 02 00 27 00 01 00 03 00 27 00/
+      assert_regex r, /0001f0 03 00 05 00 27 00 00 00 00 00 3b 00 05 00 00 00/
 
       r = check_code "./kvsp-packet", ["dec-json", "_test_sk", "_test_res_packet01"]
       json = JSON.parse(r)

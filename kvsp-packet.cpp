@@ -40,11 +40,12 @@ void print(const PlainPacket& packet, std::ostream& os)
     for (int i = 0; i < WIDTH; i++)
         os << std::setw(3) << i;
     os << std::endl;
-    for (size_t addr = 0; addr < ramA.size() * 2; addr++) {
+    for (size_t addr = 0; addr < ramA.size() / 8 * 2; addr++) {
         if (addr % WIDTH == 0)
             os << std::setw(6) << std::setfill('0') << std::hex << addr << " ";
         os << std::setw(2) << std::setfill('0') << std::hex
-           << static_cast<int>((addr % 2 == 1 ? ramA : ramB).at(addr / 2))
+           << bitvec2i(addr % 2 == 1 ? ramA : ramB, addr / 2 * 8,
+                       (addr / 2 + 1) * 8)
            << " ";
         if (addr % WIDTH == WIDTH - 1)
             os << std::endl;
