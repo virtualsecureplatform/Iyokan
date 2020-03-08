@@ -151,38 +151,59 @@ public:
     }
 };
 
+class TaskTFHEppCBInv : public TaskAsync<TFHEpp::TLWElvl0, TFHEpp::TRGSWFFTlvl1,
+                                         TFHEppWorkerInfo> {
+private:
+    void startSync(TFHEppWorkerInfo wi) override
+    {
+        auto ck = wi.circuitKey;
+        assert(ck);
+        TFHEpp::CircuitBootstrappingFFTInv(output(), input(0), *ck);
+    }
+
+public:
+    TaskTFHEppCBInv()
+        : TaskAsync<TFHEpp::TLWElvl0, TFHEpp::TRGSWFFTlvl1, TFHEppWorkerInfo>(1)
+    {
+    }
+};
+
 class TaskTFHEppROMUX : public TaskAsync<TFHEpp::TRGSWFFTlvl1,
                                          TFHEpp::TRLWElvl1, TFHEppWorkerInfo> {
 private:
-    const static size_t ADDRESS_BIT = 7, WIDTH_BIT = 5;
+    size_t inAddrWidth_, numWordsPerTRLWE_, log2NumWordsPerTRLWE_;
     std::vector<TFHEpp::TRLWElvl1> data_;
+
+    // Workplace for UROMUX()
+    std::vector<TFHEpp::TRLWElvl1> UROMUX_temp;
 
 private:
     TFHEpp::TRLWElvl1 UROMUX()
     {
-        const uint32_t num_trlwe = 1 << (ADDRESS_BIT - WIDTH_BIT);
-        std::array<TFHEpp::TRLWElvl1, num_trlwe / 2> temp;
+        std::vector<TFHEpp::TRLWElvl1> &temp = UROMUX_temp;
+        temp.resize(data_.size() / 2);
 
-        for (uint32_t index = 0; index < num_trlwe / 2; index++)
-            TFHEpp::CMUXFFTlvl1(temp[index], input(WIDTH_BIT),
-                                data_[2 * index + 1], data_[2 * index]);
+        uint32_t log2NumTRLWE = inAddrWidth_ - log2NumWordsPerTRLWE_;
+        assert(data_.size() == (1 << log2NumTRLWE));
 
-        for (uint32_t bit = 0; bit < (ADDRESS_BIT - WIDTH_BIT - 2); bit++) {
-            const uint32_t stride = 1 << bit;
-            const uint32_t offset = (1 << bit) - 1;
-            for (uint32_t index = 0; index < (num_trlwe >> (bit + 1));
-                 index++) {
-                TFHEpp::CMUXFFTlvl1(temp[(2 * index + 1) * stride + offset],
-                                    input(WIDTH_BIT + bit + 1),
-                                    temp[(2 * index + 1) * stride + offset],
-                                    temp[(2 * index) * stride + offset]);
+        for (int index = 0; index < data_.size() / 2; index++)
+            TFHEpp::CMUXFFTlvl1(temp[index], input(log2NumWordsPerTRLWE_),
+                                data_[2 * index], data_[2 * index + 1]);
+
+        for (uint32_t bit = 0; bit < log2NumTRLWE - 2; bit++) {
+            uint32_t stride = 1 << bit;
+            for (int index = 0; index < (data_.size() >> (bit + 2)); index++) {
+                TFHEpp::CMUXFFTlvl1(temp[(2 * index) * stride],
+                                    input(log2NumWordsPerTRLWE_ + bit + 1),
+                                    temp[(2 * index) * stride],
+                                    temp[(2 * index + 1) * stride]);
             }
         }
-        const uint32_t stride = 1 << (ADDRESS_BIT - WIDTH_BIT - 2);
-        const uint32_t offset = (1 << (ADDRESS_BIT - WIDTH_BIT - 2)) - 1;
+
         TFHEpp::TRLWElvl1 res;
-        TFHEpp::CMUXFFTlvl1(res, input(ADDRESS_BIT - 1), temp[stride + offset],
-                            temp[offset]);
+        uint32_t stride = 1 << (inAddrWidth_ - log2NumWordsPerTRLWE_ - 2);
+        TFHEpp::CMUXFFTlvl1(res, input(inAddrWidth_ - 1), temp[0],
+                            temp[stride]);
         return res;
     }
 
@@ -194,19 +215,20 @@ private:
                                                2 * N - (N >> 1));
         TFHEpp::PolynomialMulByXaiMinusOnelvl1(temp[1], data[1],
                                                2 * N - (N >> 1));
-        TFHEpp::trgswfftExternalProductlvl1(temp, temp, input(WIDTH_BIT - 1));
+        TFHEpp::trgswfftExternalProductlvl1(temp, temp,
+                                            input(log2NumWordsPerTRLWE_ - 1));
         for (uint32_t i = 0; i < N; i++) {
             acc[0][i] = temp[0][i] + data[0][i];
             acc[1][i] = temp[1][i] + data[1][i];
         }
 
-        for (uint32_t bit = 2; bit <= WIDTH_BIT; bit++) {
+        for (uint32_t bit = 2; bit <= log2NumWordsPerTRLWE_; bit++) {
             TFHEpp::PolynomialMulByXaiMinusOnelvl1(temp[0], acc[0],
                                                    2 * N - (N >> bit));
             TFHEpp::PolynomialMulByXaiMinusOnelvl1(temp[1], acc[1],
                                                    2 * N - (N >> bit));
-            TFHEpp::trgswfftExternalProductlvl1(temp, temp,
-                                                input(WIDTH_BIT - bit));
+            TFHEpp::trgswfftExternalProductlvl1(
+                temp, temp, input(log2NumWordsPerTRLWE_ - bit));
             for (uint32_t i = 0; i < N; i++) {
                 acc[0][i] += temp[0][i];
                 acc[1][i] += temp[1][i];
@@ -216,18 +238,22 @@ private:
 
     void startSync(TFHEppWorkerInfo wi) override
     {
-        // input(0) : TRGSWFFTlvl1 -> data : TRLWElvl1
         TFHEpp::TRLWElvl1 data = UROMUX();
-        // data : TRLWElvl1 -> output() : TRLWElvl1
         LROMUX(wi.params.N, data);
     }
 
 public:
-    TaskTFHEppROMUX()
+    TaskTFHEppROMUX(size_t inAddrWidth, size_t log2OutRdataWidth)
         : TaskAsync<TFHEpp::TRGSWFFTlvl1, TFHEpp::TRLWElvl1, TFHEppWorkerInfo>(
-              ADDRESS_BIT),
-          data_(1 << (ADDRESS_BIT - WIDTH_BIT))
+              inAddrWidth),
+          inAddrWidth_(inAddrWidth)
     {
+        assert(TFHEpp::DEF_Nbit >= log2OutRdataWidth);
+        assert(inAddrWidth >= TFHEpp::DEF_Nbit - log2OutRdataWidth);
+
+        log2NumWordsPerTRLWE_ = TFHEpp::DEF_Nbit - log2OutRdataWidth;
+        numWordsPerTRLWE_ = 1 << log2NumWordsPerTRLWE_;
+        data_.resize(1 << (inAddrWidth - log2NumWordsPerTRLWE_));
     }
 
     size_t size() const
@@ -238,12 +264,6 @@ public:
     void set(size_t index, TFHEpp::TRLWElvl1 val)
     {
         data_.at(index) = val;
-    }
-
-    void set128le(size_t addr, TFHEpp::TRLWElvl1 val)
-    {
-        assert((addr & 0b1111111) == 0);
-        data_.at(addr >> 7) = std::move(val);
     }
 };
 
@@ -654,52 +674,65 @@ inline TaskNetwork<TFHEppWorkerInfo> makeTFHEppRAMNetwork(
     return TaskNetwork<TFHEppWorkerInfo>(std::move(builder));
 }
 
-inline TaskNetwork<TFHEppWorkerInfo> makeTFHEppROMNetwork()
+inline TaskNetwork<TFHEppWorkerInfo> makeTFHEppROMNetwork(
+    size_t inAddrWidth, size_t log2OutRdataWidth)
 {
+    size_t outRdataWidth = 1 << log2OutRdataWidth,
+           log2NumWordsPerTRLWE = TFHEpp::DEF_Nbit - log2OutRdataWidth;
+
     /*
-       INPUT (addr[0]) -- CB --+-----+  +-- SEI --- OUTPUT (rdata[0])
-                               |  R  |  |
-       INPUT (addr[1]) -- CB --+  O  +--+-- SEI --- OUTPUT (rdata[1])
-                               |  M  |  |
-       INPUT (addr[2]) -- CB --+  U  +  +-- SEI --- OUTPUT (rdata[2])
-                               |  X  |  |
-                                 ...       ...
-                               |     |  |
-       INPUT (addr[6]) -- CB --+-----+  +-- SEI --- OUTPUT (rdata[6])
-                                        |
-                                        +-- SEI --- OUTPUT (rdata[7])
-                                        |
-                                           ...
-                                        |
-                                        +-- SEI --- OUTPUT (rdata[31])
+       INPUT (addr[0])  ----------- CB -----+-----+  +-- SEI --- OUTPUT
+                                            |  R  |  |            (rdata[0])
+       INPUT (addr[1])  ----------- CB -----+  O  +--+-- SEI --- OUTPUT
+                                            |  M  |  |            (rdata[1])
+       INPUT (addr[2])  ----------- CB -----+  U  |  +-- SEI --- OUTPUT
+                                            |  X  |  |            (rdata[2])
+                                              ...
+                                            |     |  +-- SEI
+                                            |     |       |
+                                            |     |     OUTPUT
+       INPUT            ----------- CB -----+     |  (rdata[outRdataWidth])
+        (addr[log2NumWordsPerTRLWE-1])      |     |
+                                            |     |
+       INPUT            ----------- CBInv --+     |
+        (addr[log2NumWordsPerTRLWE])        |     |
+                                            |     |
+       INPUT            ----------- CBInv --+     |
+        (addr[log2NumWordsPerTRLWE+1])      |     |
+                                              ...
+                                            |     |
+       INPUT            ----------- CBInv --+-----+
+        (addr[inAddrWidth])
     */
 
     NetworkBuilderBase<TFHEppWorkerInfo> builder;
 
-    // Create inputs and CBs.
-    std::vector<std::shared_ptr<TaskTFHEppCB>> cbs;
-    for (int i = 0; i < 7; i++) {
-        auto taskINPUT = builder.addINPUT<TaskTFHEppGateWIRE>(detail::genid(),
-                                                              "addr", i, false);
-        auto taskCB = std::make_shared<TaskTFHEppCB>();
-        builder.addTask(
-            NodeLabel{detail::genid(), "CB", utility::fok("[", i, "]")},
-            taskCB);
-        builder.connectTasks(taskINPUT, taskCB);
-        cbs.push_back(taskCB);
-    }
-
     // Create ROMUX.
-    auto taskROMUX = std::make_shared<TaskTFHEppROMUX>();
-    builder.addTask(NodeLabel{detail::genid(), "ROMUX", ""}, taskROMUX);
+    auto taskROMUX = builder.emplaceTask<TaskTFHEppROMUX>(
+        NodeLabel{detail::genid(), "ROMUX", ""}, inAddrWidth,
+        log2OutRdataWidth);
     builder.registerTask("rom", "all", 0, taskROMUX);
 
-    // Connect CBs and ROMUX
-    for (auto &&cb : cbs)
-        builder.connectTasks(cb, taskROMUX);
+    // Create inputs and CB/CBInvs, and connect them to ROMUX.
+    for (int i = 0; i < log2NumWordsPerTRLWE; i++) {
+        auto taskINPUT = builder.addINPUT<TaskTFHEppGateWIRE>(detail::genid(),
+                                                              "addr", i, false);
+        auto taskCB = builder.emplaceTask<TaskTFHEppCB>(
+            NodeLabel{detail::genid(), "CB", utility::fok("[", i, "]")});
+        builder.connectTasks(taskINPUT, taskCB);
+        builder.connectTasks(taskCB, taskROMUX);
+    }
+    for (int i = log2NumWordsPerTRLWE; i < inAddrWidth; i++) {
+        auto taskINPUT = builder.addINPUT<TaskTFHEppGateWIRE>(detail::genid(),
+                                                              "addr", i, false);
+        auto taskCBInv = builder.emplaceTask<TaskTFHEppCBInv>(
+            NodeLabel{detail::genid(), "CBInv", utility::fok("[", i, "]")});
+        builder.connectTasks(taskINPUT, taskCBInv);
+        builder.connectTasks(taskCBInv, taskROMUX);
+    }
 
     // Create SEIs and outputs, and connect them properly
-    for (int i = 0; i < 32; i++) {
+    for (int i = 0; i < outRdataWidth; i++) {
         auto taskSEI = std::make_shared<TaskTFHEppSEI>(i);
         builder.addTask(
             NodeLabel{detail::genid(), "SEI", utility::fok("[", i, "]")},

@@ -357,11 +357,13 @@ CUFHENetworkWithTFHEpp makeTFHEppRAMNetworkForCUFHE(
     return ret;
 }
 
-CUFHENetworkWithTFHEpp makeTFHEppROMNetworkForCUFHE()
+CUFHENetworkWithTFHEpp makeTFHEppROMNetworkForCUFHE(size_t inAddrWidth,
+                                                    size_t log2OutRdataWidth)
 {
     auto ret = CUFHENetworkWithTFHEpp{
         nullptr,
-        std::make_shared<TFHEppNetwork>(makeTFHEppROMNetwork()),
+        std::make_shared<TFHEppNetwork>(
+            makeTFHEppROMNetwork(inAddrWidth, log2OutRdataWidth)),
         {},
         {}};
     capTFHEppNetWithCUFHEWIRE(ret);
@@ -519,9 +521,13 @@ public:
         // [[builtin]] type = rom
         for (const auto& bprom : bp.builtinROMs()) {
             assert(reqPacket_.ck);
-            assert(bprom.inAddrWidth == 7 && bprom.outRdataWidth == 32);
 
-            auto net = makeTFHEppROMNetworkForCUFHE();
+            if (!utility::isPowerOfTwo(bprom.outRdataWidth))
+                error::die("Invalid out_rdata_width of ROM \"", bprom.name,
+                           "\": ", "must be a power of 2.");
+
+            auto net = makeTFHEppROMNetworkForCUFHE(
+                bprom.inAddrWidth, utility::log2(bprom.outRdataWidth));
             name2cnet_.emplace(bprom.name, net.cufheNet);
             name2tnet_.emplace(bprom.name, net.tfheppNet);
             merge(bridges0_, net.bridges0);

@@ -168,9 +168,13 @@ public:
         // [[builtin]] type = rom
         for (const auto &bprom : bp.builtinROMs()) {
             assert(reqPacket_.ck);
-            assert(bprom.inAddrWidth == 7 && bprom.outRdataWidth == 32);
 
-            auto net = std::make_shared<TFHEppNetwork>(makeTFHEppROMNetwork());
+            if (!utility::isPowerOfTwo(bprom.outRdataWidth))
+                error::die("Invalid out_rdata_width of ROM \"", bprom.name,
+                           "\": ", "must be a power of 2.");
+
+            auto net = std::make_shared<TFHEppNetwork>(makeTFHEppROMNetwork(
+                bprom.inAddrWidth, utility::log2(bprom.outRdataWidth)));
             name2net_.emplace(bprom.name, net);
 
             // Set initial ROM data

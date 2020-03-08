@@ -2,6 +2,7 @@
 #define VIRTUALSECUREPLATFORM_IYOKAN_UTILITY_HPP
 
 #include <cassert>
+#include <cmath>
 #include <iostream>
 #include <regex>
 #include <vector>
@@ -25,6 +26,16 @@ inline std::vector<std::string> regexMatch(const std::string &text,
     for (auto &&elm : m)
         ret.push_back(elm.str());
     return ret;
+}
+
+inline bool isPowerOfTwo(uint64_t n)
+{
+    return (n != 0) && ((n & (n - 1)) == 0);
+}
+
+inline uint64_t log2(uint64_t n)
+{
+    return std::log2(n);
 }
 
 }  // namespace utility
