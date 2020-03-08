@@ -114,6 +114,33 @@ end
 
 test_iyokan [
   "plain",
+  "--blueprint", "test/cahp-emerald.toml",
+  "-i", "_test_plain_req_packet01",
+  "-o", "_test_plain_res_packet01",
+] do |_|
+  r = check_code "./kvsp-packet", ["plain-unpack", "_test_plain_res_packet01"]
+  assert_regex r, /#cycle\t261/
+  assert_regex r, /f0\t1/
+  assert_regex r, /x8\t5/
+  assert_regex r, /0001e0 02 00 27 00 01 00 02 00 27 00 01 00 03 00 27 00/
+  assert_regex r, /0001f0 03 00 05 00 27 00 00 00 00 00 3b 00 05 00 00 00/
+
+  r = check_code "./kvsp-packet", ["plain-unpack-json", "_test_plain_res_packet01"]
+  json = JSON.parse(r)
+  assert_include json, { "type" => "flag", "addr" => 0, "byte" => 1 }
+  assert_include json, { "type" => "reg", "addr" => 8, "byte" => 5 }
+  [
+    0x02, 0x00, 0x27, 0x00, 0x01, 0x00, 0x02, 0x00,
+    0x27, 0x00, 0x01, 0x00, 0x03, 0x00, 0x27, 0x00,
+    0x03, 0x00, 0x05, 0x00, 0x27, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x3b, 0x00, 0x05, 0x00, 0x00, 0x00,
+  ].reverse.each_with_index do |byte, index|
+    assert_include json, { "type" => "ram", "addr" => (512 - 1 - index), "byte" => byte }
+  end
+end
+
+test_iyokan [
+  "plain",
   "--blueprint", "test/cahp-diamond.toml",
   "-i", "_test_plain_req_packet00",
   "-o", "_test_plain_res_packet00",
@@ -204,6 +231,35 @@ if $SLOW_MODE_ENABLED
     ] do |_|
       r = check_code "./kvsp-packet", ["dec", "_test_sk", "_test_res_packet01"]
       assert_regex r, /#cycle\t346/
+      assert_regex r, /f0\t1/
+      assert_regex r, /x8\t5/
+      assert_regex r, /0001e0 02 00 27 00 01 00 02 00 27 00 01 00 03 00 27 00/
+      assert_regex r, /0001f0 03 00 05 00 27 00 00 00 00 00 3b 00 05 00 00 00/
+
+      r = check_code "./kvsp-packet", ["dec-json", "_test_sk", "_test_res_packet01"]
+      json = JSON.parse(r)
+      assert_include json, { "type" => "flag", "addr" => 0, "byte" => 1 }
+      assert_include json, { "type" => "reg", "addr" => 8, "byte" => 5 }
+      [
+        0x02, 0x00, 0x27, 0x00, 0x01, 0x00, 0x02, 0x00,
+        0x27, 0x00, 0x01, 0x00, 0x03, 0x00, 0x27, 0x00,
+        0x03, 0x00, 0x05, 0x00, 0x27, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x3b, 0x00, 0x05, 0x00, 0x00, 0x00,
+      ].reverse.each_with_index do |byte, index|
+        assert_include json, { "type" => "ram", "addr" => (512 - 1 - index), "byte" => byte }
+      end
+    end
+
+    test_iyokan [
+      "tfhe",
+      "--blueprint", "test/cahp-emerald.toml",
+      "-i", "_test_req_packet01",
+      "-o", "_test_res_packet01",
+      "-c", "261",
+      "--enable-gpu",
+    ] do |_|
+      r = check_code "./kvsp-packet", ["dec", "_test_sk", "_test_res_packet01"]
+      assert_regex r, /#cycle\t261/
       assert_regex r, /f0\t1/
       assert_regex r, /x8\t5/
       assert_regex r, /0001e0 02 00 27 00 01 00 02 00 27 00 01 00 03 00 27 00/
