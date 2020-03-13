@@ -1,5 +1,3 @@
-#include "kvsp-packet.hpp"
-
 #include "iyokan.hpp"
 
 //
@@ -538,26 +536,6 @@ void testProgressGraphMaker()
     assert(dot.find("n3 -> n4") != std::string::npos);
 }
 
-void testDoPlainWithRAMROM()
-{
-    // Prepare request packet
-    writeToArchive("_test_plain_req_packet00", parseELF("test/test00.elf"));
-
-    Options opt;
-    opt.blueprint = NetworkBlueprint{"test/cahp-diamond.toml"};
-    opt.inputFile = "_test_plain_req_packet00";
-    opt.outputFile = "_test_plain_res_packet00";
-    opt.numCycles = 8;
-    opt.quiet = true;
-
-    doPlain(opt);
-
-    auto resPacket = readFromArchive<PlainPacket>("_test_plain_res_packet00");
-    assert(bitvec2i(resPacket.bits.at("finflag")) == 1);
-    assert(bitvec2i(resPacket.bits.at("reg_x0")) == 42);
-    assert(bitvec2i(resPacket.ram.at("ramB"), 12 * 8, 13 * 8) == 42);
-}
-
 #include "iyokan_tfhepp.hpp"
 
 class TFHEppTestHelper {
@@ -606,16 +584,6 @@ public:
     const TFHEpp::TLWElvl0& one() const
     {
         return one_;
-    }
-
-    std::string getELFAsPacketFile(const std::string& elfFilePath) const
-    {
-        // Read packet
-        auto reqPacket = parseELF(elfFilePath).encrypt(*sk());
-        // Write packet into temporary file
-        static const std::string outFilePath = "_test_req_packet00";
-        writeToArchive(outFilePath, reqPacket);
-        return outFilePath;
     }
 };
 
@@ -698,27 +666,6 @@ void testTFHEppSerialization()
     }
 }
 
-void testDoTFHEWithRAMROM()
-{
-    auto& h = TFHEppTestHelper::instance();
-
-    Options opt;
-    opt.blueprint = NetworkBlueprint{"test/cahp-diamond.toml"};
-    opt.inputFile = h.getELFAsPacketFile("test/test00.elf");
-    opt.outputFile = "_test_res_packet00";
-    opt.numCycles = 8;
-
-    doTFHE(opt);
-
-    writeToArchive("_test_sk", *h.sk());
-    auto resPacket = readFromArchive<TFHEPacket>("_test_res_packet00");
-    auto plainResPacket = resPacket.decrypt(*h.sk());
-
-    assert(bitvec2i(plainResPacket.bits.at("finflag")) == 1);
-    assert(bitvec2i(plainResPacket.bits.at("reg_x0")) == 42);
-    assert(bitvec2i(plainResPacket.ram.at("ramB"), 12 * 8, 13 * 8) == 42);
-}
-
 #ifdef IYOKAN_CUDA_ENABLED
 #include "iyokan_cufhe.hpp"
 
@@ -798,26 +745,6 @@ int getOutput(std::shared_ptr<TaskCUFHEGateMem> task)
     cufhe::Ptxt p;
     cufhe::Decrypt(p, task->get(), *CUFHETestHelper::instance().sk());
     return p.get();
-}
-
-void testDoCUFHEWithRAMROM()
-{
-    auto& h = TFHEppTestHelper::instance();
-
-    Options opt;
-    opt.blueprint = NetworkBlueprint{"test/cahp-diamond.toml"};
-    opt.inputFile = h.getELFAsPacketFile("test/test00.elf");
-    opt.outputFile = "_test_res_packet00";
-    opt.numCycles = 8;
-
-    doCUFHE(opt);
-
-    writeToArchive("_test_sk", *h.sk());
-    auto resPacket = readFromArchive<TFHEPacket>("_test_res_packet00");
-    auto plainResPacket = resPacket.decrypt(*h.sk());
-    assert(bitvec2i(plainResPacket.bits.at("finflag")) == 1);
-    assert(bitvec2i(plainResPacket.bits.at("reg_x0")) == 42);
-    assert(bitvec2i(plainResPacket.ram.at("ramB"), 12 * 8, 13 * 8) == 42);
 }
 
 void testBridgeBetweenCUFHEAndTFHEpp()
@@ -949,7 +876,7 @@ void testBlueprint()
     }
 }
 
-int main(int argc, char** argv)
+int main()
 {
     AsyncThread::setNumThreads(std::thread::hardware_concurrency());
 
@@ -965,7 +892,6 @@ int main(int argc, char** argv)
     testSequentialCircuit<PlainNetworkBuilder>();
     testFromJSONtest_counter_4bit<PlainNetworkBuilder>();
     testPrioritySetVisitor<PlainNetworkBuilder>();
-    testDoPlainWithRAMROM();
 
     testNOT<TFHEppNetworkBuilder>();
     testMUX<TFHEppNetworkBuilder>();
@@ -1004,14 +930,4 @@ int main(int argc, char** argv)
 
     testProgressGraphMaker();
     testBlueprint();
-
-    if (argc >= 2 && strcmp(argv[1], "slow") == 0) {
-        // TFHEppTestHelper::instance().prepareCircuitKey();
-
-        testDoTFHEWithRAMROM();
-
-#ifdef IYOKAN_CUDA_ENABLED
-        testDoCUFHEWithRAMROM();
-#endif
-    }
 }
