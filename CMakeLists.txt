@@ -86,6 +86,20 @@ if (IYOKAN_ENABLE_CUDA)
     target_compile_definitions(test0 PRIVATE IYOKAN_CUDA_ENABLED)
 endif(IYOKAN_ENABLE_CUDA)
 
+##### iyokan-packet
+add_executable(iyokan-packet iyokan-packet.cpp ${BACKWARD_ENABLE})
+add_sanitizers(iyokan-packet)
+add_backward(iyokan-packet)
+target_compile_options(iyokan-packet PUBLIC "$<$<CONFIG:DEBUG>:${IYOKAN_CXXFLAGS_DEBUG}>")
+target_compile_options(iyokan-packet PUBLIC "$<$<CONFIG:RELEASE>:${IYOKAN_CXXFLAGS_RELEASE}>")
+target_link_libraries(iyokan-packet ${IYOKAN_LIBS})
+target_include_directories(iyokan-packet PRIVATE ${IYOKAN_INCLUDE_DIRS})
+
+set_target_properties(iyokan test0 iyokan-packet
+    PROPERTIES
+    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin"
+)
+
 ##### kvsp-packet
 add_executable(kvsp-packet kvsp-packet.cpp ${BACKWARD_ENABLE})
 add_sanitizers(kvsp-packet)
