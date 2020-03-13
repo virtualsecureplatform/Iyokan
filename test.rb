@@ -4,6 +4,7 @@ require "shellwords"
 require "open3"
 require "pathname"
 require "json"
+require "toml-rb"
 
 $has_any_error = false
 
@@ -14,6 +15,10 @@ def quote(str, prefix = "> ")
 end
 
 ##### assert #####
+
+def assert_equal(got, expected)
+  raise "Assert failed: assert_equal #{expected.inspect}\n#{quote(got.to_s)}" unless got == expected
+end
 
 def assert_include(src, val)
   raise "Assert failed: assert_include #{val.inspect}\n#{quote(src.to_s)}" unless src.include?(val)
@@ -61,28 +66,27 @@ $CUDA_MODE_ENABLED = ARGV.include?("cuda")
 ##### test0 #####
 
 check_code "./test0"
-check_code "./test0", ["slow"] if $SLOW_MODE_ENABLED
 
 ##### iyokan #####
 
-check_code "./kvsp-packet", ["plain-pack", "test/test00.elf", "_test_plain_req_packet00"]
-check_code "./kvsp-packet", ["plain-pack", "test/test01-recur-fib.elf", "_test_plain_req_packet01"]
+check_code "./iyokan-packet", ["toml2packet",
+                               "--in", "test/test00-packet.toml",
+                               "--out", "_test_plain_req_packet00"]
+check_code "./iyokan-packet", ["toml2packet",
+                               "--in", "test/test01-packet.toml",
+                               "--out", "_test_plain_req_packet01"]
 
 test_iyokan [
   "plain",
   "--blueprint", "test/cahp-diamond.toml",
   "-i", "_test_plain_req_packet00",
   "-o", "_test_plain_res_packet00",
-] do |r|
-  r = check_code "./kvsp-packet", ["plain-unpack", "_test_plain_res_packet00"]
-  assert_regex r, /#cycle\t8/
-  assert_regex r, /f0\t1/
-  assert_regex r, /x0\t42/
-
-  r = check_code "./kvsp-packet", ["plain-unpack-json", "_test_plain_res_packet00"]
-  json = JSON.parse(r)
-  assert_include json, { "type" => "flag", "addr" => 0, "byte" => 1 }
-  assert_include json, { "type" => "reg", "addr" => 0, "byte" => 42 }
+] do |_|
+  r = check_code "./iyokan-packet", ["unpack", "--in", "_test_plain_res_packet00"]
+  toml = TomlRB.parse(r)
+  assert_equal toml["cycles"].to_i, 8
+  assert_include toml["bits"], { "bytes" => [1], "size" => 1, "name" => "finflag" }
+  assert_include toml["bits"], { "bytes" => [42, 0], "size" => 16, "name" => "reg_x0" }
 end
 
 test_iyokan [
@@ -91,25 +95,19 @@ test_iyokan [
   "-i", "_test_plain_req_packet01",
   "-o", "_test_plain_res_packet01",
 ] do |_|
-  r = check_code "./kvsp-packet", ["plain-unpack", "_test_plain_res_packet01"]
-  assert_regex r, /#cycle\t346/
-  assert_regex r, /f0\t1/
-  assert_regex r, /x8\t5/
-  assert_regex r, /0001e0 02 00 27 00 01 00 02 00 27 00 01 00 03 00 27 00/
-  assert_regex r, /0001f0 03 00 05 00 27 00 00 00 00 00 3b 00 05 00 00 00/
+  r = check_code "./iyokan-packet", ["unpack", "--in", "_test_plain_res_packet01"]
+  toml = TomlRB.parse(r)
+  assert_equal toml["cycles"].to_i, 346
+  assert_include toml["bits"], { "bytes" => [1], "size" => 1, "name" => "finflag" }
+  assert_include toml["bits"], { "bytes" => [5, 0], "size" => 16, "name" => "reg_x8" }
 
-  r = check_code "./kvsp-packet", ["plain-unpack-json", "_test_plain_res_packet01"]
-  json = JSON.parse(r)
-  assert_include json, { "type" => "flag", "addr" => 0, "byte" => 1 }
-  assert_include json, { "type" => "reg", "addr" => 8, "byte" => 5 }
-  [
-    0x02, 0x00, 0x27, 0x00, 0x01, 0x00, 0x02, 0x00,
-    0x27, 0x00, 0x01, 0x00, 0x03, 0x00, 0x27, 0x00,
-    0x03, 0x00, 0x05, 0x00, 0x27, 0x00, 0x00, 0x00,
-    0x00, 0x00, 0x3b, 0x00, 0x05, 0x00, 0x00, 0x00,
-  ].reverse.each_with_index do |byte, index|
-    assert_include json, { "type" => "ram", "addr" => (512 - 1 - index), "byte" => byte }
-  end
+  assert_include toml["ram"], { "bytes" => [0] * 256, "size" => 2048, "name" => "ramA" }
+  assert_include toml["ram"], {
+                   "bytes" => [0] * 239 +
+                              [1, 2, 39, 1, 2, 39, 1, 3, 39, 3, 5, 39, 0, 0, 59, 5, 0],
+                   "size" => 2048,
+                   "name" => "ramB",
+                 }
 end
 
 test_iyokan [
@@ -118,25 +116,19 @@ test_iyokan [
   "-i", "_test_plain_req_packet01",
   "-o", "_test_plain_res_packet01",
 ] do |_|
-  r = check_code "./kvsp-packet", ["plain-unpack", "_test_plain_res_packet01"]
-  assert_regex r, /#cycle\t261/
-  assert_regex r, /f0\t1/
-  assert_regex r, /x8\t5/
-  assert_regex r, /0001e0 02 00 27 00 01 00 02 00 27 00 01 00 03 00 27 00/
-  assert_regex r, /0001f0 03 00 05 00 27 00 00 00 00 00 3b 00 05 00 00 00/
+  r = check_code "./iyokan-packet", ["unpack", "--in", "_test_plain_res_packet01"]
+  toml = TomlRB.parse(r)
+  assert_equal toml["cycles"].to_i, 261
+  assert_include toml["bits"], { "bytes" => [1], "size" => 1, "name" => "finflag" }
+  assert_include toml["bits"], { "bytes" => [5, 0], "size" => 16, "name" => "reg_x8" }
 
-  r = check_code "./kvsp-packet", ["plain-unpack-json", "_test_plain_res_packet01"]
-  json = JSON.parse(r)
-  assert_include json, { "type" => "flag", "addr" => 0, "byte" => 1 }
-  assert_include json, { "type" => "reg", "addr" => 8, "byte" => 5 }
-  [
-    0x02, 0x00, 0x27, 0x00, 0x01, 0x00, 0x02, 0x00,
-    0x27, 0x00, 0x01, 0x00, 0x03, 0x00, 0x27, 0x00,
-    0x03, 0x00, 0x05, 0x00, 0x27, 0x00, 0x00, 0x00,
-    0x00, 0x00, 0x3b, 0x00, 0x05, 0x00, 0x00, 0x00,
-  ].reverse.each_with_index do |byte, index|
-    assert_include json, { "type" => "ram", "addr" => (512 - 1 - index), "byte" => byte }
-  end
+  assert_include toml["ram"], { "bytes" => [0] * 256, "size" => 2048, "name" => "ramA" }
+  assert_include toml["ram"], {
+                   "bytes" => [0] * 239 +
+                              [1, 2, 39, 1, 2, 39, 1, 3, 39, 3, 5, 39, 0, 0, 59, 5, 0],
+                   "size" => 2048,
+                   "name" => "ramB",
+                 }
 end
 
 test_iyokan [
@@ -146,15 +138,23 @@ test_iyokan [
   "-o", "_test_plain_res_packet00",
   "--dump-prefix", "_test_dump",
 ] do |r|
-  r = check_code "./kvsp-packet", ["plain-unpack", "_test_dump-7"]
-  assert_regex r, /#cycle\t7/
-  assert_regex r, /f0\t0/
-  assert_regex r, /x0\t42/
+  r = check_code "./iyokan-packet", ["unpack", "--in", "_test_dump-7"]
+  toml = TomlRB.parse(r)
+  assert_equal toml["cycles"].to_i, 7
+  assert_include toml["bits"], { "bytes" => [0], "size" => 1, "name" => "finflag" }
+  assert_include toml["bits"], { "bytes" => [42, 0], "size" => 16, "name" => "reg_x0" }
 end
 
 if $SLOW_MODE_ENABLED
-  check_code "./kvsp-packet", ["genkey", "_test_sk"]
-  check_code "./kvsp-packet", ["enc", "_test_sk", "test/test00.elf", "_test_req_packet00"]
+  check_code "./iyokan-packet", ["genkey", "--type", "tfhepp", "--out", "_test_sk"]
+  check_code "./iyokan-packet", ["enc",
+                                 "--key", "_test_sk",
+                                 "--in", "_test_plain_req_packet00",
+                                 "--out", "_test_req_packet00"]
+  check_code "./iyokan-packet", ["enc",
+                                 "--key", "_test_sk",
+                                 "--in", "_test_plain_req_packet01",
+                                 "--out", "_test_req_packet01"]
 
   test_iyokan [
     "tfhe",
@@ -163,10 +163,11 @@ if $SLOW_MODE_ENABLED
     "-o", "_test_res_packet00",
     "-c", "8",
   ] do |_|
-    r = check_code "./kvsp-packet", ["dec", "_test_sk", "_test_res_packet00"]
-    assert_regex r, /#cycle\t8/
-    assert_regex r, /f0\t1/
-    assert_regex r, /x0\t42/
+    r = check_code "./iyokan-packet", ["unpack", "--in", "_test_plain_res_packet00"]
+    toml = TomlRB.parse(r)
+    assert_equal toml["cycles"].to_i, 8
+    assert_include toml["bits"], { "bytes" => [1], "size" => 1, "name" => "finflag" }
+    assert_include toml["bits"], { "bytes" => [42, 0], "size" => 16, "name" => "reg_x0" }
   end
 
   test_iyokan [
@@ -178,10 +179,11 @@ if $SLOW_MODE_ENABLED
     "--dump-prefix", "_test_dump",
     "--secret-key", "_test_sk",
   ] do |r|
-    r = check_code "./kvsp-packet", ["plain-unpack", "_test_dump-7"]
-    assert_regex r, /#cycle\t7/
-    assert_regex r, /f0\t0/
-    assert_regex r, /x0\t42/
+    r = check_code "./iyokan-packet", ["unpack", "--in", "_test_dump-7"]
+    toml = TomlRB.parse(r)
+    assert_equal toml["cycles"].to_i, 7
+    assert_include toml["bits"], { "bytes" => [0], "size" => 1, "name" => "finflag" }
+    assert_include toml["bits"], { "bytes" => [42, 0], "size" => 16, "name" => "reg_x0" }
   end
 
   if $CUDA_MODE_ENABLED
@@ -193,15 +195,11 @@ if $SLOW_MODE_ENABLED
       "-c", "8",
       "--enable-gpu",
     ] do |_|
-      r = check_code "./kvsp-packet", ["dec", "_test_sk", "_test_res_packet00"]
-      assert_regex r, /#cycle\t8/
-      assert_regex r, /f0\t1/
-      assert_regex r, /x0\t42/
-
-      r = check_code "./kvsp-packet", ["dec-json", "_test_sk", "_test_res_packet00"]
-      json = JSON.parse(r)
-      assert_include json, { "type" => "flag", "addr" => 0, "byte" => 1 }
-      assert_include json, { "type" => "reg", "addr" => 0, "byte" => 42 }
+      r = check_code "./iyokan-packet", ["unpack", "--in", "_test_plain_res_packet00"]
+      toml = TomlRB.parse(r)
+      assert_equal toml["cycles"].to_i, 8
+      assert_include toml["bits"], { "bytes" => [1], "size" => 1, "name" => "finflag" }
+      assert_include toml["bits"], { "bytes" => [42, 0], "size" => 16, "name" => "reg_x0" }
     end
 
     test_iyokan [
@@ -214,13 +212,13 @@ if $SLOW_MODE_ENABLED
       "--dump-prefix", "_test_dump",
       "--secret-key", "_test_sk",
     ] do |r|
-      r = check_code "./kvsp-packet", ["plain-unpack", "_test_dump-7"]
-      assert_regex r, /#cycle\t7/
-      assert_regex r, /f0\t0/
-      assert_regex r, /x0\t42/
+      r = check_code "./iyokan-packet", ["unpack", "--in", "_test_dump-7"]
+      toml = TomlRB.parse(r)
+      assert_equal toml["cycles"].to_i, 7
+      assert_include toml["bits"], { "bytes" => [0], "size" => 1, "name" => "finflag" }
+      assert_include toml["bits"], { "bytes" => [42, 0], "size" => 16, "name" => "reg_x0" }
     end
 
-    check_code "./kvsp-packet", ["enc", "_test_sk", "test/test01-recur-fib.elf", "_test_req_packet01"]
     test_iyokan [
       "tfhe",
       "--blueprint", "test/cahp-diamond.toml",
@@ -229,25 +227,19 @@ if $SLOW_MODE_ENABLED
       "-c", "346",
       "--enable-gpu",
     ] do |_|
-      r = check_code "./kvsp-packet", ["dec", "_test_sk", "_test_res_packet01"]
-      assert_regex r, /#cycle\t346/
-      assert_regex r, /f0\t1/
-      assert_regex r, /x8\t5/
-      assert_regex r, /0001e0 02 00 27 00 01 00 02 00 27 00 01 00 03 00 27 00/
-      assert_regex r, /0001f0 03 00 05 00 27 00 00 00 00 00 3b 00 05 00 00 00/
+      r = check_code "./iyokan-packet", ["unpack", "--in", "_test_plain_res_packet01"]
+      toml = TomlRB.parse(r)
+      assert_equal toml["cycles"].to_i, 346
+      assert_include toml["bits"], { "bytes" => [1], "size" => 1, "name" => "finflag" }
+      assert_include toml["bits"], { "bytes" => [5, 0], "size" => 16, "name" => "reg_x8" }
 
-      r = check_code "./kvsp-packet", ["dec-json", "_test_sk", "_test_res_packet01"]
-      json = JSON.parse(r)
-      assert_include json, { "type" => "flag", "addr" => 0, "byte" => 1 }
-      assert_include json, { "type" => "reg", "addr" => 8, "byte" => 5 }
-      [
-        0x02, 0x00, 0x27, 0x00, 0x01, 0x00, 0x02, 0x00,
-        0x27, 0x00, 0x01, 0x00, 0x03, 0x00, 0x27, 0x00,
-        0x03, 0x00, 0x05, 0x00, 0x27, 0x00, 0x00, 0x00,
-        0x00, 0x00, 0x3b, 0x00, 0x05, 0x00, 0x00, 0x00,
-      ].reverse.each_with_index do |byte, index|
-        assert_include json, { "type" => "ram", "addr" => (512 - 1 - index), "byte" => byte }
-      end
+      assert_include toml["ram"], { "bytes" => [0] * 256, "size" => 2048, "name" => "ramA" }
+      assert_include toml["ram"], {
+                       "bytes" => [0] * 239 +
+                                  [1, 2, 39, 1, 2, 39, 1, 3, 39, 3, 5, 39, 0, 0, 59, 5, 0],
+                       "size" => 2048,
+                       "name" => "ramB",
+                     }
     end
 
     test_iyokan [
@@ -258,25 +250,19 @@ if $SLOW_MODE_ENABLED
       "-c", "261",
       "--enable-gpu",
     ] do |_|
-      r = check_code "./kvsp-packet", ["dec", "_test_sk", "_test_res_packet01"]
-      assert_regex r, /#cycle\t261/
-      assert_regex r, /f0\t1/
-      assert_regex r, /x8\t5/
-      assert_regex r, /0001e0 02 00 27 00 01 00 02 00 27 00 01 00 03 00 27 00/
-      assert_regex r, /0001f0 03 00 05 00 27 00 00 00 00 00 3b 00 05 00 00 00/
+      r = check_code "./iyokan-packet", ["unpack", "--in", "_test_plain_res_packet01"]
+      toml = TomlRB.parse(r)
+      assert_equal toml["cycles"].to_i, 261
+      assert_include toml["bits"], { "bytes" => [1], "size" => 1, "name" => "finflag" }
+      assert_include toml["bits"], { "bytes" => [5, 0], "size" => 16, "name" => "reg_x8" }
 
-      r = check_code "./kvsp-packet", ["dec-json", "_test_sk", "_test_res_packet01"]
-      json = JSON.parse(r)
-      assert_include json, { "type" => "flag", "addr" => 0, "byte" => 1 }
-      assert_include json, { "type" => "reg", "addr" => 8, "byte" => 5 }
-      [
-        0x02, 0x00, 0x27, 0x00, 0x01, 0x00, 0x02, 0x00,
-        0x27, 0x00, 0x01, 0x00, 0x03, 0x00, 0x27, 0x00,
-        0x03, 0x00, 0x05, 0x00, 0x27, 0x00, 0x00, 0x00,
-        0x00, 0x00, 0x3b, 0x00, 0x05, 0x00, 0x00, 0x00,
-      ].reverse.each_with_index do |byte, index|
-        assert_include json, { "type" => "ram", "addr" => (512 - 1 - index), "byte" => byte }
-      end
+      assert_include toml["ram"], { "bytes" => [0] * 256, "size" => 2048, "name" => "ramA" }
+      assert_include toml["ram"], {
+                       "bytes" => [0] * 239 +
+                                  [1, 2, 39, 1, 2, 39, 1, 3, 39, 3, 5, 39, 0, 0, 59, 5, 0],
+                       "size" => 2048,
+                       "name" => "ramB",
+                     }
     end
   end
 end

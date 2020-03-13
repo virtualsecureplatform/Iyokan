@@ -1,0 +1,24 @@
+[[rom]]
+name = "rom"
+size = 4096           # 512 * 8
+bytes = [
+    0x74, 0x80,       # lsi	ra, 24
+    0x15, 0x00, 0x00, # lw	ra, 0(ra)
+    0x0e, 0x00,       # js	0
+]
+
+[[ram]]
+name = "ramA"
+size = 2048           # 256 * 8
+bytes = []
+
+[[ram]]
+name = "ramB"
+size = 2048           # 256 * 8
+bytes = [
+#     00    02    04    06    08    0a    0c    0e
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+
+#     10    12    14    16    18    1a    1c    1e
+    0x00, 0x00, 0x00, 0x00,   42, 0x00, 0x00, 0x00,
+]
