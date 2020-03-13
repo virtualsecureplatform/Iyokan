@@ -99,17 +99,3 @@ set_target_properties(iyokan test0 iyokan-packet
     PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin"
 )
-
-##### kvsp-packet
-add_executable(kvsp-packet kvsp-packet.cpp ${BACKWARD_ENABLE})
-add_sanitizers(kvsp-packet)
-add_backward(kvsp-packet)
-target_compile_options(kvsp-packet PUBLIC "$<$<CONFIG:DEBUG>:${IYOKAN_CXXFLAGS_DEBUG}>")
-target_compile_options(kvsp-packet PUBLIC "$<$<CONFIG:RELEASE>:${IYOKAN_CXXFLAGS_RELEASE}>")
-target_link_libraries(kvsp-packet ${IYOKAN_LIBS})
-target_include_directories(kvsp-packet PRIVATE ${IYOKAN_INCLUDE_DIRS})
-
-set_target_properties(iyokan test0 kvsp-packet
-    PROPERTIES
-    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin"
-)
