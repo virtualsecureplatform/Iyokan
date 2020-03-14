@@ -163,7 +163,7 @@ if $SLOW_MODE_ENABLED
     "-o", "_test_res_packet00",
     "-c", "8",
   ] do |_|
-    r = check_code "./iyokan-packet", ["unpack", "--in", "_test_plain_res_packet00"]
+    r = check_code "./iyokan-packet", ["unpack", "--in", "_test_res_packet00"]
     toml = TomlRB.parse(r)
     assert_equal toml["cycles"].to_i, 8
     assert_include toml["bits"], { "bytes" => [1], "size" => 1, "name" => "finflag" }
@@ -195,7 +195,7 @@ if $SLOW_MODE_ENABLED
       "-c", "8",
       "--enable-gpu",
     ] do |_|
-      r = check_code "./iyokan-packet", ["unpack", "--in", "_test_plain_res_packet00"]
+      r = check_code "./iyokan-packet", ["unpack", "--in", "_test_res_packet00"]
       toml = TomlRB.parse(r)
       assert_equal toml["cycles"].to_i, 8
       assert_include toml["bits"], { "bytes" => [1], "size" => 1, "name" => "finflag" }
@@ -227,7 +227,7 @@ if $SLOW_MODE_ENABLED
       "-c", "346",
       "--enable-gpu",
     ] do |_|
-      r = check_code "./iyokan-packet", ["unpack", "--in", "_test_plain_res_packet01"]
+      r = check_code "./iyokan-packet", ["unpack", "--in", "_test_res_packet01"]
       toml = TomlRB.parse(r)
       assert_equal toml["cycles"].to_i, 346
       assert_include toml["bits"], { "bytes" => [1], "size" => 1, "name" => "finflag" }
@@ -250,7 +250,7 @@ if $SLOW_MODE_ENABLED
       "-c", "261",
       "--enable-gpu",
     ] do |_|
-      r = check_code "./iyokan-packet", ["unpack", "--in", "_test_plain_res_packet01"]
+      r = check_code "./iyokan-packet", ["unpack", "--in", "_test_res_packet01"]
       toml = TomlRB.parse(r)
       assert_equal toml["cycles"].to_i, 261
       assert_include toml["bits"], { "bytes" => [1], "size" => 1, "name" => "finflag" }
