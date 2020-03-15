@@ -79,6 +79,25 @@ private:
         return task;
     }
 
+    template <class T = TaskPlainGate>
+    std::shared_ptr<T> maybeGet(const blueprint::Port &port)
+    {
+        auto it = name2net_.find(port.nodeName);
+        if (it == name2net_.end())
+            return nullptr;
+        return it->second->get_if<T>(port.portLabel);
+    }
+
+    template <class T = TaskPlainGateMem>
+    std::shared_ptr<T> maybeGetAt(const std::string &kind,
+                                  const std::string &portName, int portBit = 0)
+    {
+        auto port = opt_.blueprint->at(portName, portBit);
+        if (!port || port->portLabel.kind != kind)
+            return nullptr;
+        return std::dynamic_pointer_cast<T>(maybeGet(*port));
+    }
+
     PlainPacket makeResPacket(int numCycles)
     {
         PlainPacket resPacket;
@@ -208,9 +227,7 @@ public:
             numCycles = opt_.numCycles;
 
         // Reset
-        {
-            auto reset = get_at("input", "reset");
-            assert(reset);
+        if (auto reset = maybeGetAt("input", "reset"); reset) {
             reset->set(1_b);
             runner.run();
             reset->set(0_b);
@@ -221,8 +238,7 @@ public:
             std::stringstream devnull;
             std::ostream &os = opt_.quiet ? devnull : std::cout;
 
-            auto finflag = get_at("output", "finflag");
-            assert(finflag);
+            auto finflag = maybeGetAt("output", "finflag");
 
             numCycles = processCycles(numCycles, os, [&](int currentCycle) {
                 if (opt_.dumpPrefix)
@@ -237,7 +253,9 @@ public:
 
                 runner.run();
 
-                return finflag->get() == 1_b;
+                if (finflag)
+                    return finflag->get() == 1_b;
+                return false;
             });
         }
 

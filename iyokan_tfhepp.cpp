@@ -79,6 +79,25 @@ private:
         return task;
     }
 
+    template <class T = TaskTFHEppGate>
+    std::shared_ptr<T> maybeGet(const blueprint::Port &port)
+    {
+        auto it = name2net_.find(port.nodeName);
+        if (it == name2net_.end())
+            return nullptr;
+        return it->second->get_if<T>(port.portLabel);
+    }
+
+    template <class T = TaskTFHEppGateMem>
+    std::shared_ptr<T> maybeGetAt(const std::string &kind,
+                                  const std::string &portName, int portBit = 0)
+    {
+        auto port = opt_.blueprint->at(portName, portBit);
+        if (!port || port->portLabel.kind != kind)
+            return nullptr;
+        return std::dynamic_pointer_cast<T>(maybeGet(*port));
+    }
+
     TFHEPacket makeResPacket(int numCycles)
     {
         TFHEPacket resPacket;
@@ -219,15 +238,14 @@ public:
             runner.addNetwork(p.second);
 
         // Reset
-        {
+        if (auto reset = maybeGetAt("input", "reset"); reset) {
             TFHEpp::TLWElvl0 one, zero;
             TFHEpp::HomCONSTANTONE(one);
             TFHEpp::HomCONSTANTZERO(zero);
 
-            auto &reset = *get_at("input", "reset");
-            reset.set(one);
+            reset->set(one);
             runner.run();
-            reset.set(zero);
+            reset->set(zero);
         }
 
         // Go computing

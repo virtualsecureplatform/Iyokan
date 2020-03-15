@@ -425,6 +425,36 @@ private:
         return task;
     }
 
+    template <class T = TaskCUFHEGateMem>
+    std::shared_ptr<T> maybeGet(const blueprint::Port& port)
+    {
+        if constexpr (std::is_same_v<typename T::ParamWorkerInfo,
+                                     CUFHEWorkerInfo>) {
+            // CUFHE
+            auto it = name2cnet_.find(port.nodeName);
+            if (it == name2cnet_.end())
+                return nullptr;
+            return it->second->get_if<T>(port.portLabel);
+        }
+        else {
+            // TFHEpp
+            auto it = name2tnet_.find(port.nodeName);
+            if (it == name2tnet_.end())
+                return nullptr;
+            return it->second->get_if<T>(port.portLabel);
+        }
+    }
+
+    template <class T = TaskCUFHEGateMem>
+    std::shared_ptr<T> maybeGetAt(const std::string& kind,
+                                  const std::string& portName, int portBit = 0)
+    {
+        auto port = opt_.blueprint->at(portName, portBit);
+        if (!port || port->portLabel.kind != kind)
+            return nullptr;
+        return std::dynamic_pointer_cast<T>(maybeGet(*port));
+    }
+
     TFHEPacket makeResPacket(int numCycles)
     {
         TFHEPacket resPacket;
@@ -587,16 +617,15 @@ public:
             runner.addBridge(bridge1);
 
         // Reset
-        {
+        if (auto reset = maybeGetAt("input", "reset"); reset) {
             cufhe::Ctxt one, zero;
             cufhe::ConstantOne(one);
             cufhe::ConstantZero(zero);
             cufhe::Synchronize();
 
-            auto& reset = *get_at("input", "reset");
-            reset.set(one);
+            reset->set(one);
             runner.run();
-            reset.set(zero);
+            reset->set(zero);
         }
 
         // Go computing

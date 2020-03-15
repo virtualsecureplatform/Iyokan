@@ -1404,7 +1404,7 @@ public:
         // [[file]]
         {
             const auto srcFiles =
-                toml::find<std::vector<toml::value>>(src, "file");
+                toml::find_or<std::vector<toml::value>>(src, "file", {});
             for (const auto &srcFile : srcFiles) {
                 std::string type = toml::find<std::string>(srcFile, "type");
                 fs::path path = toml::find<std::string>(srcFile, "path");
@@ -1423,7 +1423,7 @@ public:
         // [[builtin]]
         {
             const auto srcBuiltins =
-                toml::find<std::vector<toml::value>>(src, "builtin");
+                toml::find_or<std::vector<toml::value>>(src, "builtin", {});
             for (const auto &srcBuiltin : srcBuiltins) {
                 const auto type = toml::find<std::string>(srcBuiltin, "type");
                 const auto name = toml::find<std::string>(srcBuiltin, "name");
@@ -1453,7 +1453,8 @@ public:
 
         // [connect]
         {
-            const auto srcConnect = toml::find<toml::table>(src, "connect");
+            const auto srcConnect =
+                toml::find_or<toml::table>(src, "connect", {});
             for (const auto &[srcKey, srcValue] : srcConnect) {
                 std::string srcTo = srcKey,
                             srcFrom = toml::get<std::string>(srcValue),
