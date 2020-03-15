@@ -210,6 +210,7 @@ test_in_out "test/cahp-diamond.toml", "test/test00.in", "test/test00-diamond.out
 test_in_out "test/cahp-emerald.toml", "test/test00.in", "test/test00-emerald.out"
 test_in_out "test/cahp-diamond.toml", "test/test01.in", "test/test01-diamond.out"
 test_in_out "test/cahp-emerald.toml", "test/test01.in", "test/test01-emerald.out"
+test_in_out "test/test-addr-4bit.toml", "test/test04.in", "test/test04.out", ["-c", 1]
 
 test_in_out "test/cahp-diamond.toml", "test/test00.in", "test/test00-diamond.out",
             ["--dump-prefix", "_test_dump"],

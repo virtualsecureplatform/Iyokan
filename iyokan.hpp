@@ -1352,6 +1352,7 @@ private:
     std::vector<std::pair<blueprint::Port, blueprint::Port>> edges_;
 
     std::map<std::tuple<std::string, int>, blueprint::Port> atPorts_;
+    std::unordered_map<std::string, int> atPortWidths_;
 
 private:
     std::vector<blueprint::Port> parsePortString(const std::string &src,
@@ -1482,17 +1483,25 @@ public:
                         if (!to.nodeName.empty() || from.nodeName.empty())
                             error::die(errMsg);
 
-                        auto key = std::make_tuple(to.portLabel.portName,
-                                                   to.portLabel.portBit);
-                        atPorts_.emplace(key, from);
+                        const std::string &name = to.portLabel.portName;
+                        int bit = to.portLabel.portBit;
+
+                        atPorts_.emplace(std::make_tuple(name, bit), from);
+
+                        auto [it, inserted] = atPortWidths_.emplace(name, 0);
+                        it->second = std::max(it->second, bit + 1);
                     }
                     else if (srcFrom[0] == '@') {  // ... = @...
                         if (!from.nodeName.empty() || to.nodeName.empty())
                             error::die(errMsg);
 
-                        auto key = std::make_tuple(from.portLabel.portName,
-                                                   from.portLabel.portBit);
-                        atPorts_.emplace(key, to);
+                        const std::string &name = from.portLabel.portName;
+                        int bit = from.portLabel.portBit;
+
+                        atPorts_.emplace(std::make_tuple(name, bit), to);
+
+                        auto [it, inserted] = atPortWidths_.emplace(name, 0);
+                        it->second = std::max(it->second, bit + 1);
                     }
                     else {  // ... = ...
                         edges_.emplace_back(from, to);
@@ -1536,6 +1545,11 @@ public:
         if (it == atPorts_.end())
             return std::nullopt;
         return it->second;
+    }
+
+    const std::unordered_map<std::string, int> &atPortWidths() const
+    {
+        return atPortWidths_;
     }
 };
 

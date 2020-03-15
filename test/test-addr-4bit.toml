@@ -1,0 +1,9 @@
+[[file]]
+type = "iyokanl1-json"
+path = "test-addr-4bit.json"
+name = "addr"
+
+[connect]
+"addr/io_inA[0:3]" = "@A[0:3]"
+"addr/io_inB[0:3]" = "@B[0:3]"
+"@out[0:3]" = "addr/io_out[0:3]"

@@ -143,6 +143,28 @@ private:
         }
     }
 
+    void setCircularInputs(int currentCycle)
+    {
+        // Find input @port
+        for (auto &&[key, port] : opt_.blueprint->atPorts()) {
+            if (port.portLabel.kind != "input")
+                continue;
+            auto &[atPortName, atPortBit] = key;
+            auto it = reqPacket_.bits.find(atPortName);
+            if (it == reqPacket_.bits.end())
+                continue;
+            const auto &bits = it->second;  // Found input bit stream
+
+            // Calculate the index in the bit stream for the port.
+            size_t index =
+                (opt_.blueprint->atPortWidths().at(atPortName) * currentCycle +
+                 atPortBit) %
+                bits.size();
+
+            get<TaskPlainGateMem>(port)->set(bits.at(index));
+        }
+    }
+
 public:
     PlainFrontend(const Options &opt)
         : opt_(opt), reqPacket_(readFromArchive<PlainPacket>(opt.inputFile))
@@ -250,6 +272,7 @@ public:
 
                 if (currentCycle == 0)
                     setInitialRAM();
+                setCircularInputs(currentCycle);
 
                 runner.run();
 
