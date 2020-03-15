@@ -100,17 +100,14 @@ void serialize(Archive& ar, CircuitKey& src)
 }
 }  // namespace TFHEpp
 
-inline std::vector<TFHEpp::TLWElvl0> encrypt(const TFHEpp::SecretKey& key,
-                                             const std::vector<uint8_t>& src)
+inline std::vector<TFHEpp::TLWElvl0> encryptBits(const TFHEpp::SecretKey& key,
+                                                 const std::vector<Bit>& src)
 {
-    std::vector<TFHEpp::TLWElvl0> ret;
-    for (uint8_t v : src) {
-        for (uint32_t i = 0; i < 8; i++) {
-            uint8_t b = (v >> i) & 1u;
-            ret.push_back(TFHEpp::bootsSymEncrypt(std::vector{b}, key).at(0));
-        }
-    }
-    return ret;
+    std::vector<uint8_t> in;
+    in.reserve(src.size());
+    for (auto&& bit : src)
+        in.push_back(bit == 1_b ? 1 : 0);
+    return TFHEpp::bootsSymEncrypt(in, key);
 }
 
 inline std::vector<TFHEpp::TRLWElvl1> encryptROM(const TFHEpp::SecretKey& key,
@@ -240,7 +237,12 @@ TFHEPacket PlainPacket::encrypt(const TFHEpp::SecretKey& key) const
             error::die("Invalid PlainPacket. Duplicate rom's key: ", name);
     }
 
-    // FIXME: Encrypt bits
+    // Encrypt bits
+    for (auto&& [name, src] : bits) {
+        auto [it, inserted] = tfhe.bits.emplace(name, encryptBits(key, src));
+        if (!inserted)
+            error::die("Invalid PlainPacket. Duplicate bits's key: ", name);
+    }
 
     return tfhe;
 }
@@ -253,7 +255,7 @@ PlainPacket TFHEPacket::decrypt(const TFHEpp::SecretKey& key) const
     for (auto&& [name, trlwes] : ram) {
         auto [it, inserted] = plain.ram.emplace(name, decryptRAM(key, trlwes));
         if (!inserted)
-            error::die("Invalid TFHEPacket. Duplicate trlweData's key: ", name);
+            error::die("Invalid TFHEPacket. Duplicate ram's key: ", name);
     }
 
     // FIXME: Decrypt ROM
@@ -262,7 +264,7 @@ PlainPacket TFHEPacket::decrypt(const TFHEpp::SecretKey& key) const
     for (auto&& [name, tlwes] : bits) {
         auto [it, inserted] = plain.bits.emplace(name, decryptBits(key, tlwes));
         if (!inserted)
-            error::die("Invalid TFHEPacket. Duplicate tlweData's key: ", name);
+            error::die("Invalid TFHEPacket. Duplicate bits's key: ", name);
     }
 
     return plain;

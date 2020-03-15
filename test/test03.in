@@ -1,0 +1,9 @@
+[[bits]]
+name = "hoge"
+size = 3
+bytes = [5]
+
+[[bits]]
+name = "piyo"
+size = 3
+bytes = []
