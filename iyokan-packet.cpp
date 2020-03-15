@@ -157,7 +157,7 @@ void doPack(const std::string& out, const PlainPacket& pkt)
     writeToArchive(out, pkt);
 }
 
-void doUnpack(const std::string& in)
+void doPacket2Toml(const std::string& in)
 {
     auto pkt = readFromArchive<PlainPacket>(in);
     printPlainPacket(std::cout, pkt);
@@ -214,8 +214,7 @@ int main(int argc, char** argv)
               --rom A:a.bin --rom C:c.bin \
               --ram D:d.bin --ram E:e.bin \
               --bits F:f.bin
-       unpack --in packet.plain
-
+       packet2toml --in packet.plain
        toml2packet --in packet.toml --out packet.plain
     */
 
@@ -227,7 +226,7 @@ int main(int argc, char** argv)
         ENC,
         DEC,
         PACK,
-        UNPACK,
+        PACKET2TOML,
         TOML2PACKET,
     } type;
 
@@ -274,8 +273,8 @@ int main(int argc, char** argv)
     }
 
     {
-        CLI::App* sub = app.add_subcommand("unpack", "");
-        sub->parse_complete_callback([&] { type = TYPE::UNPACK; });
+        CLI::App* sub = app.add_subcommand("packet2toml", "");
+        sub->parse_complete_callback([&] { type = TYPE::PACKET2TOML; });
         sub->add_option("--in", in)->required()->check(CLI::ExistingFile);
     }
 
@@ -310,8 +309,8 @@ int main(int argc, char** argv)
         doPack(out, makePlainPacketFromCmdOptions(ram, rom, bits));
         break;
 
-    case TYPE::UNPACK:
-        doUnpack(in);
+    case TYPE::PACKET2TOML:
+        doPacket2Toml(in);
         break;
 
     case TYPE::TOML2PACKET:

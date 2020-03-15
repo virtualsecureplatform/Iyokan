@@ -94,7 +94,7 @@ def test_in_out(blueprint, in_file, out_file, args0 = [], args1 = [], args2 = []
               "--blueprint", blueprint,
               "-i", plain_req_file,
               "-o", plain_res_file] + args0
-  r = run_iyokan_packet ["unpack", "--in", plain_res_file]
+  r = run_iyokan_packet ["packet2toml", "--in", plain_res_file]
   got = TomlRB.parse(r)
   expected = TomlRB.load_file(out_file)
   assert_equal_packet got, expected
@@ -117,7 +117,7 @@ def test_in_out(blueprint, in_file, out_file, args0 = [], args1 = [], args2 = []
                        "--key", secret_key,
                        "--in", res_file,
                        "--out", plain_res_file]
-    r = run_iyokan_packet ["unpack", "--in", plain_res_file]
+    r = run_iyokan_packet ["packet2toml", "--in", plain_res_file]
     got = TomlRB.parse(r)
     expected = TomlRB.load_file(out_file)
     assert_equal_packet got, expected
@@ -135,7 +135,7 @@ def test_in_out(blueprint, in_file, out_file, args0 = [], args1 = [], args2 = []
                          "--key", secret_key,
                          "--in", res_file,
                          "--out", plain_res_file]
-      r = run_iyokan_packet ["unpack", "--in", plain_res_file]
+      r = run_iyokan_packet ["packet2toml", "--in", plain_res_file]
       got = TomlRB.parse(r)
       expected = TomlRB.load_file(out_file)
       assert_equal_packet got, expected
@@ -156,7 +156,7 @@ test_in_out "test/cahp-diamond.toml", "test/test00.in", "test/test00-diamond.out
             ["--dump-prefix", "_test_dump"],
             ["--dump-prefix", "_test_dump", "--secret-key", "_test_sk"],
             ["--dump-prefix", "_test_dump", "--secret-key", "_test_sk"] do |_|
-  r = run_iyokan_packet ["unpack", "--in", "_test_dump-7"]
+  r = run_iyokan_packet ["packet2toml", "--in", "_test_dump-7"]
   toml = TomlRB.parse(r)
   assert_equal toml["cycles"].to_i, 7
   assert_include toml["bits"], { "bytes" => [0], "size" => 1, "name" => "finflag" }
