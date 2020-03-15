@@ -167,6 +167,7 @@ void doToml2Packet(const std::string& in, const std::string& out)
 {
     const auto root = toml::parse(in);
     PlainPacket pkt;
+    pkt.numCycles = toml::find_or<int>(root, "cycles", -1);
 
     auto parseEntries =
         [&root](std::unordered_map<std::string, std::vector<Bit>>& name2bitvec,
