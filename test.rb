@@ -137,7 +137,11 @@ end
 
 ##### iyokan #####
 
+## args1 == nil means tests for TFHEpp won't run. args2 == nil for cuFHE.
+## args0 must not be nil. Tests for plain must run.
 def test_in_out(blueprint, in_file, out_file, args0 = [], args1 = [], args2 = [])
+  raise "args0 must not be nil" if args0.nil?
+
   plain_req_file = "_test_plain_req_packet"
   plain_res_file = "_test_plain_res_packet"
   req_file = "_test_req_packet"
@@ -167,30 +171,13 @@ def test_in_out(blueprint, in_file, out_file, args0 = [], args1 = [], args2 = []
                        "--in", plain_req_file,
                        "--out", req_file]
 
-    ## Check TFHE mode
-    run_iyokan ["tfhe",
-                "--blueprint", blueprint,
-                "-c", cycles,
-                "-i", req_file,
-                "-o", res_file] + args1
-    run_iyokan_packet ["dec",
-                       "--key", secret_key,
-                       "--in", res_file,
-                       "--out", plain_res_file]
-    r = run_iyokan_packet ["packet2toml", "--in", plain_res_file]
-    got = TomlRB.parse(r)
-    expected = TomlRB.load_file(out_file)
-    assert_equal_packet got, expected
-    yield 1 if block_given?
-
-    if $CUDA_MODE_ENABLED
-      ## Check cuFHE mode
+    unless args1.nil?
+      ## Check TFHE mode
       run_iyokan ["tfhe",
-                  "--enable-gpu",
                   "--blueprint", blueprint,
                   "-c", cycles,
                   "-i", req_file,
-                  "-o", res_file] + args2
+                  "-o", res_file] + args1
       run_iyokan_packet ["dec",
                          "--key", secret_key,
                          "--in", res_file,
@@ -199,7 +186,28 @@ def test_in_out(blueprint, in_file, out_file, args0 = [], args1 = [], args2 = []
       got = TomlRB.parse(r)
       expected = TomlRB.load_file(out_file)
       assert_equal_packet got, expected
-      yield 2 if block_given?
+      yield 1 if block_given?
+    end
+
+    if $CUDA_MODE_ENABLED
+      unless args2.nil?
+        ## Check cuFHE mode
+        run_iyokan ["tfhe",
+                    "--enable-gpu",
+                    "--blueprint", blueprint,
+                    "-c", cycles,
+                    "-i", req_file,
+                    "-o", res_file] + args2
+        run_iyokan_packet ["dec",
+                           "--key", secret_key,
+                           "--in", res_file,
+                           "--out", plain_res_file]
+        r = run_iyokan_packet ["packet2toml", "--in", plain_res_file]
+        got = TomlRB.parse(r)
+        expected = TomlRB.load_file(out_file)
+        assert_equal_packet got, expected
+        yield 2 if block_given?
+      end
     end
   end
 rescue => ex
@@ -208,9 +216,12 @@ end
 
 test_in_out "test/cahp-diamond.toml", "test/test00.in", "test/test00-diamond.out"
 test_in_out "test/cahp-emerald.toml", "test/test00.in", "test/test00-emerald.out"
-test_in_out "test/cahp-diamond.toml", "test/test01.in", "test/test01-diamond.out"
-test_in_out "test/cahp-emerald.toml", "test/test01.in", "test/test01-emerald.out"
-test_in_out "test/test-addr-4bit.toml", "test/test04.in", "test/test04.out", ["-c", 1]
+test_in_out "test/cahp-diamond.toml", "test/test01.in", "test/test01-diamond.out",
+            [], nil, [] # Won't do test for TFHEpp
+test_in_out "test/cahp-emerald.toml", "test/test01.in", "test/test01-emerald.out",
+            [], nil, [] # Won't do test for TFHEpp
+test_in_out "test/test-addr-4bit.toml", "test/test04.in", "test/test04.out",
+            ["-c", 1] # "-c 1" will be automatically set for args1 and args2
 
 test_in_out "test/cahp-diamond.toml", "test/test00.in", "test/test00-diamond.out",
             ["--dump-prefix", "_test_dump"],
