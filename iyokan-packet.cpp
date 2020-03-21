@@ -219,6 +219,9 @@ int main(int argc, char** argv)
        toml2packet --in packet.toml --out packet.plain
     */
 
+    using namespace utility;
+    using namespace std::chrono;
+
     CLI::App app{"A simple toolset for Iyokan's packet"};
     app.require_subcommand();
 
@@ -288,9 +291,8 @@ int main(int argc, char** argv)
 
     CLI11_PARSE(app, argc, argv);
 
+    auto start = high_resolution_clock::now();
     switch (type) {
-        using namespace utility;
-
     case TYPE::GENKEY:
         assert(keyType == KEY_TYPE::TFHEPP);
         doGenKeyTFHEpp(out);
@@ -318,4 +320,8 @@ int main(int argc, char** argv)
         doToml2Packet(in, out);
         break;
     }
+    auto end = std::chrono::high_resolution_clock::now();
+
+    std::cerr << "Done. (" << duration_cast<seconds>(end - start).count()
+              << " seconds)" << std::endl;
 }

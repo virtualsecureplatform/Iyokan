@@ -58,8 +58,8 @@ end
 
 def run_command(command, args = [])
   path = Pathname.new($path) / command
-  res, _, code = Open3.capture3("#{Shellwords.join([path.to_s] + args)} 2>&1")
-  raise "Unexpected status code: #{code}\n#{quote(res)}" if code != 0
+  res, err, code = Open3.capture3("#{Shellwords.join([path.to_s] + args)}")
+  raise "Unexpected status code: #{code}\n#{quote(res)}\n#{quote(err)}" if code != 0
   res
 end
 
