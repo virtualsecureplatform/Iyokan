@@ -171,6 +171,19 @@ inline std::vector<Bit> decryptRAM(const TFHEpp::SecretKey& key,
     return ret;
 }
 
+inline std::vector<Bit> decryptROM(const TFHEpp::SecretKey& key,
+                                   const std::vector<TFHEpp::TRLWElvl1>& src)
+{
+    std::vector<Bit> ret;
+    for (auto&& encblk : src) {
+        auto blk = TFHEpp::trlweSymDecryptlvl1(encblk, key.key.lvl1);
+        for (uint8_t bitval : blk)
+            ret.push_back(bitval != 0 ? 1_b : 0_b);
+    }
+
+    return ret;
+}
+
 inline std::vector<Bit> decryptBits(const TFHEpp::SecretKey& key,
                                     const std::vector<TFHEpp::TLWElvl0>& src)
 {
@@ -258,7 +271,12 @@ PlainPacket TFHEPacket::decrypt(const TFHEpp::SecretKey& key) const
             error::die("Invalid TFHEPacket. Duplicate ram's key: ", name);
     }
 
-    // FIXME: Decrypt ROM
+    // Decrypt ROM
+    for (auto&& [name, trlwes] : rom) {
+        auto [it, inserted] = plain.rom.emplace(name, decryptROM(key, trlwes));
+        if (!inserted)
+            error::die("Invalid TFHEPacket. Duplicate rom's key: ", name);
+    }
 
     // Decrypt bits
     for (auto&& [name, tlwes] : bits) {

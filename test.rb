@@ -131,9 +131,9 @@ def test_iyokan_packet_e2e(in_file)
   assert_equal_packet got, expected
 end
 
-#test_iyokan_packet_e2e "test/test00.in"
-#test_iyokan_packet_e2e "test/test00-diamond.out"
-#test_iyokan_packet_e2e "test/test03.in"
+test_iyokan_packet_e2e "test/test00.in"
+test_iyokan_packet_e2e "test/test00-diamond.out"
+test_iyokan_packet_e2e "test/test03.in"
 
 ##### iyokan #####
 
