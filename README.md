@@ -63,7 +63,7 @@ and again compile it to DAG in JSON with
 Write a configuration file in TOML,
 which includes specification of inputs/outputs (`test/test-div-8bit.toml`):
 
-```
+```toml
 # Add DAG's JSON file as a module.
 [[file]]
 type = "iyokanl1-json"
@@ -82,7 +82,7 @@ Now we will run this circuit with test inputs.
 The inputs have to be 'packed' into a single file with `iyokan-packet`.
 Write another TOML file like this (`test/test05.in`):
 
-```
+```toml
 [[bits]]
 name = "A"      # To input port 'A'
 size = 8        # 8-bit-wide (1-byte-wide) integer
@@ -94,7 +94,7 @@ size = 8        # 8-bit-wide (1-byte-wide) integer
 bytes = [53]    # Input 53
 ```
 
-Then convert this TOML file into 'packet' (`request.plain.packet`) with `iyokan-packet`:
+Then convert this TOML file into 'packet' with `iyokan-packet`:
 
 ```
 $ iyokan-packet toml2packet --in test/test05.in --out request.plain.packet
@@ -123,16 +123,16 @@ Done. (0 seconds)
 `bytes=[3]` means the output of the circuit is 3, which is exactly the same as 159/53.
 
 Now, we will run Iyokan with the same but encrypted packet as input.
-First, generate a secret key (`secret.key`) to encrypt the data:
+First, generate a secret key to encrypt the data:
 
 ```
-$ iyokan-packet genkey --out secret.key
+$ iyokan-packet genkey --type tfhepp --out secret.key
 ```
 
-Next, encrypt the packet (`request.enc.packet`):
+Next, encrypt the packet:
 
 ```
-$ iyokan-packet enc --key secret.key --in request.plain.packet --out result.enc.packet
+$ iyokan-packet enc --key secret.key --in request.plain.packet --out request.enc.packet
 ```
 
 Finally, run Iyokan with it:
