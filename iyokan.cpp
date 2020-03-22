@@ -19,38 +19,50 @@ int main(int argc, char **argv)
 
     app.require_subcommand();
     enum class TYPE { PLAIN, TFHE } type;
-    app.add_option("--blueprint", blueprintFilePath, "")
-        ->required()
-        ->check(CLI::ExistingFile);
-    app.add_option("--cpu", opt.numCPUWorkers, "")->check(CLI::PositiveNumber);
-    app.add_option("--gpu", opt.numGPUWorkers, "")->check(CLI::PositiveNumber);
-    app.add_option("-i", opt.inputFile, "")
-        ->required()
-        ->check(CLI::ExistingFile);
-    app.add_flag("--quiet", opt.quiet, "");
 
     {
         CLI::App *plain = app.add_subcommand("plain", "");
-        plain->fallthrough();
         plain->parse_complete_callback([&] { type = TYPE::PLAIN; });
+        plain->add_option("--blueprint", blueprintFilePath, "")
+            ->required()
+            ->check(CLI::ExistingFile);
         plain->add_option("-c", opt.numCycles, "");
-        plain->add_option("-o", opt.outputFile, "")->required();
+        plain->add_option("--cpu", opt.numCPUWorkers, "")
+            ->check(CLI::PositiveNumber);
+        plain->add_option("-i,--in", opt.inputFile, "")
+            ->required()
+            ->check(CLI::ExistingFile);
+        plain->add_option("-o,--out", opt.outputFile, "")->required();
+        plain->add_flag("--quiet", opt.quiet, "");
+
         plain->add_option("--dump-prefix", opt.dumpPrefix, "");
     }
 
     {
         CLI::App *tfhe = app.add_subcommand("tfhe", "");
-        tfhe->fallthrough();
+        tfhe->parse_complete_callback([&] { type = TYPE::TFHE; });
+        tfhe->add_option("--blueprint", blueprintFilePath, "")
+            ->required()
+            ->check(CLI::ExistingFile);
         tfhe->add_option("-c", opt.numCycles, "")->required();
-        tfhe->add_option("-o", opt.outputFile, "")->required();
+        tfhe->add_option("--cpu", opt.numCPUWorkers, "")
+            ->check(CLI::PositiveNumber);
+        tfhe->add_option("-i,--in", opt.inputFile, "")
+            ->required()
+            ->check(CLI::ExistingFile);
+        tfhe->add_option("-o,--out", opt.outputFile, "")->required();
+        tfhe->add_flag("--quiet", opt.quiet, "");
+
         tfhe->add_option("--secret-key", opt.secretKey, "")
             ->check(CLI::ExistingFile);
         tfhe->add_option("--dump-prefix", opt.dumpPrefix, "")
             ->needs("--secret-key");
+
 #ifdef IYOKAN_CUDA_ENABLED
         tfhe->add_flag("--enable-gpu", enableGPU, "");
+        tfhe->add_option("--gpu", opt.numGPUWorkers, "")
+            ->check(CLI::PositiveNumber);
 #endif
-        tfhe->parse_complete_callback([&] { type = TYPE::TFHE; });
     }
 
     CLI11_PARSE(app, argc, argv);
