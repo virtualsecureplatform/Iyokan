@@ -1,0 +1,9 @@
+[[bits]]
+name = "A"
+size = 8
+bytes = [159]
+
+[[bits]]
+name = "B"
+size = 8
+bytes = [53]

@@ -1,0 +1,10 @@
+[[file]]
+type = "iyokanl1-json"
+path = "test-div-8bit.json"
+name = "core"
+
+[connect]
+"core/reset" = "@reset"
+"core/io_in_a[0:7]" = "@A[0:7]"
+"core/io_in_b[0:7]" = "@B[0:7]"
+"@out[0:7]" = "core/io_out[0:7]"
