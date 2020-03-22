@@ -2,7 +2,7 @@
 
 # Iyokan
 
-Iyokan is an generic engine to evaluate logical circuits, such as processor,
+Iyokan is a generic engine to evaluate logical circuits, such as processor,
 on homomorphic encryption like TFHE.
 Currently Iyokan supports [TFHEpp](https://github.com/virtualsecureplatform/TFHEpp)
 and [cuFHE](https://github.com/virtualsecureplatform/cuFHE)
