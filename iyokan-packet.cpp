@@ -247,7 +247,7 @@ int main(int argc, char** argv)
     {
         CLI::App* sub = app.add_subcommand("genkey", "");
         sub->parse_complete_callback([&] { type = TYPE::GENKEY; });
-        sub->add_option("--out", out)->required();
+        sub->add_option("-o,--out", out)->required();
         sub->add_option("--type", keyType)->required()->transform(transKeyType);
     }
 
@@ -255,22 +255,22 @@ int main(int argc, char** argv)
         CLI::App* sub = app.add_subcommand("enc", "");
         sub->parse_complete_callback([&] { type = TYPE::ENC; });
         sub->add_option("--key", key)->required();
-        sub->add_option("--in", in)->required();
-        sub->add_option("--out", out)->required();
+        sub->add_option("-i,--in", in)->required();
+        sub->add_option("-o,--out", out)->required();
     }
 
     {
         CLI::App* sub = app.add_subcommand("dec", "");
         sub->parse_complete_callback([&] { type = TYPE::DEC; });
         sub->add_option("--key", key)->required();
-        sub->add_option("--in", in)->required();
-        sub->add_option("--out", out)->required();
+        sub->add_option("-i,--in", in)->required();
+        sub->add_option("-o,--out", out)->required();
     }
 
     {
         CLI::App* sub = app.add_subcommand("pack", "");
         sub->parse_complete_callback([&] { type = TYPE::PACK; });
-        sub->add_option("--out", out)->required();
+        sub->add_option("-o,--out", out)->required();
         sub->add_option("--rom", rom)->join();
         sub->add_option("--ram", ram)->join();
         sub->add_option("--bits", bits)->join();
@@ -279,14 +279,14 @@ int main(int argc, char** argv)
     {
         CLI::App* sub = app.add_subcommand("packet2toml", "");
         sub->parse_complete_callback([&] { type = TYPE::PACKET2TOML; });
-        sub->add_option("--in", in)->required()->check(CLI::ExistingFile);
+        sub->add_option("-i,--in", in)->required()->check(CLI::ExistingFile);
     }
 
     {
         CLI::App* sub = app.add_subcommand("toml2packet", "");
         sub->parse_complete_callback([&] { type = TYPE::TOML2PACKET; });
-        sub->add_option("--in", in)->required()->check(CLI::ExistingFile);
-        sub->add_option("--out", out)->required();
+        sub->add_option("-i,--in", in)->required()->check(CLI::ExistingFile);
+        sub->add_option("-o,--out", out)->required();
     }
 
     CLI11_PARSE(app, argc, argv);
