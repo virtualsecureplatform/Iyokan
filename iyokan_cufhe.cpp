@@ -548,7 +548,7 @@ public:
         const NetworkBlueprint& bp = *opt_.blueprint;
 
         // Prepare cuFHE
-        cufhe::SetGPUNum(1);
+        cufhe::SetGPUNum(opt_.numGPU);
         cufhe::SetSeed();
         cufhe::Initialize(*tfhepp2cufhe(*reqPacket_.gk));
 

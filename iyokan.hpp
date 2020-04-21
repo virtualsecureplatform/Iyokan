@@ -1557,7 +1557,7 @@ struct Options {
     std::optional<NetworkBlueprint> blueprint;
     std::string inputFile, outputFile;
     int numCPUWorkers = std::thread::hardware_concurrency(),
-        numGPUWorkers = 80 * 10, numCycles = -1;
+        numGPUWorkers = 80 * 10, numGPU = 1, numCycles = -1;
     std::optional<std::string> secretKey;
     bool quiet = false;
     std::optional<std::string> dumpPrefix;
