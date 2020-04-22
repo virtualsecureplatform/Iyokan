@@ -62,6 +62,8 @@ int main(int argc, char **argv)
         tfhe->add_flag("--enable-gpu", enableGPU, "");
         tfhe->add_option("--gpu", opt.numGPUWorkers, "")
             ->check(CLI::PositiveNumber);
+        tfhe->add_option("--gpu_num", opt.numGPU, "")
+            ->check(CLI::PositiveNumber);
 #endif
     }
 
