@@ -216,6 +216,7 @@ end
 
 test_in_out "test/cahp-diamond.toml", "test/test00.in", "test/test00-diamond.out"
 test_in_out "test/cahp-emerald.toml", "test/test00.in", "test/test00-emerald.out"
+test_in_out "test/cahp-diamond-mux.toml", "test/test00.in", "test/test00-diamond.out"
 test_in_out "test/cahp-diamond.toml", "test/test01.in", "test/test01-diamond.out",
             [], nil, [] # Won't do test for TFHEpp
 test_in_out "test/cahp-emerald.toml", "test/test01.in", "test/test01-emerald.out",

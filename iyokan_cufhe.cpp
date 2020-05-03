@@ -370,6 +370,13 @@ CUFHENetworkWithTFHEpp makeTFHEppROMNetworkForCUFHE(size_t inAddrWidth,
     return ret;
 }
 
+class TaskCUFHEMux1bitROM : public TaskCUFHEGateWIRE {
+public:
+    TaskCUFHEMux1bitROM() : TaskCUFHEGateWIRE(false)
+    {
+    }
+};
+
 class CUFHEFrontend {
 private:
     Name2TFHEppNetMap name2tnet_;
@@ -557,46 +564,88 @@ public:
             name2cnet_.emplace(file.name,
                                readNetwork<CUFHENetworkBuilder>(file));
 
-        // [[builtin]] type = ram
+        // [[builtin]] type = ram | type = mux-ram
         for (const auto& ram : bp.builtinRAMs()) {
             assert(reqPacket_.ck);
             assert(ram.inAddrWidth == 8 && ram.inWdataWidth == 8 &&
                    ram.outRdataWidth == 8);
 
-            auto net = makeTFHEppRAMNetworkForCUFHE("");
-            name2cnet_.emplace(ram.name, net.cufheNet);
-            name2tnet_.emplace(ram.name, net.tfheppNet);
-            merge(bridges0_, net.bridges0);
-            merge(bridges1_, net.bridges1);
+            using RAM_TYPE = blueprint::BuiltinRAM::TYPE;
+            switch (ram.type) {
+            case RAM_TYPE::CMUX_MEMORY: {
+                auto net = makeTFHEppRAMNetworkForCUFHE("");
+                name2cnet_.emplace(ram.name, net.cufheNet);
+                name2tnet_.emplace(ram.name, net.tfheppNet);
+                merge(bridges0_, net.bridges0);
+                merge(bridges1_, net.bridges1);
+                break;
+            }
+
+            case RAM_TYPE::MUX:
+                // FIXME
+                break;
+            }
         }
 
-        // [[builtin]] type = rom
+        // [[builtin]] type = rom | type = mux-rom
         for (const auto& bprom : bp.builtinROMs()) {
-            assert(reqPacket_.ck);
+            using ROM_TYPE = blueprint::BuiltinROM::TYPE;
+            switch (bprom.type) {
+            case ROM_TYPE::CMUX_MEMORY: {
+                assert(reqPacket_.ck);
 
-            if (!utility::isPowerOfTwo(bprom.outRdataWidth))
-                error::die("Invalid out_rdata_width of ROM \"", bprom.name,
-                           "\": ", "must be a power of 2.");
+                if (!utility::isPowerOfTwo(bprom.outRdataWidth))
+                    error::die("Invalid out_rdata_width of ROM \"", bprom.name,
+                               "\": ", "must be a power of 2.");
 
-            auto net = makeTFHEppROMNetworkForCUFHE(
-                bprom.inAddrWidth, utility::log2(bprom.outRdataWidth));
-            name2cnet_.emplace(bprom.name, net.cufheNet);
-            name2tnet_.emplace(bprom.name, net.tfheppNet);
-            merge(bridges0_, net.bridges0);
-            merge(bridges1_, net.bridges1);
+                auto net = makeTFHEppROMNetworkForCUFHE(
+                    bprom.inAddrWidth, utility::log2(bprom.outRdataWidth));
+                name2cnet_.emplace(bprom.name, net.cufheNet);
+                name2tnet_.emplace(bprom.name, net.tfheppNet);
+                merge(bridges0_, net.bridges0);
+                merge(bridges1_, net.bridges1);
 
-            // Set initial ROM data
-            if (auto it = reqPacket_.rom.find(bprom.name);
-                it != reqPacket_.rom.end()) {
-                std::vector<TFHEpp::TRLWElvl1>& init = it->second;
-                auto& rom =
-                    *get<TaskTFHEppROMUX>({bprom.name, {"rom", "all", 0}});
+                // Set initial ROM data
+                if (auto it = reqPacket_.rom.find(bprom.name);
+                    it != reqPacket_.rom.end()) {
+                    std::vector<TFHEpp::TRLWElvl1>& init = it->second;
+                    auto& rom =
+                        *get<TaskTFHEppROMUX>({bprom.name, {"rom", "all", 0}});
 
-                if (rom.size() != init.size())
-                    error::die("Invalid request packet: wrong length of ROM");
+                    if (rom.size() != init.size())
+                        error::die(
+                            "Invalid request packet: wrong length of ROM");
 
-                for (size_t i = 0; i < rom.size(); i++)
-                    rom.set(i, init.at(i));
+                    for (size_t i = 0; i < rom.size(); i++)
+                        rom.set(i, init.at(i));
+                }
+                break;
+            }
+
+            case ROM_TYPE::MUX: {
+                // Create ROM with MUX
+                auto romnet = makeROMWithMUX<CUFHENetworkBuilder>(
+                    bprom.inAddrWidth, bprom.outRdataWidth);
+                name2cnet_.emplace(bprom.name, romnet);
+
+                // Set initial data
+                if (auto it = reqPacket_.romInTLWE.find(bprom.name);
+                    it != reqPacket_.romInTLWE.end()) {
+                    std::vector<TFHEpp::TLWElvl0>& init = it->second;
+                    if (init.size() !=
+                        (1 << bprom.inAddrWidth) * bprom.outRdataWidth)
+                        error::die(
+                            "Invalid request packet: wrong length of ROM");
+
+                    for (size_t i = 0; i < init.size(); i++) {
+                        auto& rom = *romnet->get<TaskCUFHEGateMem>(
+                            {"rom", "romdata", static_cast<int>(i)});
+                        rom.set(*::tfhepp2cufhe(init.at(i)));
+                    }
+                }
+
+                break;
+            }
             }
         }
 

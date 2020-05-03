@@ -1326,10 +1326,18 @@ struct File {
     std::string path, name;
 };
 struct BuiltinROM {
+    enum class TYPE {
+        CMUX_MEMORY,
+        MUX,
+    } type;
     std::string name;
     size_t inAddrWidth, outRdataWidth;
 };
 struct BuiltinRAM {
+    enum class TYPE {
+        CMUX_MEMORY,
+        MUX,
+    } type;
     std::string name;
     size_t inAddrWidth, inWdataWidth, outRdataWidth;
 };
@@ -1429,16 +1437,22 @@ public:
                 const auto type = toml::find<std::string>(srcBuiltin, "type");
                 const auto name = toml::find<std::string>(srcBuiltin, "name");
 
-                if (type == "rom") {
+                if (type == "rom" || type == "mux-rom") {
+                    auto romType =
+                        type == "rom" ? blueprint::BuiltinROM::TYPE::CMUX_MEMORY
+                                      : blueprint::BuiltinROM::TYPE::MUX;
                     const auto inAddrWidth =
                         toml::find<size_t>(srcBuiltin, "in_addr_width");
                     const auto outRdataWidth =
                         toml::find<size_t>(srcBuiltin, "out_rdata_width");
 
                     builtinROMs_.push_back(blueprint::BuiltinROM{
-                        name, inAddrWidth, outRdataWidth});
+                        romType, name, inAddrWidth, outRdataWidth});
                 }
-                else if (type == "ram") {
+                else if (type == "ram" || type == "mux-ram") {
+                    auto ramType =
+                        type == "ram" ? blueprint::BuiltinRAM::TYPE::CMUX_MEMORY
+                                      : blueprint::BuiltinRAM::TYPE::MUX;
                     const auto inAddrWidth =
                         toml::find<size_t>(srcBuiltin, "in_addr_width");
                     const auto inWdataWidth =
@@ -1446,8 +1460,9 @@ public:
                     const auto outRdataWidth =
                         toml::find<size_t>(srcBuiltin, "out_rdata_width");
 
-                    builtinRAMs_.push_back(blueprint::BuiltinRAM{
-                        name, inAddrWidth, inWdataWidth, outRdataWidth});
+                    builtinRAMs_.push_back(
+                        blueprint::BuiltinRAM{ramType, name, inAddrWidth,
+                                              inWdataWidth, outRdataWidth});
                 }
             }
         }
@@ -1788,6 +1803,88 @@ std::shared_ptr<typename NetworkBuilder::NetworkType> readNetwork(
         error::die("Invalid network named \"", file.name, "\":\n", err.str());
 
     return net;
+}
+
+template <class NetworkBuilder>
+std::shared_ptr<typename NetworkBuilder::NetworkType> makeROMWithMUX(
+    int inAddrWidth, int outRdataWidth)
+{
+    NetworkBuilder b;
+
+    // Create inputs
+    std::vector<int> addrInputs;
+    for (int i = 0; i < inAddrWidth; i++) {
+        int id = detail::genid();
+        b.INPUT(id, "addr", i);
+        addrInputs.push_back(id);
+    }
+
+    // Create 1bitROMs
+    for (int i = 0; i < outRdataWidth; i++) {
+        make1bitROMWithMUX(b, addrInputs, outRdataWidth, i);
+    }
+
+    return std::make_shared<typename NetworkBuilder::NetworkType>(std::move(b));
+}
+
+template <class NetworkBuilder>
+void make1bitROMWithMUX(NetworkBuilder &b, const std::vector<int> &addrInputs,
+                        int outRdataWidth, int indexOutRdata)
+{
+    /*
+       INPUT
+        addr[1] ------------------------------+
+       INPUT                                  |
+        addr[0] --+-----------------+         |
+                  |                 |         |
+                  | ROM             |         |
+                  |  romdata[0] -- |\         |
+                  | ROM            | | --+    |
+                  |  romdata[1] -- |/    +-- |\           OUTPUT
+                  |                          | | -- ... -- rdata[indexOutRdata]
+                  +-----------------+    +-- |/
+                                    |    |
+                    ROM             |    |
+                     romdata[2] -- +\    |
+                    ROM            | | --+
+                     romdata[3] -- |/
+
+        ...
+
+                    ROM
+                     addr[2^inAddrWidth-1] -- ...
+    */
+
+    const int inAddrWidth = addrInputs.size();
+
+    // Create ROMs
+    std::vector<int> workingIds;
+    for (int i = 0; i < (1 << inAddrWidth); i++) {
+        int id = detail::genid();
+        b.ROM(id, "romdata", indexOutRdata + i * outRdataWidth);
+        workingIds.push_back(id);
+    }
+
+    // Create MUXs
+    for (int i = 0; i < inAddrWidth; i++) {
+        assert(workingIds.size() > 0 && workingIds.size() % 2 == 0);
+        std::vector<int> newWorkingIds;
+        for (int j = 0; j < workingIds.size(); j += 2) {
+            int id = detail::genid();
+            b.MUX(id);
+            b.connect(workingIds.at(j), id);
+            b.connect(workingIds.at(j + 1), id);
+            b.connect(addrInputs.at(i), id);
+            newWorkingIds.push_back(id);
+        }
+        workingIds.swap(newWorkingIds);
+    }
+    assert(workingIds.size() == 1);
+
+    // Create output
+    int id = detail::genid();
+    b.OUTPUT(id, "rdata", indexOutRdata);
+    b.connect(workingIds.at(0), id);
 }
 
 #endif

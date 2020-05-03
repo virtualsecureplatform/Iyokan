@@ -191,30 +191,62 @@ public:
             name2net_.emplace(ram.name, net);
         }
 
-        // [[builtin]] type = rom
+        // [[builtin]] type = rom | type = mux-rom
         for (const auto &bprom : bp.builtinROMs()) {
-            auto net = std::make_shared<PlainNetwork>(
-                makePlainROMNetwork(bprom.inAddrWidth, bprom.outRdataWidth));
-            name2net_.emplace(bprom.name, net);
+            using ROM_TYPE = blueprint::BuiltinROM::TYPE;
+            switch (bprom.type) {
+            case ROM_TYPE::CMUX_MEMORY: {
+                auto net = std::make_shared<PlainNetwork>(makePlainROMNetwork(
+                    bprom.inAddrWidth, bprom.outRdataWidth));
+                name2net_.emplace(bprom.name, net);
 
-            // Set initial data
-            if (auto it = reqPacket_.rom.find(bprom.name);
-                it != reqPacket_.rom.end()) {
-                const size_t inAddrSpaceSize = 1 << bprom.inAddrWidth;
+                // Set initial data
+                if (auto it = reqPacket_.rom.find(bprom.name);
+                    it != reqPacket_.rom.end()) {
+                    const size_t inAddrSpaceSize = 1 << bprom.inAddrWidth;
 
-                std::vector<Bit> &init = it->second;
-                if (init.size() != inAddrSpaceSize * bprom.outRdataWidth)
-                    error::die("Invalid request packet: wrong length of ROM");
+                    std::vector<Bit> &init = it->second;
+                    if (init.size() != inAddrSpaceSize * bprom.outRdataWidth)
+                        error::die(
+                            "Invalid request packet: wrong length of ROM");
 
-                for (int addr = 0; addr < inAddrSpaceSize; addr++) {
-                    for (int ibit = 0; ibit < bprom.outRdataWidth; ibit++) {
-                        auto &rom = *get<TaskPlainROMUX>(
-                            {bprom.name, {"rom", "all", ibit}});
-                        assert(rom.size() == inAddrSpaceSize);
-                        rom.set(addr,
-                                init.at(addr * bprom.outRdataWidth + ibit));
+                    for (int addr = 0; addr < inAddrSpaceSize; addr++) {
+                        for (int ibit = 0; ibit < bprom.outRdataWidth; ibit++) {
+                            auto &rom = *get<TaskPlainROMUX>(
+                                {bprom.name, {"rom", "all", ibit}});
+                            assert(rom.size() == inAddrSpaceSize);
+                            rom.set(addr,
+                                    init.at(addr * bprom.outRdataWidth + ibit));
+                        }
                     }
                 }
+                break;
+            }
+
+            case ROM_TYPE::MUX: {
+                // Create ROM with MUX
+                auto romnet = makeROMWithMUX<PlainNetworkBuilder>(
+                    bprom.inAddrWidth, bprom.outRdataWidth);
+                name2net_.emplace(bprom.name, romnet);
+
+                // Set initial data
+                if (auto it = reqPacket_.rom.find(bprom.name);
+                    it != reqPacket_.rom.end()) {
+                    std::vector<Bit> &init = it->second;
+                    if (init.size() !=
+                        (1 << bprom.inAddrWidth) * bprom.outRdataWidth)
+                        error::die(
+                            "Invalid request packet: wrong length of ROM");
+
+                    for (size_t i = 0; i < init.size(); i++) {
+                        auto &rom = *romnet->get<TaskPlainGateMem>(
+                            {"rom", "romdata", static_cast<int>(i)});
+                        rom.set(init.at(i));
+                    }
+                }
+
+                break;
+            }
             }
         }
 

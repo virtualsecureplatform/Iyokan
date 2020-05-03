@@ -127,6 +127,20 @@ inline std::vector<TFHEpp::TRLWElvl1> encryptROM(const TFHEpp::SecretKey& key,
     return ret;
 }
 
+inline std::vector<TFHEpp::TLWElvl0> encryptROMInTLWE(
+    const TFHEpp::SecretKey& key, const std::vector<Bit>& src)
+{
+    const TFHEpp::lweParams& params = key.params;
+    std::vector<TFHEpp::TLWElvl0> ret;
+
+    for (Bit b : src) {
+        auto v = b == 1_b ? params.μ : -params.μ;
+        ret.push_back(TFHEpp::tlweSymEncryptlvl0(v, params.α, key.key.lvl0));
+    }
+
+    return ret;
+}
+
 inline std::vector<TFHEpp::TRLWElvl1> encryptRAM(const TFHEpp::SecretKey& key,
                                                  const std::vector<Bit>& src)
 {
@@ -216,13 +230,14 @@ struct TFHEPacket {
     std::shared_ptr<TFHEpp::CircuitKey> ck;
     std::unordered_map<std::string, std::vector<TFHEpp::TRLWElvl1>> ram;
     std::unordered_map<std::string, std::vector<TFHEpp::TRLWElvl1>> rom;
+    std::unordered_map<std::string, std::vector<TFHEpp::TLWElvl0>> romInTLWE;
     std::unordered_map<std::string, std::vector<TFHEpp::TLWElvl0>> bits;
     std::optional<int> numCycles;
 
     template <class Archive>
     void serialize(Archive& ar)
     {
-        ar(gk, ck, ram, rom, bits, numCycles);
+        ar(gk, ck, ram, rom, romInTLWE, bits, numCycles);
     }
 
     inline PlainPacket decrypt(const TFHEpp::SecretKey& key) const;
@@ -232,6 +247,7 @@ TFHEPacket PlainPacket::encrypt(const TFHEpp::SecretKey& key) const
 {
     TFHEPacket tfhe{std::make_shared<TFHEpp::GateKey>(key),
                     std::make_shared<TFHEpp::CircuitKey>(key),
+                    {},
                     {},
                     {},
                     {},
@@ -245,8 +261,12 @@ TFHEPacket PlainPacket::encrypt(const TFHEpp::SecretKey& key) const
 
     // Encrypt ROM
     for (auto&& [name, src] : rom) {
-        auto [it, inserted] = tfhe.rom.emplace(name, encryptROM(key, src));
-        if (!inserted)
+        if (auto [it, inserted] = tfhe.rom.emplace(name, encryptROM(key, src));
+            !inserted)
+            error::die("Invalid PlainPacket. Duplicate rom's key: ", name);
+        if (auto [it, inserted] =
+                tfhe.romInTLWE.emplace(name, encryptROMInTLWE(key, src));
+            !inserted)
             error::die("Invalid PlainPacket. Duplicate rom's key: ", name);
     }
 
