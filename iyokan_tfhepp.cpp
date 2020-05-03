@@ -116,16 +116,35 @@ private:
         // Get values of RAM
         // FIXME: subset of RAMs?
         for (auto &&bp : opt_.blueprint->builtinRAMs()) {
-            std::vector<TFHEpp::TRLWElvl1> &dst = resPacket.ram[bp.name];
-            assert(dst.size() == 0);
-            for (int bit = 0; bit < 8; bit++) {
-                auto &ram = *get<TaskTFHEppRAMUX>({bp.name, {"ram", "", bit}});
-                if (dst.size() == 0)
-                    dst.resize(ram.size() * 8);
-                else
-                    assert(ram.size() == dst.size() / 8);
-                for (size_t addr = 0; addr < ram.size(); addr++)
-                    dst.at(addr * 8 + bit) = ram.get(addr);
+            using RAM_TYPE = blueprint::BuiltinRAM::TYPE;
+            switch (bp.type) {
+            case RAM_TYPE::CMUX_MEMORY: {
+                std::vector<TFHEpp::TRLWElvl1> &dst = resPacket.ram[bp.name];
+                assert(dst.size() == 0);
+                for (int bit = 0; bit < 8; bit++) {
+                    auto &ram =
+                        *get<TaskTFHEppRAMUX>({bp.name, {"ram", "", bit}});
+                    if (dst.size() == 0)
+                        dst.resize(ram.size() * 8);
+                    else
+                        assert(ram.size() == dst.size() / 8);
+                    for (size_t addr = 0; addr < ram.size(); addr++)
+                        dst.at(addr * 8 + bit) = ram.get(addr);
+                }
+                break;
+            }
+
+            case RAM_TYPE::MUX: {
+                std::vector<TFHEpp::TLWElvl0> &dst =
+                    resPacket.ramInTLWE[bp.name];
+                for (size_t i = 0; i < (1 << bp.inAddrWidth) * bp.outRdataWidth;
+                     i++) {
+                    const auto &ram = *get<TaskTFHEppGateMem>(
+                        {bp.name, {"ram", "ramdata", static_cast<int>(i)}});
+                    dst.push_back(ram.get());
+                }
+                break;
+            }
             }
         }
 
@@ -134,13 +153,44 @@ private:
 
     void setInitialRAM()
     {
-        for (auto &&[name, init] : reqPacket_.ram) {
-            for (int bit = 0; bit < 8; bit++) {
-                auto &ram = *get<TaskTFHEppRAMUX>({name, {"ram", "", bit}});
-                if (ram.size() != init.size() / 8)
-                    error::die("Invalid request packet: wrong length of RAM");
-                for (size_t addr = 0; addr < ram.size(); addr++)
-                    ram.set(addr, init.at(addr * 8 + bit));
+        for (const auto &bpram : opt_.blueprint->builtinRAMs()) {
+            using RAM_TYPE = blueprint::BuiltinRAM::TYPE;
+            switch (bpram.type) {
+            case RAM_TYPE::CMUX_MEMORY: {
+                auto it = reqPacket_.ram.find(bpram.name);
+                if (it != reqPacket_.ram.end()) {
+                    const auto &init = it->second;
+                    for (int bit = 0; bit < 8; bit++) {
+                        auto &ram = *get<TaskTFHEppRAMUX>(
+                            {bpram.name, {"ram", "", bit}});
+                        if (ram.size() != init.size() / 8)
+                            error::die(
+                                "Invalid request packet: wrong length of RAM");
+                        for (size_t addr = 0; addr < ram.size(); addr++)
+                            ram.set(addr, init.at(addr * 8 + bit));
+                    }
+                }
+                break;
+            }
+
+            case RAM_TYPE::MUX: {
+                auto it = reqPacket_.ramInTLWE.find(bpram.name);
+                if (it != reqPacket_.ramInTLWE.end()) {
+                    const auto &init = it->second;
+                    if (init.size() !=
+                        (1 << bpram.inAddrWidth) * bpram.outRdataWidth)
+                        error::die(
+                            "Invalid request packet: wrong length of RAM");
+
+                    for (size_t i = 0; i < init.size(); i++) {
+                        auto &ram = *get<TaskTFHEppGateMem>(
+                            {bpram.name,
+                             {"ram", "ramdata", static_cast<int>(i)}});
+                        ram.set(init.at(i));
+                    }
+                }
+                break;
+            }
             }
         }
     }
@@ -195,15 +245,27 @@ public:
             name2net_.emplace(file.name,
                               readNetwork<TFHEppNetworkBuilder>(file));
 
-        // [[builtin]] type = ram
+        // [[builtin]] type = ram | type = mux-ram
         for (const auto &ram : bp.builtinRAMs()) {
             assert(reqPacket_.ck);
             assert(ram.inAddrWidth == 8 && ram.inWdataWidth == 8 &&
                    ram.outRdataWidth == 8);
 
-            auto net =
-                std::make_shared<TFHEppNetwork>(makeTFHEppRAMNetwork(""));
-            name2net_.emplace(ram.name, net);
+            using RAM_TYPE = blueprint::BuiltinRAM::TYPE;
+            switch (ram.type) {
+            case RAM_TYPE::CMUX_MEMORY: {
+                auto net =
+                    std::make_shared<TFHEppNetwork>(makeTFHEppRAMNetwork(""));
+                name2net_.emplace(ram.name, net);
+                break;
+            }
+
+            case RAM_TYPE::MUX:
+                auto net = makeRAMWithMUX<TFHEppNetworkBuilder>(
+                    ram.inAddrWidth, ram.inWdataWidth, ram.outRdataWidth);
+                name2net_.emplace(ram.name, net);
+                break;
+            }
         }
 
         // [[builtin]] type = rom | type = mux-rom

@@ -10,14 +10,14 @@ in_addr_width = 7
 out_rdata_width = 32
 
 [[builtin]]
-type = "ram"
+type = "mux-ram"
 name = "ramA"
 in_addr_width = 8
 in_wdata_width = 8
 out_rdata_width = 8
 
 [[builtin]]
-type = "ram"
+type = "mux-ram"
 name = "ramB"
 in_addr_width = 8
 in_wdata_width = 8

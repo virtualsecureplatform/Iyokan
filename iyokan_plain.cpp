@@ -115,13 +115,30 @@ private:
         // Get values of RAM
         // FIXME: subset of RAMs?
         for (auto &&bp : opt_.blueprint->builtinRAMs()) {
-            auto &ram = *get<TaskPlainRAM>({bp.name, {"ram", "", 0}});
-            std::vector<Bit> &dst = resPacket.ram[bp.name];
-            assert(dst.size() == 0);
-            for (size_t addr = 0; addr < ram.size(); addr++) {
-                uint8_t val = ram.get(addr);
-                for (int i = 0; i < 8; i++)
-                    dst.push_back(((val >> i) & 1u) != 0 ? 1_b : 0_b);
+            using RAM_TYPE = blueprint::BuiltinRAM::TYPE;
+            switch (bp.type) {
+            case RAM_TYPE::CMUX_MEMORY: {
+                auto &ram = *get<TaskPlainRAM>({bp.name, {"ram", "", 0}});
+                std::vector<Bit> &dst = resPacket.ram[bp.name];
+                assert(dst.size() == 0);
+                for (size_t addr = 0; addr < ram.size(); addr++) {
+                    uint8_t val = ram.get(addr);
+                    for (int i = 0; i < 8; i++)
+                        dst.push_back(((val >> i) & 1u) != 0 ? 1_b : 0_b);
+                }
+                break;
+            }
+
+            case RAM_TYPE::MUX: {
+                std::vector<Bit> &dst = resPacket.ram[bp.name];
+                for (size_t i = 0; i < (1 << bp.inAddrWidth) * bp.outRdataWidth;
+                     i++) {
+                    const auto &ram = *get<TaskPlainGateMem>(
+                        {bp.name, {"ram", "ramdata", static_cast<int>(i)}});
+                    dst.push_back(ram.get());
+                }
+                break;
+            }
             }
         }
 
@@ -131,14 +148,24 @@ private:
     void setInitialRAM()
     {
         for (auto &&[name, init] : reqPacket_.ram) {
-            auto &ram = *get<TaskPlainRAM>({name, {"ram", "", 0}});
-            if (ram.size() * 8 != init.size())
-                error::die("Invalid request packet: wrong length of RAM");
-            for (size_t addr = 0; addr < ram.size(); addr++) {
-                uint8_t val = 0;
-                for (int i = 0; i < 8; i++)
-                    val |= static_cast<uint8_t>(init[addr * 8 + i]) << i;
-                ram.set(addr, val);
+            if (auto ramPtr = maybeGet<TaskPlainRAM>({name, {"ram", "", 0}});
+                ramPtr) {  // CMUX Memory
+                auto &ram = *ramPtr;
+                if (ram.size() * 8 != init.size())
+                    error::die("Invalid request packet: wrong length of RAM");
+                for (size_t addr = 0; addr < ram.size(); addr++) {
+                    uint8_t val = 0;
+                    for (int i = 0; i < 8; i++)
+                        val |= static_cast<uint8_t>(init[addr * 8 + i]) << i;
+                    ram.set(addr, val);
+                }
+            }
+            else {  // MUX
+                for (size_t i = 0; i < init.size(); i++) {
+                    auto &ram = *get<TaskPlainGateMem>(
+                        {name, {"ram", "ramdata", static_cast<int>(i)}});
+                    ram.set(init.at(i));
+                }
             }
         }
     }
@@ -182,13 +209,26 @@ public:
             name2net_.emplace(file.name,
                               readNetwork<PlainNetworkBuilder>(file));
 
-        // [[builtin]] type = ram
+        // [[builtin]] type = ram | type = mux-ram
         for (const auto &ram : bp.builtinRAMs()) {
-            // FIXME: relax this constraint
-            assert(ram.inAddrWidth == 8 && ram.inWdataWidth == 8 &&
-                   ram.outRdataWidth == 8);
-            auto net = std::make_shared<PlainNetwork>(makePlainRAMNetwork(""));
-            name2net_.emplace(ram.name, net);
+            using RAM_TYPE = blueprint::BuiltinRAM::TYPE;
+            switch (ram.type) {
+            case RAM_TYPE::CMUX_MEMORY: {
+                // FIXME: relax this constraint
+                assert(ram.inAddrWidth == 8 && ram.inWdataWidth == 8 &&
+                       ram.outRdataWidth == 8);
+                auto net =
+                    std::make_shared<PlainNetwork>(makePlainRAMNetwork(""));
+                name2net_.emplace(ram.name, net);
+                break;
+            }
+            case RAM_TYPE::MUX: {
+                auto net = makeRAMWithMUX<PlainNetworkBuilder>(
+                    ram.inAddrWidth, ram.inWdataWidth, ram.outRdataWidth);
+                name2net_.emplace(ram.name, net);
+                break;
+            }
+            }
         }
 
         // [[builtin]] type = rom | type = mux-rom

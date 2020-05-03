@@ -130,15 +130,7 @@ inline std::vector<TFHEpp::TRLWElvl1> encryptROM(const TFHEpp::SecretKey& key,
 inline std::vector<TFHEpp::TLWElvl0> encryptROMInTLWE(
     const TFHEpp::SecretKey& key, const std::vector<Bit>& src)
 {
-    const TFHEpp::lweParams& params = key.params;
-    std::vector<TFHEpp::TLWElvl0> ret;
-
-    for (Bit b : src) {
-        auto v = b == 1_b ? params.μ : -params.μ;
-        ret.push_back(TFHEpp::tlweSymEncryptlvl0(v, params.α, key.key.lvl0));
-    }
-
-    return ret;
+    return encryptBits(key, src);
 }
 
 inline std::vector<TFHEpp::TRLWElvl1> encryptRAM(const TFHEpp::SecretKey& key,
@@ -154,6 +146,12 @@ inline std::vector<TFHEpp::TRLWElvl1> encryptRAM(const TFHEpp::SecretKey& key,
     }
 
     return ret;
+}
+
+inline std::vector<TFHEpp::TLWElvl0> encryptRAMInTLWE(
+    const TFHEpp::SecretKey& key, const std::vector<Bit>& src)
+{
+    return encryptBits(key, src);
 }
 
 inline std::vector<uint8_t> decrypt(const TFHEpp::SecretKey& key,
@@ -172,6 +170,16 @@ inline std::vector<uint8_t> decrypt(const TFHEpp::SecretKey& key,
     return ret;
 }
 
+inline std::vector<Bit> decryptBits(const TFHEpp::SecretKey& key,
+                                    const std::vector<TFHEpp::TLWElvl0>& src)
+{
+    auto bitvals = TFHEpp::bootsSymDecrypt(src, key);
+    std::vector<Bit> bits;
+    for (auto&& bitval : bitvals)
+        bits.push_back(bitval != 0 ? 1_b : 0_b);
+    return bits;
+}
+
 inline std::vector<Bit> decryptRAM(const TFHEpp::SecretKey& key,
                                    const std::vector<TFHEpp::TRLWElvl1>& src)
 {
@@ -183,6 +191,12 @@ inline std::vector<Bit> decryptRAM(const TFHEpp::SecretKey& key,
     }
 
     return ret;
+}
+
+inline std::vector<Bit> decryptRAMInTLWE(
+    const TFHEpp::SecretKey& key, const std::vector<TFHEpp::TLWElvl0>& src)
+{
+    return decryptBits(key, src);
 }
 
 inline std::vector<Bit> decryptROM(const TFHEpp::SecretKey& key,
@@ -198,14 +212,10 @@ inline std::vector<Bit> decryptROM(const TFHEpp::SecretKey& key,
     return ret;
 }
 
-inline std::vector<Bit> decryptBits(const TFHEpp::SecretKey& key,
-                                    const std::vector<TFHEpp::TLWElvl0>& src)
+inline std::vector<Bit> decryptROMInTLWE(
+    const TFHEpp::SecretKey& key, const std::vector<TFHEpp::TLWElvl0>& src)
 {
-    auto bitvals = TFHEpp::bootsSymDecrypt(src, key);
-    std::vector<Bit> bits;
-    for (auto&& bitval : bitvals)
-        bits.push_back(bitval != 0 ? 1_b : 0_b);
-    return bits;
+    return decryptBits(key, src);
 }
 
 struct TFHEPacket;
@@ -229,6 +239,7 @@ struct TFHEPacket {
     std::shared_ptr<TFHEpp::GateKey> gk;
     std::shared_ptr<TFHEpp::CircuitKey> ck;
     std::unordered_map<std::string, std::vector<TFHEpp::TRLWElvl1>> ram;
+    std::unordered_map<std::string, std::vector<TFHEpp::TLWElvl0>> ramInTLWE;
     std::unordered_map<std::string, std::vector<TFHEpp::TRLWElvl1>> rom;
     std::unordered_map<std::string, std::vector<TFHEpp::TLWElvl0>> romInTLWE;
     std::unordered_map<std::string, std::vector<TFHEpp::TLWElvl0>> bits;
@@ -237,7 +248,7 @@ struct TFHEPacket {
     template <class Archive>
     void serialize(Archive& ar)
     {
-        ar(gk, ck, ram, rom, romInTLWE, bits, numCycles);
+        ar(gk, ck, ram, ramInTLWE, rom, romInTLWE, bits, numCycles);
     }
 
     inline PlainPacket decrypt(const TFHEpp::SecretKey& key) const;
@@ -251,11 +262,16 @@ TFHEPacket PlainPacket::encrypt(const TFHEpp::SecretKey& key) const
                     {},
                     {},
                     {},
+                    {},
                     numCycles};
     // Encrypt RAM
     for (auto&& [name, src] : ram) {
-        auto [it, inserted] = tfhe.ram.emplace(name, encryptRAM(key, src));
-        if (!inserted)
+        if (auto [it, inserted] = tfhe.ram.emplace(name, encryptRAM(key, src));
+            !inserted)
+            error::die("Invalid PlainPacket. Duplicate ram's key: ", name);
+        if (auto [it, inserted] =
+                tfhe.ramInTLWE.emplace(name, encryptRAMInTLWE(key, src));
+            !inserted)
             error::die("Invalid PlainPacket. Duplicate ram's key: ", name);
     }
 
@@ -285,18 +301,16 @@ PlainPacket TFHEPacket::decrypt(const TFHEpp::SecretKey& key) const
     PlainPacket plain{{}, {}, {}, numCycles};
 
     // Decrypt RAM
-    for (auto&& [name, trlwes] : ram) {
-        auto [it, inserted] = plain.ram.emplace(name, decryptRAM(key, trlwes));
-        if (!inserted)
-            error::die("Invalid TFHEPacket. Duplicate ram's key: ", name);
-    }
+    for (auto&& [name, trlwes] : ram)
+        plain.ram.emplace(name, decryptRAM(key, trlwes));
+    for (auto&& [name, tlwes] : ramInTLWE)
+        plain.ram.emplace(name, decryptRAMInTLWE(key, tlwes));
 
     // Decrypt ROM
-    for (auto&& [name, trlwes] : rom) {
-        auto [it, inserted] = plain.rom.emplace(name, decryptROM(key, trlwes));
-        if (!inserted)
-            error::die("Invalid TFHEPacket. Duplicate rom's key: ", name);
-    }
+    for (auto&& [name, trlwes] : rom)
+        plain.rom.emplace(name, decryptROM(key, trlwes));
+    for (auto&& [name, tlwes] : romInTLWE)
+        plain.rom.emplace(name, decryptROMInTLWE(key, tlwes));
 
     // Decrypt bits
     for (auto&& [name, tlwes] : bits) {

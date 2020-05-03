@@ -1887,4 +1887,152 @@ void make1bitROMWithMUX(NetworkBuilder &b, const std::vector<int> &addrInputs,
     b.connect(workingIds.at(0), id);
 }
 
+template <class NetworkBuilder>
+std::shared_ptr<typename NetworkBuilder::NetworkType> makeRAMWithMUX(
+    int inAddrWidth, int inWdataWidth, int outRdataWidth)
+{
+    NetworkBuilder b;
+
+    // Create inputs
+    std::vector<int> addrInputs;
+    for (int i = 0; i < inAddrWidth; i++) {
+        int id = detail::genid();
+        b.INPUT(id, "addr", i);
+        addrInputs.push_back(id);
+    }
+    int wrenInput = detail::genid();
+    b.INPUT(wrenInput, "wren", 0);
+
+    // Create 1bitRAMs
+    for (int i = 0; i < outRdataWidth; i++) {
+        make1bitRAMWithMUX(b, addrInputs, wrenInput, outRdataWidth, i);
+    }
+
+    return std::make_shared<typename NetworkBuilder::NetworkType>(std::move(b));
+}
+
+template <class NetworkBuilder>
+void make1bitRAMWithMUX(NetworkBuilder &b, const std::vector<int> &addrInputs,
+                        int wrenInput, int outRdataWidth, int indexWRdata)
+{
+    /*
+        wdata[indexWRdata]
+          |
+          |   +---------------------+
+          |   |                     |
+          |   +--|\                 |
+          |      | |-- ramdata[.] --+------------+-|\
+          +------|/                                | |-- rdata[indexWRdata]
+          |       |    +---------------------+   +-|/
+          |       a    +--|\                 |---+
+          |               | |-- ramdata[.] --+
+          +---------------|/
+          |                |
+          |                b
+
+          ...
+
+          |
+          +---- ... -- ramdata[2^inAddrWidth-1] --
+
+
+                a   b
+                |   |
+                -----
+   addr[0] --- /0   1\ DMUX
+               -------           ...
+                  |               |
+                  +-------+-------+
+                          |
+                         ... ...
+                          |   |
+                          |   |
+                          -----
+ addr[inAddrWidth-1] --- /0   1\ DMUX
+                         -------
+                            |
+                          wren
+
+
+    DMUX: (in, sel) -> (out0, out1)
+        out0 = andnot(in, sel)
+        out1 = and(in, sel)
+    */
+
+    const int inAddrWidth = addrInputs.size();
+
+    // Create input "wdata[indexWRdata]"
+    int wdataInput = detail::genid();
+    b.INPUT(wdataInput, "wdata", indexWRdata);
+
+    // Create DMUXs
+    std::vector<int> workingIds = {wrenInput}, newWorkingIds;
+    for (auto it = addrInputs.rbegin(); it != addrInputs.rend(); ++it) {
+        int addr = *it;
+        for (int src : workingIds) {
+            // Create DMUX
+            //   dst0 = andnot(src, addr)
+            //   dst1 = and(src, addr)
+            int dst0 = detail::genid(), dst1 = detail::genid();
+            b.ANDNOT(dst0);
+            b.connect(src, dst0);
+            b.connect(addr, dst0);
+            b.AND(dst1);
+            b.connect(src, dst1);
+            b.connect(addr, dst1);
+
+            newWorkingIds.push_back(dst0);
+            newWorkingIds.push_back(dst1);
+        }
+        workingIds.swap(newWorkingIds);
+        newWorkingIds.clear();
+    }
+    assert(workingIds.size() == (1 << inAddrWidth));
+
+    // Create RAMs
+    for (int addr = 0; addr < (1 << inAddrWidth); addr++) {
+        /*
+                                +-------------------------+
+                                |                         |
+                                +--|\   RAM               |--
+           INPUT                   | |-- ramdata[ ... ] --+
+            wdata[indexRWdata] ----|/
+                                    |
+                                   sel
+         */
+        int sel = workingIds.at(addr), mux = detail::genid(),
+            ram = detail::genid();
+        b.MUX(mux);
+        b.RAM(ram, "ramdata", indexWRdata + addr * outRdataWidth);
+        b.connect(ram, mux);
+        b.connect(wdataInput, mux);
+        b.connect(sel, mux);
+        b.connect(mux, ram);
+        newWorkingIds.push_back(ram);
+    }
+    workingIds.swap(newWorkingIds);
+    newWorkingIds.clear();
+
+    // Create MUXs
+    for (int i = 0; i < inAddrWidth; i++) {
+        assert(workingIds.size() > 0 && workingIds.size() % 2 == 0);
+        for (int j = 0; j < workingIds.size(); j += 2) {
+            int id = detail::genid();
+            b.MUX(id);
+            b.connect(workingIds.at(j), id);
+            b.connect(workingIds.at(j + 1), id);
+            b.connect(addrInputs.at(i), id);
+            newWorkingIds.push_back(id);
+        }
+        workingIds.swap(newWorkingIds);
+        newWorkingIds.clear();
+    }
+    assert(workingIds.size() == 1);
+
+    // Create output "rdata[indexWRdata]"
+    int rdataOutput = detail::genid();
+    b.OUTPUT(rdataOutput, "rdata", indexWRdata);
+    b.connect(workingIds.at(0), rdataOutput);
+}
+
 #endif
