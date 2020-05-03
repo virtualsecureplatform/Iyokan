@@ -221,6 +221,8 @@ test_in_out "test/cahp-diamond.toml", "test/test01.in", "test/test01-diamond.out
             [], nil, [] # Won't do test for TFHEpp
 test_in_out "test/cahp-emerald.toml", "test/test01.in", "test/test01-emerald.out",
             [], nil, [] # Won't do test for TFHEpp
+test_in_out "test/cahp-diamond-mux.toml", "test/test01.in", "test/test01-diamond.out",
+            [], nil, [] # Won't do test for TFHEpp
 test_in_out "test/test-addr-4bit.toml", "test/test04.in", "test/test04.out",
             ["-c", 1] # "-c 1" will be automatically set for args1 and args2
 test_in_out "test/test-div-8bit.toml", "test/test05.in", "test/test05.out",
