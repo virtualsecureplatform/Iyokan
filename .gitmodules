@@ -25,3 +25,6 @@
 [submodule "toml11"]
 	path = toml11
 	url = https://github.com/ToruNiina/toml11.git
+[submodule "spdlog"]
+	path = spdlog
+	url = https://github.com/gabime/spdlog.git
