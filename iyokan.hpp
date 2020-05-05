@@ -1911,7 +1911,7 @@ void make1bitROMWithMUX(NetworkBuilder &b, const std::vector<int> &addrInputs,
 
 template <class NetworkBuilder>
 std::shared_ptr<typename NetworkBuilder::NetworkType> makeRAMWithMUX(
-    int inAddrWidth, int inWdataWidth, int outRdataWidth)
+    int inAddrWidth, int outRdataWidth)
 {
     NetworkBuilder b;
 

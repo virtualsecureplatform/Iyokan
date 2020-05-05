@@ -224,7 +224,7 @@ public:
             }
             case RAM_TYPE::MUX: {
                 auto net = makeRAMWithMUX<PlainNetworkBuilder>(
-                    ram.inAddrWidth, ram.inWdataWidth, ram.outRdataWidth);
+                    ram.inAddrWidth, ram.outRdataWidth);
                 name2net_.emplace(ram.name, net);
                 break;
             }

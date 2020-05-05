@@ -633,7 +633,7 @@ public:
 
             case RAM_TYPE::MUX:
                 auto net = makeRAMWithMUX<CUFHENetworkBuilder>(
-                    ram.inAddrWidth, ram.inWdataWidth, ram.outRdataWidth);
+                    ram.inAddrWidth, ram.outRdataWidth);
                 name2cnet_.emplace(ram.name, net);
                 break;
             }
