@@ -7,6 +7,8 @@
 
 #include <backward.hpp>
 
+#include <spdlog/spdlog.h>
+
 namespace error {
 template <class... Args>
 [[noreturn]] void die(Args... args)
@@ -14,15 +16,17 @@ template <class... Args>
     using namespace backward;
 
     // Print error message
-    std::cerr << "ERROR!" << std::endl;
-    (std::cerr << ... << args);
-    std::cerr << std::endl;
+    std::stringstream ss;
+    (ss << ... << args) << std::endl;
 
     // Print backtrace
     StackTrace st;
     st.load_here(32);
     Printer p;
-    p.print(st, std::cerr);
+    p.print(st, ss);
+
+    // Emit
+    spdlog::error(ss.str());
 
     // Abort
     std::exit(EXIT_FAILURE);

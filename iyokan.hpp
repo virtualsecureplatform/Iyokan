@@ -1597,27 +1597,26 @@ struct Options {
     int numCPUWorkers = std::thread::hardware_concurrency(),
         numGPUWorkers = 80 * 10, numGPU = 1, numCycles = -1;
     std::optional<std::string> secretKey;
-    bool quiet = false;
     std::optional<std::string> dumpPrefix;
 };
 
 template <class Func>
-int processCycles(int numCycles, std::ostream &os, Func func)
+int processCycles(int numCycles, Func func)
 {
     for (int i = 0; i < numCycles; i++) {
-        os << "#" << (i + 1) << std::flush;
+        spdlog::info("#{}", i + 1);
 
         auto begin = std::chrono::high_resolution_clock::now();
         bool shouldBreak = func(i);
         auto end = std::chrono::high_resolution_clock::now();
 
-        os << "\tdone. ("
-           << std::chrono::duration_cast<std::chrono::microseconds>(end - begin)
-                  .count()
-           << " us)" << std::endl;
+        auto duration =
+            std::chrono::duration_cast<std::chrono::microseconds>(end - begin)
+                .count();
+        spdlog::info("\tdone. ({} us)", duration);
 
         if (shouldBreak) {
-            os << "break." << std::endl;
+            spdlog::info("break.");
             return i + 1;
         }
     }

@@ -29,8 +29,8 @@ if (IYOKAN_ENABLE_CUDA)
     enable_language(CUDA)
     add_subdirectory(cuFHE/cufhe)
 endif(IYOKAN_ENABLE_CUDA)
-
 add_subdirectory(${CMAKE_SOURCE_DIR}/backward-cpp)
+add_subdirectory(spdlog)
 
 set(IYOKAN_CXXFLAGS -Wall -Wextra -pedantic -Wno-sign-compare -g3)
 set(IYOKAN_CXXFLAGS_DEBUG   ${IYOKAN_CXXFLAGS} -O0)
@@ -42,6 +42,7 @@ set(IYOKAN_INCLUDE_DIRS
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/cereal/include>
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/ELFIO>
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/toml11>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/spdlog/include>
 )
 if (IYOKAN_ENABLE_CUDA)
     list(APPEND IYOKAN_INCLUDE_DIRS ${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES})

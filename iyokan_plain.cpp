@@ -201,10 +201,6 @@ public:
 
     void go()
     {
-        // Prepare output stream
-        std::stringstream devnull;
-        std::ostream &os = opt_.quiet ? devnull : std::cout;
-
         // Create network according to blueprint and request packet
         const NetworkBlueprint &bp = *opt_.blueprint;
 
@@ -302,10 +298,10 @@ public:
             if (vis.kind2count().empty())
                 continue;
 
-            os << name << " :" << std::endl;
+            spdlog::debug("{} :", name);
             for (auto &&[kind, count] : vis.kind2count())
-                os << "\t" << count << "\t" << kind << std::endl;
-            os << std::endl;
+                spdlog::debug("\t{}\t{}", count, kind);
+            spdlog::debug("");
         }
 
         // [connect]
@@ -349,7 +345,7 @@ public:
         {
             auto finflag = maybeGetAt("output", "finflag");
 
-            numCycles = processCycles(numCycles, os, [&](int currentCycle) {
+            numCycles = processCycles(numCycles, [&](int currentCycle) {
                 if (opt_.dumpPrefix)
                     writeToArchive(
                         utility::fok(*opt_.dumpPrefix, "-", currentCycle),

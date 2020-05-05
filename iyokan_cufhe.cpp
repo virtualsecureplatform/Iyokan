@@ -602,10 +602,6 @@ public:
 
     void go()
     {
-        // Prepare output stream
-        std::stringstream devnull;
-        std::ostream& os = opt_.quiet ? devnull : std::cout;
-
         const NetworkBlueprint& bp = *opt_.blueprint;
 
         // Prepare cuFHE
@@ -713,10 +709,10 @@ public:
             if (vis.kind2count().empty())
                 continue;
 
-            os << name << " (TFHEpp) :" << std::endl;
+            spdlog::debug("{} (TFHEpp) :", name);
             for (auto&& [kind, count] : vis.kind2count())
-                os << "\t" << count << "\t" << kind << std::endl;
-            os << std::endl;
+                spdlog::debug("\t{}\t{}", count, kind);
+            spdlog::debug("");
         }
         for (auto&& [name, net] : name2cnet_) {
             GateCountVisitor vis;
@@ -725,10 +721,10 @@ public:
             if (vis.kind2count().empty())
                 continue;
 
-            os << name << " (cuFHE) :" << std::endl;
+            spdlog::debug("{} (cuFHE) :", name);
             for (auto&& [kind, count] : vis.kind2count())
-                os << "\t" << count << "\t" << kind << std::endl;
-            os << std::endl;
+                spdlog::debug("\t{}\t{}", count, kind);
+            spdlog::debug("");
         }
 
         // [connect]
@@ -783,7 +779,7 @@ public:
 
         // Go computing
         {
-            processCycles(opt_.numCycles, os, [&](int currentCycle) {
+            processCycles(opt_.numCycles, [&](int currentCycle) {
                 mayDumpPacket(currentCycle);
 
                 runner.tick();

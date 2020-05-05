@@ -11,14 +11,15 @@
 
 int main(int argc, char **argv)
 {
-    CLI::App app{"Prallel FHE circuit evaluation engine."};
+    spdlog::set_level(spdlog::level::info);
 
+    CLI::App app{"Prallel FHE circuit evaluation engine."};
+    app.require_subcommand();
+
+    enum class TYPE { PLAIN, TFHE } type;
     Options opt;
     bool enableGPU = false;
     std::string blueprintFilePath;
-
-    app.require_subcommand();
-    enum class TYPE { PLAIN, TFHE } type;
 
     {
         CLI::App *plain = app.add_subcommand("plain", "");
@@ -33,7 +34,10 @@ int main(int argc, char **argv)
             ->required()
             ->check(CLI::ExistingFile);
         plain->add_option("-o,--out", opt.outputFile, "")->required();
-        plain->add_flag("--quiet", opt.quiet, "");
+        plain->add_flag_callback(
+            "--quiet", [] { spdlog::set_level(spdlog::level::err); }, "");
+        plain->add_flag_callback(
+            "--verbose", [] { spdlog::set_level(spdlog::level::debug); }, "");
 
         plain->add_option("--dump-prefix", opt.dumpPrefix, "");
     }
@@ -51,7 +55,10 @@ int main(int argc, char **argv)
             ->required()
             ->check(CLI::ExistingFile);
         tfhe->add_option("-o,--out", opt.outputFile, "")->required();
-        tfhe->add_flag("--quiet", opt.quiet, "");
+        tfhe->add_flag_callback(
+            "--quiet", [] { spdlog::set_level(spdlog::level::err); }, "");
+        tfhe->add_flag_callback(
+            "--verbose", [] { spdlog::set_level(spdlog::level::debug); }, "");
 
         tfhe->add_option("--secret-key", opt.secretKey, "")
             ->check(CLI::ExistingFile);
