@@ -201,6 +201,10 @@ public:
 
     void go()
     {
+        // Prepare output stream
+        std::stringstream devnull;
+        std::ostream &os = opt_.quiet ? devnull : std::cout;
+
         // Create network according to blueprint and request packet
         const NetworkBlueprint &bp = *opt_.blueprint;
 
@@ -290,6 +294,20 @@ public:
             }
         }
 
+        // Print gate counts
+        for (auto &&[name, net] : name2net_) {
+            GateCountVisitor vis;
+            net->visit(vis);
+
+            if (vis.kind2count().empty())
+                continue;
+
+            os << name << " :" << std::endl;
+            for (auto &&[kind, count] : vis.kind2count())
+                os << "\t" << count << "\t" << kind << std::endl;
+            os << std::endl;
+        }
+
         // [connect]
         for (const auto &[src, dst] : bp.edges()) {
             assert(src.portLabel.kind == "output");
@@ -329,9 +347,6 @@ public:
 
         // Go computing
         {
-            std::stringstream devnull;
-            std::ostream &os = opt_.quiet ? devnull : std::cout;
-
             auto finflag = maybeGetAt("output", "finflag");
 
             numCycles = processCycles(numCycles, os, [&](int currentCycle) {

@@ -403,6 +403,29 @@ private:
     }
 };
 
+class GateCountVisitor : public GraphVisitor {
+private:
+    std::unordered_map<std::string, int> kind2count_;
+
+public:
+    const std::unordered_map<std::string, int> &kind2count() const
+    {
+        return kind2count_;
+    }
+
+private:
+    void onStart(DepNodeBase &depnode) override
+    {
+        std::string kind = depnode.label().kind;
+        auto [it, inserted] = kind2count_.emplace(kind, 0);
+        it->second++;
+    }
+
+    void onEnd() override
+    {
+    }
+};
+
 template <class WorkerInfo>
 class DepNode : public DepNodeBase,
                 public std::enable_shared_from_this<DepNode<WorkerInfo>> {

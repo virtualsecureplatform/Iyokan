@@ -602,6 +602,10 @@ public:
 
     void go()
     {
+        // Prepare output stream
+        std::stringstream devnull;
+        std::ostream& os = opt_.quiet ? devnull : std::cout;
+
         const NetworkBlueprint& bp = *opt_.blueprint;
 
         // Prepare cuFHE
@@ -701,6 +705,32 @@ public:
             }
         }
 
+        // Print gate counts
+        for (auto&& [name, net] : name2tnet_) {
+            GateCountVisitor vis;
+            net->visit(vis);
+
+            if (vis.kind2count().empty())
+                continue;
+
+            os << name << " (TFHEpp) :" << std::endl;
+            for (auto&& [kind, count] : vis.kind2count())
+                os << "\t" << count << "\t" << kind << std::endl;
+            os << std::endl;
+        }
+        for (auto&& [name, net] : name2cnet_) {
+            GateCountVisitor vis;
+            net->visit(vis);
+
+            if (vis.kind2count().empty())
+                continue;
+
+            os << name << " (cuFHE) :" << std::endl;
+            for (auto&& [kind, count] : vis.kind2count())
+                os << "\t" << count << "\t" << kind << std::endl;
+            os << std::endl;
+        }
+
         // [connect]
         for (const auto& [src, dst] : bp.edges()) {
             assert(src.portLabel.kind == "output");
@@ -753,9 +783,6 @@ public:
 
         // Go computing
         {
-            std::stringstream devnull;
-            std::ostream& os = opt_.quiet ? devnull : std::cout;
-
             processCycles(opt_.numCycles, os, [&](int currentCycle) {
                 mayDumpPacket(currentCycle);
 
