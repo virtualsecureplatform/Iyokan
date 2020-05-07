@@ -308,6 +308,12 @@ inline std::unordered_map<int, int> doTopologicalSort(
 }  // namespace graph
 
 class GraphVisitor {
+public:
+    enum class STRATEGY {
+        DFS,     // Follow as many edges as possible from ready nodes.
+        SINGLE,  // Visit each node in arbitrary order.
+    };
+
 private:
     std::stack<graph::NodePtr> nodeStack_;
     std::unordered_map<int, graph::NodePtr> id2node_;
@@ -349,6 +355,11 @@ public:
     {
     }
 
+    virtual STRATEGY getStrategy() const
+    {
+        return STRATEGY::DFS;
+    }
+
     const std::unordered_map<int, graph::NodePtr> &getMap() const
     {
         return id2node_;
@@ -359,7 +370,7 @@ public:
     {
         auto [node, isNew] = depnode2node(curNode);
 
-        if (!nodeStack_.empty()) {
+        if (getStrategy() == STRATEGY::DFS && !nodeStack_.empty()) {
             graph::NodePtr parent = nodeStack_.top();
             parent->children.insert(node->label.id);
             node->parents.insert(parent->label.id);
@@ -370,14 +381,17 @@ public:
 
         onStart(curNode);
 
-        nodeStack_.push(node);
+        if (getStrategy() == STRATEGY::DFS)
+            nodeStack_.push(node);
         return true;
     }
 
     void end()
     {
-        assert(!nodeStack_.empty());
-        nodeStack_.pop();
+        if (getStrategy() == STRATEGY::DFS) {
+            assert(!nodeStack_.empty());
+            nodeStack_.pop();
+        }
         onEnd();
     }
 };
@@ -411,6 +425,11 @@ public:
     const std::unordered_map<std::string, int> &kind2count() const
     {
         return kind2count_;
+    }
+
+    STRATEGY getStrategy() const override
+    {
+        return STRATEGY::SINGLE;
     }
 
 private:
@@ -506,10 +525,12 @@ public:
         if (!visitor.start(*this))
             return;
 
-        for (auto &&dep : dependents_) {
-            auto next = dep.lock();
-            assert(next);
-            next->visit(visitor);
+        if (visitor.getStrategy() == GraphVisitor::STRATEGY::DFS) {
+            for (auto &&dep : dependents_) {
+                auto next = dep.lock();
+                assert(next);
+                next->visit(visitor);
+            }
         }
 
         visitor.end();
@@ -927,9 +948,13 @@ public:
 
     void visit(GraphVisitor &visitor)
     {
-        for (auto &&[id, node] : id2node_)
-            if (node->task()->areInputsReady())
+        using ST = GraphVisitor::STRATEGY;
+        ST st = visitor.getStrategy();
+        for (auto &&[id, node] : id2node_) {
+            if (st == ST::SINGLE ||
+                (st == ST::DFS && node->task()->areInputsReady()))
                 node->visit(visitor);
+        }
     }
 };
 
@@ -1322,7 +1347,8 @@ public:
     {
         if (!visitor.start(*this))
             return;
-        src_->visit(visitor);
+        if (visitor.getStrategy() == GraphVisitor::STRATEGY::DFS)
+            src_->visit(visitor);
         visitor.end();
     }
 };
