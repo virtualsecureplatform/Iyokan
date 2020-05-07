@@ -132,7 +132,8 @@ $ iyokan-packet genkey --type tfhepp --out secret.key
 Next, encrypt the packet:
 
 ```
-$ iyokan-packet enc --key secret.key --in request.plain.packet --out request.enc.packet
+$ iyokan-packet genbkey --in secret.key --out bootstrapping.key
+$ iyokan-packet enc --key secret.key --bkey bootstrapping.key --in request.plain.packet --out request.enc.packet
 ```
 
 Finally, run Iyokan with it:

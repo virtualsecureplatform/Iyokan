@@ -93,6 +93,9 @@ run_command "./test0"
 ##### prepare #####
 
 run_iyokan_packet ["genkey", "--type", "tfhepp", "--out", "_test_sk"]
+if $SLOW_MODE_ENABLED
+  run_iyokan_packet ["genbkey", "--in", "_test_sk", "--out", "_test_bk"]
+end
 
 ##### method toml2packet #####
 
@@ -117,12 +120,13 @@ test_method_toml2packet "test/test03.in", {
 def test_iyokan_packet_e2e(in_file)
   plain_pkt = "_test_plain_packet"
   pkt = "_test_packet"
-  secret_key = "_test_sk"
+  skey = "_test_sk"
+  bkey = "_test_bk"
 
   run_iyokan_packet ["toml2packet", "--in", in_file, "--out", plain_pkt]
   if $SLOW_MODE_ENABLED
-    run_iyokan_packet ["enc", "--key", secret_key, "--in", plain_pkt, "--out", pkt]
-    run_iyokan_packet ["dec", "--key", secret_key, "--in", pkt, "--out", plain_pkt]
+    run_iyokan_packet ["enc", "--key", skey, "--bkey", bkey, "--in", plain_pkt, "--out", pkt]
+    run_iyokan_packet ["dec", "--key", skey, "--in", pkt, "--out", plain_pkt]
   end
   r = run_iyokan_packet ["packet2toml", "--in", plain_pkt]
 
@@ -147,6 +151,7 @@ def test_in_out(blueprint, in_file, out_file, args0 = [], args1 = [], args2 = []
   req_file = "_test_req_packet"
   res_file = "_test_res_packet"
   secret_key = "_test_sk"
+  bootstrapping_key = "_test_bk"
   cycles = -1
 
   run_iyokan_packet ["toml2packet",
@@ -168,6 +173,7 @@ def test_in_out(blueprint, in_file, out_file, args0 = [], args1 = [], args2 = []
   if $SLOW_MODE_ENABLED
     run_iyokan_packet ["enc",
                        "--key", secret_key,
+                       "--bkey", bootstrapping_key,
                        "--in", plain_req_file,
                        "--out", req_file]
 

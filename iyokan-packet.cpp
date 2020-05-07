@@ -135,12 +135,20 @@ void doGenKeyTFHEpp(const std::string& out)
     writeToArchive(out, sk);
 }
 
-void doEnc(const std::string& key, const std::string& in,
-           const std::string& out)
+void doGenBKeyTFHEpp(const std::string& in, const std::string& out)
+{
+    auto sk = readFromArchive<TFHEpp::SecretKey>(in);
+    TFHEppBKey bk{sk};
+    writeToArchive(out, bk);
+}
+
+void doEnc(const std::string& key, const std::string& bkey,
+           const std::string& in, const std::string& out)
 {
     auto sk = readFromArchive<TFHEpp::SecretKey>(key);
     auto pkt = readFromArchive<PlainPacket>(in);
-    writeToArchive(out, pkt.encrypt(sk));
+    auto encPkt = pkt.encrypt(sk, readFromArchive<TFHEppBKey>(bkey));
+    writeToArchive(out, encPkt);
 }
 
 void doDec(const std::string& key, const std::string& in,
@@ -208,13 +216,15 @@ void doToml2Packet(const std::string& in, const std::string& out)
 int main(int argc, char** argv)
 {
     /*
-       genkey --type tfhepp --out secret.key
-       enc    --key secret.key --in packet.plain --out packet.enc
-       dec    --key secret.key --in packet.enc --out packet.plain
-       pack   --out packet.plain            \
-              --rom A:a.bin --rom C:c.bin \
-              --ram D:d.bin --ram E:e.bin \
-              --bits F:f.bin
+       genkey  --type tfhepp --out secret.key
+       genbkey --in secret.key --out bootstrapping.key
+       enc     --key secret.key --bkey bootstrapping.key \
+               --in packet.plain --out packet.enc
+       dec     --key secret.key --in packet.enc --out packet.plain
+       pack    --out packet.plain            \
+               --rom A:a.bin --rom C:c.bin \
+               --ram D:d.bin --ram E:e.bin \
+               --bits F:f.bin
        packet2toml --in packet.plain
        toml2packet --in packet.toml --out packet.plain
     */
@@ -227,6 +237,7 @@ int main(int argc, char** argv)
 
     enum class TYPE {
         GENKEY,
+        GENBKEY,
         ENC,
         DEC,
         PACK,
@@ -234,7 +245,7 @@ int main(int argc, char** argv)
         TOML2PACKET,
     } type;
 
-    std::string in = "", out = "", key = "";
+    std::string in = "", out = "", key = "", bkey = "";
     std::optional<std::string> rom, ram, bits;
 
     enum class KEY_TYPE {
@@ -252,9 +263,17 @@ int main(int argc, char** argv)
     }
 
     {
+        CLI::App* sub = app.add_subcommand("genbkey", "");
+        sub->parse_complete_callback([&] { type = TYPE::GENBKEY; });
+        sub->add_option("-i,--in", in)->required();
+        sub->add_option("-o,--out", out)->required();
+    }
+
+    {
         CLI::App* sub = app.add_subcommand("enc", "");
         sub->parse_complete_callback([&] { type = TYPE::ENC; });
         sub->add_option("--key", key)->required();
+        sub->add_option("--bkey", bkey)->required();
         sub->add_option("-i,--in", in)->required();
         sub->add_option("-o,--out", out)->required();
     }
@@ -298,9 +317,13 @@ int main(int argc, char** argv)
         doGenKeyTFHEpp(out);
         break;
 
+    case TYPE::GENBKEY:
+        doGenBKeyTFHEpp(in, out);
+        break;
+
     case TYPE::ENC:
         // FIXME: Assume the key type is TFHEpp
-        doEnc(key, in, out);
+        doEnc(key, bkey, in, out);
         break;
 
     case TYPE::DEC:

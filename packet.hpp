@@ -100,6 +100,27 @@ void serialize(Archive& ar, CircuitKey& src)
 }
 }  // namespace TFHEpp
 
+struct TFHEppBKey {
+    std::shared_ptr<TFHEpp::GateKey> gk;
+    std::shared_ptr<TFHEpp::CircuitKey> ck;
+
+    TFHEppBKey()
+    {
+    }
+
+    TFHEppBKey(const TFHEpp::SecretKey& sk)
+        : gk(std::make_shared<TFHEpp::GateKey>(sk)),
+          ck(std::make_shared<TFHEpp::CircuitKey>(sk))
+    {
+    }
+
+    template <class Archive>
+    void serialize(Archive& ar)
+    {
+        ar(gk, ck);
+    }
+};
+
 inline std::vector<TFHEpp::TLWElvl0> encryptBits(const TFHEpp::SecretKey& key,
                                                  const std::vector<Bit>& src)
 {
@@ -232,7 +253,8 @@ struct PlainPacket {
         ar(ram, rom, bits, numCycles);
     }
 
-    inline TFHEPacket encrypt(const TFHEpp::SecretKey& key) const;
+    inline TFHEPacket encrypt(const TFHEpp::SecretKey& key,
+                              const TFHEppBKey& bkey) const;
 };
 
 struct TFHEPacket {
@@ -254,16 +276,11 @@ struct TFHEPacket {
     inline PlainPacket decrypt(const TFHEpp::SecretKey& key) const;
 };
 
-TFHEPacket PlainPacket::encrypt(const TFHEpp::SecretKey& key) const
+TFHEPacket PlainPacket::encrypt(const TFHEpp::SecretKey& key,
+                                const TFHEppBKey& bkey) const
 {
-    TFHEPacket tfhe{std::make_shared<TFHEpp::GateKey>(key),
-                    std::make_shared<TFHEpp::CircuitKey>(key),
-                    {},
-                    {},
-                    {},
-                    {},
-                    {},
-                    numCycles};
+    TFHEPacket tfhe{bkey.gk, bkey.ck, {}, {}, {}, {}, {}, numCycles};
+
     // Encrypt RAM
     for (auto&& [name, src] : ram) {
         if (auto [it, inserted] = tfhe.ram.emplace(name, encryptRAM(key, src));
