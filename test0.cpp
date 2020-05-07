@@ -1,6 +1,6 @@
 #include "iyokan.hpp"
 
-//
+#include <fmt/printf.h>
 #include <fstream>
 
 template <class Network>
@@ -34,11 +34,11 @@ template <class NetworkBuilder>
 void testNOT()
 {
     NetworkBuilder builder;
-    builder.INPUT(0, "A", 0);
-    builder.NOT(1);
-    builder.OUTPUT(2, "out", 0);
-    builder.connect(0, 1);
-    builder.connect(1, 2);
+    int id0 = builder.INPUT("A", 0);
+    int id1 = builder.NOT();
+    int id2 = builder.OUTPUT("out", 0);
+    builder.connect(id0, id1);
+    builder.connect(id1, id2);
 
     TaskNetwork net = std::move(builder);
     auto out = get<NetworkBuilder>(net, "output", "out", 0);
@@ -61,15 +61,15 @@ template <class NetworkBuilder>
 void testMUX()
 {
     NetworkBuilder builder;
-    builder.INPUT(0, "A", 0);
-    builder.INPUT(1, "B", 0);
-    builder.INPUT(2, "S", 0);
-    builder.MUX(3);
-    builder.OUTPUT(4, "out", 0);
-    builder.connect(0, 3);
-    builder.connect(1, 3);
-    builder.connect(2, 3);
-    builder.connect(3, 4);
+    int id0 = builder.INPUT("A", 0);
+    int id1 = builder.INPUT("B", 0);
+    int id2 = builder.INPUT("S", 0);
+    int id3 = builder.MUX();
+    int id4 = builder.OUTPUT("out", 0);
+    builder.connect(id0, id3);
+    builder.connect(id1, id3);
+    builder.connect(id2, id3);
+    builder.connect(id3, id4);
 
     TaskNetwork net = std::move(builder);
 
@@ -101,10 +101,8 @@ template <class NetworkBuilder>
 void testBinopGates()
 {
     NetworkBuilder builder;
-    builder.INPUT(0, "in0", 0);
-    builder.INPUT(1, "in1", 0);
-
-    int nextId = 10;
+    int id0 = builder.INPUT("in0", 0);
+    int id1 = builder.INPUT("in1", 0);
 
     std::unordered_map<std::string, std::array<uint8_t, 4 /* 00, 01, 10, 11 */
                                                >>
@@ -112,12 +110,10 @@ void testBinopGates()
 
 #define DEFINE_BINOP_GATE_TEST(name, e00, e01, e10, e11) \
     do {                                                 \
-        int gateId = nextId++;                           \
-        int outputId = nextId++;                         \
-        builder.name(gateId);                            \
-        builder.OUTPUT(outputId, "out_" #name, 0);       \
-        builder.connect(0, gateId);                      \
-        builder.connect(1, gateId);                      \
+        int gateId = builder.name();                     \
+        int outputId = builder.OUTPUT("out_" #name, 0);  \
+        builder.connect(id0, gateId);                    \
+        builder.connect(id1, gateId);                    \
         builder.connect(gateId, outputId);               \
         id2res["out_" #name] = {e00, e01, e10, e11};     \
     } while (false);
@@ -305,36 +301,10 @@ void testFromJSONtest_register_4bit()
     processAllGates(net);
     net.tick();
 
-    assert(getOutput(std::dynamic_pointer_cast<
-                     typename NetworkBuilder::ParamTaskTypeMem>(
-               net.node(13)->task())) == 0);
-    assert(getOutput(std::dynamic_pointer_cast<
-                     typename NetworkBuilder::ParamTaskTypeMem>(
-               net.node(14)->task())) == 0);
-    assert(getOutput(std::dynamic_pointer_cast<
-                     typename NetworkBuilder::ParamTaskTypeMem>(
-               net.node(15)->task())) == 0);
-    assert(getOutput(std::dynamic_pointer_cast<
-                     typename NetworkBuilder::ParamTaskTypeMem>(
-               net.node(16)->task())) == 0);
-
     // 2: Store values into DFFs.
     SET_INPUT("reset", 0, 0);
     processAllGates(net);
     net.tick();
-
-    assert(getOutput(std::dynamic_pointer_cast<
-                     typename NetworkBuilder::ParamTaskTypeMem>(
-               net.node(13)->task())) == 0);
-    assert(getOutput(std::dynamic_pointer_cast<
-                     typename NetworkBuilder::ParamTaskTypeMem>(
-               net.node(14)->task())) == 0);
-    assert(getOutput(std::dynamic_pointer_cast<
-                     typename NetworkBuilder::ParamTaskTypeMem>(
-               net.node(15)->task())) == 1);
-    assert(getOutput(std::dynamic_pointer_cast<
-                     typename NetworkBuilder::ParamTaskTypeMem>(
-               net.node(16)->task())) == 1);
 
     ASSERT_OUTPUT_EQ("io_out", 0, 0);
     ASSERT_OUTPUT_EQ("io_out", 1, 0);
@@ -365,23 +335,23 @@ void testSequentialCircuit()
     */
 
     NetworkBuilder builder;
-    builder.INPUT(0, "reset", 0);
-    builder.OUTPUT(1, "out", 0);
-    builder.DFF(2);
-    builder.NOT(3);
-    builder.ANDNOT(4);
-    builder.connect(2, 1);
-    builder.connect(4, 2);
-    builder.connect(2, 3);
-    builder.connect(3, 4);
-    builder.connect(0, 4);
+    int id0 = builder.INPUT("reset", 0);
+    int id1 = builder.OUTPUT("out", 0);
+    int id2 = builder.DFF();
+    int id3 = builder.NOT();
+    int id4 = builder.ANDNOT();
+    builder.connect(id2, id1);
+    builder.connect(id4, id2);
+    builder.connect(id2, id3);
+    builder.connect(id3, id4);
+    builder.connect(id0, id4);
 
     TaskNetwork net = std::move(builder);
     assertNetValid(net);
 
     auto dff =
         std::dynamic_pointer_cast<typename NetworkBuilder::ParamTaskTypeMem>(
-            net.node(2)->task());
+            net.node(id2)->task());
     auto out = get<NetworkBuilder>(net, "output", "out", 0);
 
     // 1:
@@ -453,11 +423,11 @@ template <class NetworkBuilder>
 void testPrioritySetVisitor()
 {
     NetworkBuilder builder;
-    builder.INPUT(0, "A", 0);
-    builder.NOT(1);
-    builder.OUTPUT(2, "out", 0);
-    builder.connect(0, 1);
-    builder.connect(1, 2);
+    int id0 = builder.INPUT("A", 0);
+    int id1 = builder.NOT();
+    int id2 = builder.OUTPUT("out", 0);
+    builder.connect(id0, id1);
+    builder.connect(id1, id2);
 
     TaskNetwork net = std::move(builder);
     auto depnode = get<NetworkBuilder>(net, "output", "out", 0)->depnode();
@@ -503,16 +473,16 @@ void testProgressGraphMaker()
     */
 
     PlainNetworkBuilder builder;
-    builder.INPUT(0, "reset", 0);
-    builder.OUTPUT(1, "out", 0);
-    builder.DFF(2);
-    builder.NOT(3);
-    builder.ANDNOT(4);
-    builder.connect(2, 1);
-    builder.connect(4, 2);
-    builder.connect(2, 3);
-    builder.connect(3, 4);
-    builder.connect(0, 4);
+    int id0 = builder.INPUT("reset", 0);
+    int id1 = builder.OUTPUT("out", 0);
+    int id2 = builder.DFF();
+    int id3 = builder.NOT();
+    int id4 = builder.ANDNOT();
+    builder.connect(id2, id1);
+    builder.connect(id4, id2);
+    builder.connect(id2, id3);
+    builder.connect(id3, id4);
+    builder.connect(id0, id4);
 
     PlainNetwork net = std::move(builder);
     assertNetValid(net);
@@ -524,16 +494,21 @@ void testProgressGraphMaker()
     std::stringstream ss;
     graph->dumpDOT(ss);
     std::string dot = ss.str();
-    assert(dot.find("n0 [label = \"{INPUT|reset[0]}\"]") != std::string::npos);
-    assert(dot.find("n1 [label = \"{OUTPUT|out[0]}\"]") != std::string::npos);
-    assert(dot.find("n2 [label = \"{DFF}\"]") != std::string::npos);
-    assert(dot.find("n3 [label = \"{NOT}\"]") != std::string::npos);
-    assert(dot.find("n4 [label = \"{ANDNOT}\"]") != std::string::npos);
-    assert(dot.find("n2 -> n1") != std::string::npos);
-    assert(dot.find("n4 -> n2") != std::string::npos);
-    assert(dot.find("n2 -> n3") != std::string::npos);
-    assert(dot.find("n0 -> n4") != std::string::npos);
-    assert(dot.find("n3 -> n4") != std::string::npos);
+    assert(dot.find(fmt::sprintf("n%d [label = \"{INPUT|reset[0]}\"]", id0)) !=
+           std::string::npos);
+    assert(dot.find(fmt::sprintf("n%d [label = \"{OUTPUT|out[0]}\"]", id1)) !=
+           std::string::npos);
+    assert(dot.find(fmt::sprintf("n%d [label = \"{DFF}\"]", id2)) !=
+           std::string::npos);
+    assert(dot.find(fmt::sprintf("n%d [label = \"{NOT}\"]", id3)) !=
+           std::string::npos);
+    assert(dot.find(fmt::sprintf("n%d [label = \"{ANDNOT}\"]", id4)) !=
+           std::string::npos);
+    assert(dot.find(fmt::sprintf("n%d -> n%d", id2, id1)) != std::string::npos);
+    assert(dot.find(fmt::sprintf("n%d -> n%d", id4, id2)) != std::string::npos);
+    assert(dot.find(fmt::sprintf("n%d -> n%d", id2, id3)) != std::string::npos);
+    assert(dot.find(fmt::sprintf("n%d -> n%d", id0, id4)) != std::string::npos);
+    assert(dot.find(fmt::sprintf("n%d -> n%d", id3, id4)) != std::string::npos);
 }
 
 #include "iyokan_tfhepp.hpp"
@@ -753,12 +728,12 @@ void testBridgeBetweenCUFHEAndTFHEpp()
 
     NetworkBuilderBase<CUFHEWorkerInfo> b0;
     NetworkBuilderBase<TFHEppWorkerInfo> b1;
-    auto t0 = b0.addINPUT<TaskCUFHEGateWIRE>(detail::genid(), "in", 0, false);
+    auto t0 = b0.addINPUT<TaskCUFHEGateWIRE>("in", 0, false);
     auto t1 = std::make_shared<TaskCUFHE2TFHEpp>();
-    b1.addTask(NodeLabel{detail::genid(), "cufhe2tfhepp", ""}, t1);
+    b1.addTask(NodeLabel{"cufhe2tfhepp", ""}, t1);
     auto t2 = std::make_shared<TaskTFHEpp2CUFHE>();
-    b1.addTask(NodeLabel{detail::genid(), "tfhepp2cufhe", ""}, t2);
-    auto t3 = b0.addOUTPUT<TaskCUFHEGateWIRE>(detail::genid(), "out", 0, true);
+    b1.addTask(NodeLabel{"tfhepp2cufhe", ""}, t2);
+    auto t3 = b0.addOUTPUT<TaskCUFHEGateWIRE>("out", 0, true);
     connectTasks(t1, t2);
 
     auto net0 = std::make_shared<TaskNetwork<CUFHEWorkerInfo>>(std::move(b0));

@@ -50,12 +50,6 @@ class TaskNetwork;
 class ProgressGraphMaker;
 
 namespace detail {
-inline int genid()
-{
-    // FIXME: Assume that ids over (1 << 16) will not be passed by the user.
-    static int id = (1 << 16);
-    return id++;
-}
 
 }  // namespace detail
 
@@ -64,9 +58,28 @@ struct NodeLabel {
     int id;
     std::string kind, desc;
 
+    NodeLabel(std::string kind, std::string desc)
+        : id(genid()), kind(kind), desc(desc)
+    {
+    }
+
     std::string str() const
     {
         return utility::fok("#", id, " ", kind, " ", desc);
+    }
+
+    std::ostream &operator<<(std::ostream &os)
+    {
+        os << str();
+        return os;
+    }
+
+private:
+    inline int genid()
+    {
+        // FIXME: Assume that ids over (1 << 16) will not be passed by the user.
+        static int id = (1 << 16);
+        return id++;
     }
 };
 
@@ -253,6 +266,11 @@ struct Node {
     NodeLabel label;
     std::set<int> parents, children;
     bool hasNoInputsToWaitFor;
+
+    Node(const NodeLabel &label, bool hasNoInputsToWaitFor)
+        : label(label), hasNoInputsToWaitFor(hasNoInputsToWaitFor)
+    {
+    }
 };
 using NodePtr = std::shared_ptr<graph::Node>;
 
@@ -327,10 +345,8 @@ private:
         if (it != id2node_.end())
             return std::make_pair(it->second, false);
 
-        auto node = std::make_shared<graph::Node>();
-        assert(node);
-        node->label = depnode.label();
-        node->hasNoInputsToWaitFor = depnode.task()->areInputsReady();
+        auto node = std::make_shared<graph::Node>(
+            depnode.label(), depnode.task()->areInputsReady());
 
         id2node_.emplace(depnode.label().id, node);
 
@@ -985,12 +1001,14 @@ public:
             namedMems_.at(TaskLabel{kind, portName, portBit}));
     }
 
-    void addTask(NodeLabel label, std::shared_ptr<TaskBase<WorkerInfo>> task)
+    std::shared_ptr<TaskBase<WorkerInfo>> addTask(
+        NodeLabel label, const std::shared_ptr<TaskBase<WorkerInfo>> &task)
     {
         auto depnode = std::make_shared<DepNode<WorkerInfo>>(task, label);
         depnode->prepareTaskBase();
         auto [it, inserted] = id2node_.emplace(label.id, depnode);
         assert(inserted);
+        return task;
     }
 
     template <class T, class... Args>
@@ -1011,10 +1029,10 @@ public:
     }
 
     template <class T, class... Args>
-    std::shared_ptr<T> addINPUT(int id, const std::string &portName,
-                                int portBit, Args &&... args)
+    std::shared_ptr<T> addINPUT(const std::string &portName, int portBit,
+                                Args &&... args)
     {
-        NodeLabel label{id, "INPUT", utility::fok(portName, "[", portBit, "]")};
+        NodeLabel label{"INPUT", utility::fok(portName, "[", portBit, "]")};
         auto task = std::make_shared<T>(std::forward<Args>(args)...);
         addTask(label, task);
         registerTask("input", portName, portBit, task);
@@ -1022,11 +1040,10 @@ public:
     }
 
     template <class T, class... Args>
-    std::shared_ptr<T> addOUTPUT(int id, const std::string &portName,
-                                 int portBit, Args &&... args)
+    std::shared_ptr<T> addOUTPUT(const std::string &portName, int portBit,
+                                 Args &&... args)
     {
-        NodeLabel label{id, "OUTPUT",
-                        utility::fok(portName, "[", portBit, "]")};
+        NodeLabel label{"OUTPUT", utility::fok(portName, "[", portBit, "]")};
         auto task = std::make_shared<T>(std::forward<Args>(args)...);
         addTask(label, task);
         registerTask("output", portName, portBit, task);
@@ -1042,53 +1059,65 @@ public:
     using ParamTaskTypeMem = TaskTypeMem;
 
 private:
-    std::shared_ptr<TaskTypeDFF> addDFF(int id)
+    std::shared_ptr<TaskTypeDFF> addDFF()
     {
         auto task = std::make_shared<TaskTypeDFF>();
-        this->addTask(NodeLabel{id, "DFF", ""}, task);
+        this->addTask(NodeLabel{"DFF", ""}, task);
         return task;
     }
 
-    void addNamedDFF(int id, const std::string &kind,
-                     const std::string &portName, int portBit)
+    std::shared_ptr<TaskTypeDFF> addNamedDFF(const std::string &kind,
+                                             const std::string &portName,
+                                             int portBit)
     {
-        this->registerTask(kind, portName, portBit, addDFF(id));
+        auto task = addDFF();
+        this->registerTask(kind, portName, portBit, task);
+        return task;
     }
 
-    void addNamedWIRE(bool inputNeeded, int id, const std::string &kind,
-                      const std::string &portName, int portBit)
+    std::shared_ptr<TaskTypeWIRE> addNamedWIRE(bool inputNeeded,
+                                               const std::string &kind,
+                                               const std::string &portName,
+                                               int portBit)
     {
         auto task = std::make_shared<TaskTypeWIRE>(inputNeeded);
         this->addTask(
-            NodeLabel{id, "WIRE", utility::fok(portName, "[", portBit, "]")},
-            task);
+            NodeLabel{"WIRE", utility::fok(portName, "[", portBit, "]")}, task);
         this->registerTask(kind, portName, portBit, task);
+        return task;
     }
 
 public:
-    void DFF(int id)
+    int DFF()
     {
-        addDFF(id);
+        auto task = addDFF();
+        return task->depnode()->label().id;
     }
 
-    void ROM(int id, const std::string &portName, int portBit)
+    int ROM(const std::string &portName, int portBit)
     {
-        addNamedWIRE(false, id, "rom", portName, portBit);
+        auto task = addNamedWIRE(false, "rom", portName, portBit);
+        return task->depnode()->label().id;
     }
 
-    void RAM(int id, const std::string &portName, int portBit)
+    int RAM(const std::string &portName, int portBit)
     {
-        addNamedDFF(id, "ram", portName, portBit);
+        auto task = addNamedDFF("ram", portName, portBit);
+        return task->depnode()->label().id;
     }
 
-    void INPUT(int id, const std::string &portName, int portBit)
+    int INPUT(const std::string &portName, int portBit)
     {
-        this->template addINPUT<TaskTypeWIRE>(id, portName, portBit, false);
+        auto task =
+            this->template addINPUT<TaskTypeWIRE>(portName, portBit, false);
+        return task->depnode()->label().id;
     }
 
-    void OUTPUT(int id, const std::string &portName, int portBit)
+    int OUTPUT(const std::string &portName, int portBit)
     {
-        this->template addOUTPUT<TaskTypeWIRE>(id, portName, portBit, true);
+        auto task =
+            this->template addOUTPUT<TaskTypeWIRE>(portName, portBit, true);
+        return task->depnode()->label().id;
     }
 
     void connect(int from, int to)
@@ -1103,10 +1132,11 @@ protected:                                              \
     virtual std::shared_ptr<TaskType> name##Impl() = 0; \
                                                         \
 public:                                                 \
-    void name(int id)                                   \
+    int name()                                          \
     {                                                   \
         auto task = name##Impl();                       \
-        this->addTask(NodeLabel{id, #name, ""}, task);  \
+        this->addTask(NodeLabel{#name, ""}, task);      \
+        return task->depnode()->label().id;             \
     }
     DEFINE_GATE(AND);
     DEFINE_GATE(NAND);
@@ -1320,7 +1350,7 @@ public:
     BridgeDepNode(std::shared_ptr<DepNode<OutWorkerInfo>> src)
         : DepNode<InWorkerInfo>(
               std::make_shared<TaskBlackHole<InWorkerInfo>>(1),
-              NodeLabel{detail::genid(), "bridge", ""}),
+              NodeLabel{"bridge", ""}),
           src_(src)
     {
     }
@@ -1742,6 +1772,18 @@ typename NetworkBuilder::NetworkType readNetworkFromJSON(std::istream &is)
 template <class NetworkBuilder>
 void readNetworkFromJSONImpl(NetworkBuilder &builder, picojson::value &v)
 {
+    std::unordered_map<int, int> id2taskId;
+    auto addId = [&](int id, int taskId) { id2taskId.emplace(id, taskId); };
+    auto findTaskId = [&](int id) {
+        auto it = id2taskId.find(id);
+        if (it == id2taskId.end())
+            error::die("Invalid JSON");
+        return it->second;
+    };
+    auto connectIds = [&](int from, int to) {
+        builder.connect(findTaskId(from), findTaskId(to));
+    };
+
     picojson::object &obj = v.get<picojson::object>();
     picojson::array &cells = obj["cells"].get<picojson::array>();
     picojson::array &ports = obj["ports"].get<picojson::array>();
@@ -1752,36 +1794,36 @@ void readNetworkFromJSONImpl(NetworkBuilder &builder, picojson::value &v)
         std::string portName = port.at("portName").get<std::string>();
         int portBit = static_cast<int>(port.at("portBit").get<double>());
         if (type == "input")
-            builder.INPUT(id, portName, portBit);
+            addId(id, builder.INPUT(portName, portBit));
         else if (type == "output")
-            builder.OUTPUT(id, portName, portBit);
+            addId(id, builder.OUTPUT(portName, portBit));
     }
     for (const auto &e : cells) {
         picojson::object cell = e.get<picojson::object>();
         std::string type = cell.at("type").get<std::string>();
         int id = static_cast<int>(cell.at("id").get<double>());
         if (type == "AND")
-            builder.AND(id);
+            addId(id, builder.AND());
         else if (type == "NAND")
-            builder.NAND(id);
+            addId(id, builder.NAND());
         else if (type == "ANDNOT")
-            builder.ANDNOT(id);
+            addId(id, builder.ANDNOT());
         else if (type == "XOR")
-            builder.XOR(id);
+            addId(id, builder.XOR());
         else if (type == "XNOR")
-            builder.XNOR(id);
+            addId(id, builder.XNOR());
         else if (type == "DFFP")
-            builder.DFF(id);
+            addId(id, builder.DFF());
         else if (type == "NOT")
-            builder.NOT(id);
+            addId(id, builder.NOT());
         else if (type == "NOR")
-            builder.NOR(id);
+            addId(id, builder.NOR());
         else if (type == "OR")
-            builder.OR(id);
+            addId(id, builder.OR());
         else if (type == "ORNOT")
-            builder.ORNOT(id);
+            addId(id, builder.ORNOT());
         else if (type == "MUX")
-            builder.MUX(id);
+            addId(id, builder.MUX());
         else
             error::die("Invalid JSON of network. Invalid type: ", type);
     }
@@ -1796,7 +1838,7 @@ void readNetworkFromJSONImpl(NetworkBuilder &builder, picojson::value &v)
         else if (type == "output") {
             for (const auto &b : bits) {
                 int logic = static_cast<int>(b.get<double>());
-                builder.connect(logic, id);
+                connectIds(logic, id);
             }
         }
     }
@@ -1810,24 +1852,24 @@ void readNetworkFromJSONImpl(NetworkBuilder &builder, picojson::value &v)
             type == "OR" || type == "ORNOT") {
             int A = static_cast<int>(input.at("A").get<double>());
             int B = static_cast<int>(input.at("B").get<double>());
-            builder.connect(A, id);
-            builder.connect(B, id);
+            connectIds(A, id);
+            connectIds(B, id);
         }
         else if (type == "DFFP") {
             int D = static_cast<int>(input.at("D").get<double>());
-            builder.connect(D, id);
+            connectIds(D, id);
         }
         else if (type == "NOT") {
             int A = static_cast<int>(input.at("A").get<double>());
-            builder.connect(A, id);
+            connectIds(A, id);
         }
         else if (type == "MUX") {
             int A = static_cast<int>(input.at("A").get<double>());
             int B = static_cast<int>(input.at("B").get<double>());
             int S = static_cast<int>(input.at("S").get<double>());
-            builder.connect(A, id);
-            builder.connect(B, id);
-            builder.connect(S, id);
+            connectIds(A, id);
+            connectIds(B, id);
+            connectIds(S, id);
         }
         else {
             error::die("Invalid JSON of network. Invalid type: ", type);
@@ -1862,8 +1904,7 @@ std::shared_ptr<typename NetworkBuilder::NetworkType> makeROMWithMUX(
     // Create inputs
     std::vector<int> addrInputs;
     for (int i = 0; i < inAddrWidth; i++) {
-        int id = detail::genid();
-        b.INPUT(id, "addr", i);
+        int id = b.INPUT("addr", i);
         addrInputs.push_back(id);
     }
 
@@ -1908,8 +1949,7 @@ void make1bitROMWithMUX(NetworkBuilder &b, const std::vector<int> &addrInputs,
     // Create ROMs
     std::vector<int> workingIds;
     for (int i = 0; i < (1 << inAddrWidth); i++) {
-        int id = detail::genid();
-        b.ROM(id, "romdata", indexOutRdata + i * outRdataWidth);
+        int id = b.ROM("romdata", indexOutRdata + i * outRdataWidth);
         workingIds.push_back(id);
     }
 
@@ -1918,8 +1958,7 @@ void make1bitROMWithMUX(NetworkBuilder &b, const std::vector<int> &addrInputs,
         assert(workingIds.size() > 0 && workingIds.size() % 2 == 0);
         std::vector<int> newWorkingIds;
         for (int j = 0; j < workingIds.size(); j += 2) {
-            int id = detail::genid();
-            b.MUX(id);
+            int id = b.MUX();
             b.connect(workingIds.at(j), id);
             b.connect(workingIds.at(j + 1), id);
             b.connect(addrInputs.at(i), id);
@@ -1930,8 +1969,7 @@ void make1bitROMWithMUX(NetworkBuilder &b, const std::vector<int> &addrInputs,
     assert(workingIds.size() == 1);
 
     // Create output
-    int id = detail::genid();
-    b.OUTPUT(id, "rdata", indexOutRdata);
+    int id = b.OUTPUT("rdata", indexOutRdata);
     b.connect(workingIds.at(0), id);
 }
 
@@ -1944,12 +1982,10 @@ std::shared_ptr<typename NetworkBuilder::NetworkType> makeRAMWithMUX(
     // Create inputs
     std::vector<int> addrInputs;
     for (int i = 0; i < inAddrWidth; i++) {
-        int id = detail::genid();
-        b.INPUT(id, "addr", i);
+        int id = b.INPUT("addr", i);
         addrInputs.push_back(id);
     }
-    int wrenInput = detail::genid();
-    b.INPUT(wrenInput, "wren", 0);
+    int wrenInput = b.INPUT("wren", 0);
 
     // Create 1bitRAMs
     for (int i = 0; i < outRdataWidth; i++) {
@@ -2010,8 +2046,7 @@ void make1bitRAMWithMUX(NetworkBuilder &b, const std::vector<int> &addrInputs,
     const int inAddrWidth = addrInputs.size();
 
     // Create input "wdata[indexWRdata]"
-    int wdataInput = detail::genid();
-    b.INPUT(wdataInput, "wdata", indexWRdata);
+    int wdataInput = b.INPUT("wdata", indexWRdata);
 
     // Create DMUXs
     std::vector<int> workingIds = {wrenInput}, newWorkingIds;
@@ -2021,11 +2056,10 @@ void make1bitRAMWithMUX(NetworkBuilder &b, const std::vector<int> &addrInputs,
             // Create DMUX
             //   dst0 = andnot(src, addr)
             //   dst1 = and(src, addr)
-            int dst0 = detail::genid(), dst1 = detail::genid();
-            b.ANDNOT(dst0);
+            int dst0 = b.ANDNOT();
+            int dst1 = b.AND();
             b.connect(src, dst0);
             b.connect(addr, dst0);
-            b.AND(dst1);
             b.connect(src, dst1);
             b.connect(addr, dst1);
 
@@ -2048,10 +2082,8 @@ void make1bitRAMWithMUX(NetworkBuilder &b, const std::vector<int> &addrInputs,
                                     |
                                    sel
          */
-        int sel = workingIds.at(addr), mux = detail::genid(),
-            ram = detail::genid();
-        b.MUX(mux);
-        b.RAM(ram, "ramdata", indexWRdata + addr * outRdataWidth);
+        int sel = workingIds.at(addr), mux = b.MUX(),
+            ram = b.RAM("ramdata", indexWRdata + addr * outRdataWidth);
         b.connect(ram, mux);
         b.connect(wdataInput, mux);
         b.connect(sel, mux);
@@ -2065,8 +2097,7 @@ void make1bitRAMWithMUX(NetworkBuilder &b, const std::vector<int> &addrInputs,
     for (int i = 0; i < inAddrWidth; i++) {
         assert(workingIds.size() > 0 && workingIds.size() % 2 == 0);
         for (int j = 0; j < workingIds.size(); j += 2) {
-            int id = detail::genid();
-            b.MUX(id);
+            int id = b.MUX();
             b.connect(workingIds.at(j), id);
             b.connect(workingIds.at(j + 1), id);
             b.connect(addrInputs.at(i), id);
@@ -2078,8 +2109,7 @@ void make1bitRAMWithMUX(NetworkBuilder &b, const std::vector<int> &addrInputs,
     assert(workingIds.size() == 1);
 
     // Create output "rdata[indexWRdata]"
-    int rdataOutput = detail::genid();
-    b.OUTPUT(rdataOutput, "rdata", indexWRdata);
+    int rdataOutput = b.OUTPUT("rdata", indexWRdata);
     b.connect(workingIds.at(0), rdataOutput);
 }
 
