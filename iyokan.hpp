@@ -51,6 +51,27 @@ class ProgressGraphMaker;
 
 namespace detail {
 
+// Thanks to: https://qiita.com/IgnorantCoder/items/a6cebba4de6cb5901335
+// Thanks to: https://qiita.com/tyanmahou/items/c2a7c389e666d1b1bdea
+// Thanks to: https://cpprefjp.github.io/reference/type_traits/void_t.html
+template <class, template <class...> class, class...>
+struct is_detected_impl : std::false_type {
+};
+template <template <class...> class Op, class... Args>
+struct is_detected_impl<std::void_t<Op<Args...>>, Op, Args...>
+    : std::true_type {
+};
+template <template <class...> class Op, class... Args>
+using is_detected = is_detected_impl<void, Op, Args...>;
+
+// Check if T has RAM(int, int)
+template <class T, class... Args>
+using hasMethodFuncRAMImpl =
+    decltype(std::declval<T>().RAM(std::declval<Args>()...));
+template <class T>
+constexpr bool hasMethodFuncRAM =
+    is_detected<hasMethodFuncRAMImpl, T, int, int>::value;
+
 }  // namespace detail
 
 // NodeLabel is used to identify a DepNode in debugging/profiling.
@@ -895,6 +916,13 @@ public:
             node->task()->checkValid(err);
 
         checkInputSizeIsExpected(err);
+
+        {
+            GraphVisitor visitor;
+            visit(visitor);
+            if (visitor.getMap().size() != id2node_.size())
+                err.add("Network is not weekly connected");
+        }
     }
 
     TaskNetwork<WorkerInfo> merge(const TaskNetwork<WorkerInfo> &rhs)
@@ -983,7 +1011,6 @@ public:
 
 private:
     std::unordered_map<int, std::shared_ptr<DepNode<WorkerInfo>>> id2node_;
-
     typename TaskNetwork<WorkerInfo>::Label2TaskMap namedMems_;
 
 protected:
@@ -1058,7 +1085,7 @@ public:
     using ParamTaskTypeWIRE = TaskTypeWIRE;
     using ParamTaskTypeMem = TaskTypeMem;
 
-private:
+protected:
     std::shared_ptr<TaskTypeDFF> addDFF()
     {
         auto task = std::make_shared<TaskTypeDFF>();
@@ -1097,12 +1124,6 @@ public:
     int ROM(const std::string &portName, int portBit)
     {
         auto task = addNamedWIRE(false, "rom", portName, portBit);
-        return task->depnode()->label().id;
-    }
-
-    int RAM(const std::string &portName, int portBit)
-    {
-        auto task = addNamedDFF("ram", portName, portBit);
         return task->depnode()->label().id;
     }
 
@@ -1149,6 +1170,23 @@ public:                                                 \
     DEFINE_GATE(MUX);
     DEFINE_GATE(NOT);
 #undef DEFINE_GATE
+};
+
+template <class NetworkBuilder>
+class RAMNetworkBuilder : public NetworkBuilder {
+private:
+    int width_;
+
+public:
+    RAMNetworkBuilder(int width) : width_(width)
+    {
+    }
+
+    int RAM(int addr, int bit)
+    {
+        auto task = this->addNamedDFF("ram", "ramdata", addr * width_ + bit);
+        return task->depnode()->label().id;
+    }
 };
 
 template <class WorkerInfo>
@@ -1758,19 +1796,14 @@ public:
 template <class NetworkBuilder>
 typename NetworkBuilder::NetworkType readNetworkFromJSON(std::istream &is)
 {
-    picojson::value v;
-    const std::string err = picojson::parse(v, is);
-    if (!err.empty())
-        error::die("Invalid JSON of network: ", err);
-
     NetworkBuilder builder;
-    readNetworkFromJSONImpl(builder, v);
+    readNetworkFromJSONImpl(builder, is);
 
     return typename NetworkBuilder::NetworkType{std::move(builder)};
 }
 
 template <class NetworkBuilder>
-void readNetworkFromJSONImpl(NetworkBuilder &builder, picojson::value &v)
+void readNetworkFromJSONImpl(NetworkBuilder &builder, std::istream &is)
 {
     std::unordered_map<int, int> id2taskId;
     auto addId = [&](int id, int taskId) { id2taskId.emplace(id, taskId); };
@@ -1783,6 +1816,11 @@ void readNetworkFromJSONImpl(NetworkBuilder &builder, picojson::value &v)
     auto connectIds = [&](int from, int to) {
         builder.connect(findTaskId(from), findTaskId(to));
     };
+
+    picojson::value v;
+    const std::string err = picojson::parse(v, is);
+    if (!err.empty())
+        error::die("Invalid JSON of network: ", err);
 
     picojson::object &obj = v.get<picojson::object>();
     picojson::array &cells = obj["cells"].get<picojson::array>();
@@ -1824,8 +1862,22 @@ void readNetworkFromJSONImpl(NetworkBuilder &builder, picojson::value &v)
             addId(id, builder.ORNOT());
         else if (type == "MUX")
             addId(id, builder.MUX());
-        else
-            error::die("Invalid JSON of network. Invalid type: ", type);
+        else {
+            bool valid = false;
+            // If builder.RAM() exists
+            if constexpr (detail::hasMethodFuncRAM<NetworkBuilder>) {
+                if (type == "RAM") {
+                    int addr = cell.at("ramAddress").get<double>(),
+                        bit = cell.at("ramBit").get<double>();
+                    addId(id, builder.RAM(addr, bit));
+                    valid = true;
+                }
+            }
+
+            if (!valid) {
+                error::die("Invalid JSON of network. Invalid type: ", type);
+            }
+        }
     }
     for (const auto &e : ports) {
         picojson::object port = e.get<picojson::object>();
@@ -1855,7 +1907,7 @@ void readNetworkFromJSONImpl(NetworkBuilder &builder, picojson::value &v)
             connectIds(A, id);
             connectIds(B, id);
         }
-        else if (type == "DFFP") {
+        else if (type == "DFFP" || type == "RAM") {
             int D = static_cast<int>(input.at("D").get<double>());
             connectIds(D, id);
         }
@@ -1973,11 +2025,28 @@ void make1bitROMWithMUX(NetworkBuilder &b, const std::vector<int> &addrInputs,
     b.connect(workingIds.at(0), id);
 }
 
+extern char _binary_mux_ram_256_8_min_json_start[];
+extern char _binary_mux_ram_256_8_min_json_end[];
+extern char _binary_mux_ram_256_8_min_json_size[];
 template <class NetworkBuilder>
 std::shared_ptr<typename NetworkBuilder::NetworkType> makeRAMWithMUX(
     int inAddrWidth, int outRdataWidth)
 {
-    NetworkBuilder b;
+    RAMNetworkBuilder<NetworkBuilder> b{outRdataWidth};
+
+    if (inAddrWidth == 8 && outRdataWidth == 8) {
+        std::stringstream ss{std::string{_binary_mux_ram_256_8_min_json_start,
+                                         _binary_mux_ram_256_8_min_json_end}};
+        readNetworkFromJSONImpl(b, ss);
+        auto net = std::make_shared<typename NetworkBuilder::NetworkType>(
+            std::move(b));
+
+        error::Stack err;
+        net->checkValid(err);
+        assert(err.empty());
+
+        return net;
+    }
 
     // Create inputs
     std::vector<int> addrInputs;
@@ -1989,7 +2058,7 @@ std::shared_ptr<typename NetworkBuilder::NetworkType> makeRAMWithMUX(
 
     // Create 1bitRAMs
     for (int i = 0; i < outRdataWidth; i++) {
-        make1bitRAMWithMUX(b, addrInputs, wrenInput, outRdataWidth, i);
+        make1bitRAMWithMUX(b, addrInputs, wrenInput, i);
     }
 
     return std::make_shared<typename NetworkBuilder::NetworkType>(std::move(b));
@@ -1997,7 +2066,7 @@ std::shared_ptr<typename NetworkBuilder::NetworkType> makeRAMWithMUX(
 
 template <class NetworkBuilder>
 void make1bitRAMWithMUX(NetworkBuilder &b, const std::vector<int> &addrInputs,
-                        int wrenInput, int outRdataWidth, int indexWRdata)
+                        int wrenInput, int indexWRdata)
 {
     /*
         wdata[indexWRdata]
@@ -2083,7 +2152,7 @@ void make1bitRAMWithMUX(NetworkBuilder &b, const std::vector<int> &addrInputs,
                                    sel
          */
         int sel = workingIds.at(addr), mux = b.MUX(),
-            ram = b.RAM("ramdata", indexWRdata + addr * outRdataWidth);
+            ram = b.RAM(addr, indexWRdata);
         b.connect(ram, mux);
         b.connect(wdataInput, mux);
         b.connect(sel, mux);
