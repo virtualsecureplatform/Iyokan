@@ -589,7 +589,8 @@ private:
 
 public:
     CUFHEFrontend(const Options& opt)
-        : opt_(opt), reqPacket_(readFromArchive<TFHEPacket>(opt.inputFile))
+        : opt_(opt),
+          reqPacket_(readFromArchive<TFHEPacket>(opt.inputFile.value()))
     {
         assert(opt.blueprint);
     }
@@ -599,7 +600,7 @@ public:
         const NetworkBlueprint& bp = *opt_.blueprint;
 
         // Prepare cuFHE
-        cufhe::SetGPUNum(opt_.numGPU);
+        cufhe::SetGPUNum(opt_.numGPU.value());
         cufhe::SetSeed();
         cufhe::Initialize(*tfhepp2cufhe(*reqPacket_.gk));
 
@@ -747,7 +748,7 @@ public:
 
         // Make runner
         CUFHENetworkRunner runner{
-            opt_.numGPUWorkers, opt_.numCPUWorkers,
+            opt_.numGPUWorkers.value(), opt_.numCPUWorkers.value(),
             TFHEppWorkerInfo{TFHEpp::lweParams{}, reqPacket_.gk,
                              reqPacket_.ck}};
         for (auto&& p : name2cnet_)
@@ -773,7 +774,7 @@ public:
 
         // Go computing
         {
-            processCycles(opt_.numCycles, [&](int currentCycle) {
+            processCycles(opt_.numCycles.value(), [&](int currentCycle) {
                 mayDumpPacket(currentCycle);
 
                 runner.tick();
@@ -788,8 +789,8 @@ public:
         }
 
         // Dump result packet
-        TFHEPacket resPacket = makeResPacket(opt_.numCycles);
-        writeToArchive(opt_.outputFile, resPacket);
+        TFHEPacket resPacket = makeResPacket(opt_.numCycles.value());
+        writeToArchive(opt_.outputFile.value(), resPacket);
 
         // Clean cuFHE up
         cufhe::CleanUp();

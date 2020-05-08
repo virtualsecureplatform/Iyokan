@@ -46,8 +46,9 @@ public:
 class PlainFrontend {
 private:
     Name2NetMap name2net_;
-    const Options &opt_;
+    Options opt_;
     PlainPacket reqPacket_;
+    int currentCycle_;
 
 private:
     template <class T = TaskPlainGate>
@@ -193,14 +194,17 @@ private:
     }
 
 public:
-    PlainFrontend(const Options &opt)
-        : opt_(opt), reqPacket_(readFromArchive<PlainPacket>(opt.inputFile))
+    PlainFrontend()
     {
-        assert(opt.blueprint);
     }
 
-    void go()
+    PlainFrontend(const Options &opt)
+        : opt_(opt),
+          reqPacket_(readFromArchive<PlainPacket>(opt.inputFile.value())),
+          currentCycle_(0)
     {
+        assert(opt.blueprint);
+
         // Create network according to blueprint and request packet
         const NetworkBlueprint &bp = *opt_.blueprint;
 
@@ -323,51 +327,69 @@ public:
             for (auto &&p : name2net_)
                 p.second->visit(privis);
         }
+    }
 
+    void mergeOptions(const Options &rhs)
+    {
+        opt_.merge(rhs);
+    }
+
+    void go()
+    {
         // Make runner
-        PlainNetworkRunner runner{opt_.numCPUWorkers};
+        PlainNetworkRunner runner{opt_.numCPUWorkers.value()};
         for (auto &&p : name2net_)
             runner.addNetwork(p.second);
 
-        // Get #cycles
-        int numCycles = std::numeric_limits<int>::max();
-        if (opt_.numCycles > 0)
-            numCycles = opt_.numCycles;
-
         // Reset
-        if (auto reset = maybeGetAt("input", "reset"); reset) {
-            reset->set(1_b);
-            runner.run();
-            reset->set(0_b);
+        if (currentCycle_ == 0) {
+            if (auto reset = maybeGetAt("input", "reset"); reset) {
+                reset->set(1_b);
+                runner.run();
+                reset->set(0_b);
+            }
         }
+
+        // Get # of cycles
+        int numCycles =
+            opt_.numCycles.value_or(std::numeric_limits<int>::max());
 
         // Go computing
         {
             auto finflag = maybeGetAt("output", "finflag");
 
-            numCycles = processCycles(numCycles, [&](int currentCycle) {
-                if (opt_.dumpPrefix)
-                    writeToArchive(
-                        utility::fok(*opt_.dumpPrefix, "-", currentCycle),
-                        makeResPacket(currentCycle));
+            currentCycle_ = processCycles(
+                numCycles,
+                [&](int currentCycle) {
+                    if (opt_.dumpPrefix)
+                        writeToArchive(
+                            utility::fok(*opt_.dumpPrefix, "-", currentCycle),
+                            makeResPacket(currentCycle));
 
-                runner.tick();
+                    runner.tick();
 
-                if (currentCycle == 0)
-                    setInitialRAM();
-                setCircularInputs(currentCycle);
+                    if (currentCycle == 0)
+                        setInitialRAM();
+                    setCircularInputs(currentCycle);
 
-                runner.run();
+                    runner.run();
 
-                if (finflag)
-                    return finflag->get() == 1_b;
-                return false;
-            });
+                    if (finflag)
+                        return finflag->get() == 1_b;
+                    return false;
+                },
+                currentCycle_);
         }
 
         // Print the results
-        PlainPacket resPacket = makeResPacket(numCycles);
-        writeToArchive(opt_.outputFile, resPacket);
+        PlainPacket resPacket = makeResPacket(currentCycle_);
+        writeToArchive(opt_.outputFile.value(), resPacket);
+    }
+
+    template <class Archive>
+    void serialize(Archive &ar)
+    {
+        ar(name2net_, opt_, reqPacket_, currentCycle_);
     }
 };
 
@@ -399,7 +421,15 @@ void processAllGates(PlainNetwork &net, int numWorkers,
     assert(readyQueue.empty());
 }
 
+#include <cereal/archives/portable_binary.hpp>
 void doPlain(const Options &opt)
 {
-    PlainFrontend{opt}.go();
+    auto frontend = opt.resumeFile
+                        ? readFromArchive<PlainFrontend>(*opt.resumeFile)
+                        : PlainFrontend{opt};
+    if (opt.resumeFile)
+        frontend.mergeOptions(opt);
+    frontend.go();
+    if (opt.snapshotFile)
+        writeToArchive(*opt.snapshotFile, frontend);
 }

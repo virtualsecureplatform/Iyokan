@@ -19,27 +19,38 @@ int main(int argc, char **argv)
     enum class TYPE { PLAIN, TFHE } type;
     Options opt;
     bool enableGPU = false;
-    std::string blueprintFilePath;
+    std::optional<std::string> blueprintFilePath;
 
     {
         CLI::App *plain = app.add_subcommand("plain", "");
         plain->parse_complete_callback([&] { type = TYPE::PLAIN; });
-        plain->add_option("--blueprint", blueprintFilePath, "")
-            ->required()
-            ->check(CLI::ExistingFile);
         plain->add_option("-c", opt.numCycles, "");
         plain->add_option("--cpu", opt.numCPUWorkers, "")
             ->check(CLI::PositiveNumber);
-        plain->add_option("-i,--in", opt.inputFile, "")
-            ->required()
-            ->check(CLI::ExistingFile);
-        plain->add_option("-o,--out", opt.outputFile, "")->required();
+        plain->add_option("--dump-prefix", opt.dumpPrefix, "");
+        plain->add_option("--snapshot", opt.snapshotFile, "");
         plain->add_flag_callback(
             "--quiet", [] { spdlog::set_level(spdlog::level::err); }, "");
         plain->add_flag_callback(
             "--verbose", [] { spdlog::set_level(spdlog::level::debug); }, "");
 
-        plain->add_option("--dump-prefix", opt.dumpPrefix, "");
+        auto ogroups = plain->add_option_group("run in plaintext",
+                                               "Run in plaintext mode");
+        ogroups->require_option(1);
+
+        auto newRun = ogroups->add_option_group("new run", "A new run");
+        newRun->add_option("--blueprint", blueprintFilePath, "")
+            ->required()
+            ->check(CLI::ExistingFile);
+        newRun->add_option("-i,--in", opt.inputFile, "")
+            ->required()
+            ->check(CLI::ExistingFile);
+        newRun->add_option("-o,--out", opt.outputFile, "")->required();
+
+        auto resume =
+            ogroups->add_option_group("resume", "Resume from a saved snapshot");
+        resume->add_option("--resume", opt.resumeFile, "")->required();
+        resume->add_option("-o,--out", opt.outputFile, "");
     }
 
     {
@@ -76,9 +87,10 @@ int main(int argc, char **argv)
 
     CLI11_PARSE(app, argc, argv);
 
-    opt.blueprint = NetworkBlueprint{blueprintFilePath};
+    if (blueprintFilePath)
+        opt.blueprint = NetworkBlueprint{*blueprintFilePath};
 
-    AsyncThread::setNumThreads(opt.numCPUWorkers);
+    AsyncThread::setNumThreads(opt.numCPUWorkers.value());
 
     switch (type) {
     case TYPE::PLAIN:

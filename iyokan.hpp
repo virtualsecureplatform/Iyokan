@@ -34,6 +34,15 @@
 #include <picojson.h>
 #include <toml.hpp>
 
+#include <cereal/cereal.hpp>
+#include <cereal/types/array.hpp>
+#include <cereal/types/memory.hpp>
+#include <cereal/types/optional.hpp>
+#include <cereal/types/tuple.hpp>
+#include <cereal/types/unordered_map.hpp>
+#include <cereal/types/utility.hpp>
+#include <cereal/types/vector.hpp>
+
 #include "error.hpp"
 #include "utility.hpp"
 
@@ -79,6 +88,10 @@ struct NodeLabel {
     int id;
     std::string kind, desc;
 
+    NodeLabel()
+    {
+    }
+
     NodeLabel(std::string kind, std::string desc)
         : id(genid()), kind(kind), desc(desc)
     {
@@ -93,6 +106,12 @@ struct NodeLabel {
     {
         os << str();
         return os;
+    }
+
+    template <class Archive>
+    void serialize(Archive &ar)
+    {
+        ar(id, kind, desc);
     }
 
 private:
@@ -110,6 +129,10 @@ private:
     NodeLabel label_;
 
 public:
+    DepNodeBase()
+    {
+    }
+
     DepNodeBase(NodeLabel label) : priority_(-1), label_(std::move(label))
     {
     }
@@ -127,6 +150,12 @@ public:
     const NodeLabel &label() const noexcept
     {
         return label_;
+    }
+
+    template <class Archive>
+    void serialize(Archive &ar)
+    {
+        ar(priority_, label_);
     }
 };
 template <class WorkerInfo>
@@ -156,6 +185,12 @@ public:
     virtual void startAsync(WorkerInfo) = 0;
     virtual bool hasFinished() const = 0;
     virtual void tick() = 0;  // Reset for next process.
+
+    template <class Archive>
+    void serialize(Archive &ar)
+    {
+        ar(depnode_);
+    }
 };
 
 template <class InType, class OutType, class WorkerInfo>
@@ -188,6 +223,10 @@ protected:
     virtual void startAsyncImpl(WorkerInfo wi) = 0;
 
 public:
+    Task()
+    {
+    }
+
     Task(size_t expectedNumInputs)
         : numReadyInputs_(0),
           output_(std::make_shared<OutType>()),
@@ -252,6 +291,13 @@ public:
     {
         startAsyncImpl(std::move(wi));
     }
+
+    template <class Archive>
+    void serialize(Archive &ar)
+    {
+        ar(cereal::base_class<TaskBase<WorkerInfo>>(this), numReadyInputs_,
+           output_, inputs_);
+    }
 };
 
 template <class T0, class T1>
@@ -279,6 +325,12 @@ struct TaskLabel {
     {
         return std::make_tuple(kind, portName, portBit) <
                std::make_tuple(rhs.kind, rhs.portName, rhs.portBit);
+    }
+
+    template <class Archive>
+    void serialize(Archive &ar)
+    {
+        ar(kind, portName, portBit);
     }
 };
 
@@ -497,6 +549,10 @@ private:
     std::vector<std::weak_ptr<DepNode>> dependents_;
 
 public:
+    DepNode()
+    {
+    }
+
     DepNode(std::shared_ptr<TaskBase<WorkerInfo>> task, NodeLabel label)
         : DepNodeBase(std::move(label)),
           hasQueued_(false),
@@ -571,6 +627,13 @@ public:
         }
 
         visitor.end();
+    }
+
+    template <class Archive>
+    void serialize(Archive &ar)
+    {
+        ar(cereal::base_class<DepNodeBase>(this), hasQueued_, task_,
+           dependents_);
     }
 };
 
@@ -849,6 +912,10 @@ private:
     }
 
 public:
+    TaskNetwork()
+    {
+    }
+
     TaskNetwork(
         std::unordered_map<int, std::shared_ptr<DepNode<WorkerInfo>>> id2node,
         Label2TaskMap namedMems)
@@ -999,6 +1066,12 @@ public:
                 (st == ST::DFS && node->task()->areInputsReady()))
                 node->visit(visitor);
         }
+    }
+
+    template <class Archive>
+    void serialize(Archive &ar)
+    {
+        ar(id2node_, namedMems_);
     }
 };
 
@@ -1238,6 +1311,10 @@ public:
 template <class InType, class OutType, class WorkerInfo>
 class TaskMem : public Task<InType, OutType, WorkerInfo> {
 public:
+    TaskMem()
+    {
+    }
+
     TaskMem(int numInputs) : Task<InType, OutType, WorkerInfo>(numInputs)
     {
     }
@@ -1250,6 +1327,12 @@ public:
     const OutType &get() const
     {
         return this->output();
+    }
+
+    template <class Archive>
+    void serialize(Archive &ar)
+    {
+        ar(cereal::base_class<Task<InType, OutType, WorkerInfo>>(this));
     }
 };
 
@@ -1286,6 +1369,12 @@ public:
         // Since hasFinished() is called after calling of tick(), the
         // input should already be in val_.
         return true;
+    }
+
+    template <class Archive>
+    void serialize(Archive &ar)
+    {
+        ar(cereal::base_class<TaskMem<InType, OutType, WorkerInfo>>(this));
     }
 };
 
@@ -1441,6 +1530,12 @@ struct File {
         IYOKANL1_JSON,
     } type;
     std::string path, name;
+
+    template <class Archive>
+    void serialize(Archive &ar)
+    {
+        ar(type, path, name);
+    }
 };
 struct BuiltinROM {
     enum class TYPE {
@@ -1449,6 +1544,12 @@ struct BuiltinROM {
     } type;
     std::string name;
     size_t inAddrWidth, outRdataWidth;
+
+    template <class Archive>
+    void serialize(Archive &ar)
+    {
+        ar(type, name, inAddrWidth, outRdataWidth);
+    }
 };
 struct BuiltinRAM {
     enum class TYPE {
@@ -1457,6 +1558,12 @@ struct BuiltinRAM {
     } type;
     std::string name;
     size_t inAddrWidth, inWdataWidth, outRdataWidth;
+
+    template <class Archive>
+    void serialize(Archive &ar)
+    {
+        ar(type, name, inAddrWidth, inWdataWidth, outRdataWidth);
+    }
 };
 struct Port {
     std::string nodeName;
@@ -1465,6 +1572,12 @@ struct Port {
     bool operator==(const Port &rhs) const
     {
         return nodeName == rhs.nodeName && portLabel == rhs.portLabel;
+    }
+
+    template <class Archive>
+    void serialize(Archive &ar)
+    {
+        ar(nodeName, portLabel);
     }
 };
 }  // namespace blueprint
@@ -1478,6 +1591,13 @@ private:
 
     std::map<std::tuple<std::string, int>, blueprint::Port> atPorts_;
     std::unordered_map<std::string, int> atPortWidths_;
+
+public:
+    template <class Archive>
+    void serialize(Archive &ar)
+    {
+        ar(files_, builtinROMs_, builtinRAMs_, edges_, atPorts_, atPortWidths_);
+    }
 
 private:
     std::vector<blueprint::Port> parsePortString(const std::string &src,
@@ -1516,6 +1636,10 @@ private:
     }
 
 public:
+    NetworkBlueprint()
+    {
+    }
+
     NetworkBlueprint(const std::string &fileName)
     {
         namespace fs = std::filesystem;
@@ -1687,17 +1811,42 @@ public:
 
 struct Options {
     std::optional<NetworkBlueprint> blueprint;
-    std::string inputFile, outputFile;
-    int numCPUWorkers = std::thread::hardware_concurrency(),
-        numGPUWorkers = 80 * 10, numGPU = 1, numCycles = -1;
-    std::optional<std::string> secretKey;
-    std::optional<std::string> dumpPrefix;
+    std::optional<int> numCPUWorkers = std::thread::hardware_concurrency(),
+                       numGPUWorkers = 80 * 10, numGPU = 1, numCycles;
+    std::optional<std::string> inputFile, outputFile, secretKey, dumpPrefix,
+        snapshotFile, resumeFile;
+
+    template <class Archive>
+    void serialize(Archive &ar)
+    {
+        ar(blueprint, inputFile, outputFile, numCPUWorkers, numGPUWorkers,
+           numGPU, numCycles, secretKey, dumpPrefix, snapshotFile, resumeFile);
+    }
+
+    void merge(const Options &rhs)
+    {
+#define MERGE_ONE(name) \
+    if (rhs.name)       \
+        name = rhs.name;
+        MERGE_ONE(blueprint);
+        MERGE_ONE(numCPUWorkers);
+        MERGE_ONE(numGPUWorkers);
+        MERGE_ONE(numGPU);
+        MERGE_ONE(numCycles);
+        MERGE_ONE(inputFile);
+        MERGE_ONE(outputFile);
+        MERGE_ONE(secretKey);
+        MERGE_ONE(dumpPrefix);
+        MERGE_ONE(snapshotFile);
+        MERGE_ONE(resumeFile);
+#undef MERGE_ONE
+    }
 };
 
 template <class Func>
-int processCycles(int numCycles, Func func)
+int processCycles(int numCycles, Func func, int initialCycle = 0)
 {
-    for (int i = 0; i < numCycles; i++) {
+    for (int i = initialCycle; i < initialCycle + numCycles; i++) {
         spdlog::info("#{}", i + 1);
 
         auto begin = std::chrono::high_resolution_clock::now();
@@ -1715,7 +1864,7 @@ int processCycles(int numCycles, Func func)
         }
     }
 
-    return numCycles;
+    return initialCycle + numCycles;
 }
 
 template <class WorkerInfo, class WorkerType>

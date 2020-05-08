@@ -230,7 +230,8 @@ private:
 
 public:
     TFHEppFrontend(const Options &opt)
-        : opt_(opt), reqPacket_(readFromArchive<TFHEPacket>(opt.inputFile))
+        : opt_(opt),
+          reqPacket_(readFromArchive<TFHEPacket>(opt.inputFile.value()))
     {
         assert(opt.blueprint);
     }
@@ -363,7 +364,7 @@ public:
 
         // Make runner
         TFHEppWorkerInfo wi{TFHEpp::lweParams{}, reqPacket_.gk, reqPacket_.ck};
-        TFHEppNetworkRunner runner{opt_.numCPUWorkers, wi};
+        TFHEppNetworkRunner runner{opt_.numCPUWorkers.value(), wi};
         for (auto &&p : name2net_)
             runner.addNetwork(p.second);
 
@@ -380,7 +381,7 @@ public:
 
         // Go computing
         {
-            processCycles(opt_.numCycles, [&](int currentCycle) {
+            processCycles(opt_.numCycles.value(), [&](int currentCycle) {
                 mayDumpPacket(currentCycle);
 
                 runner.tick();
@@ -396,8 +397,8 @@ public:
         }
 
         // Dump result packet
-        TFHEPacket resPacket = makeResPacket(opt_.numCycles);
-        writeToArchive(opt_.outputFile, resPacket);
+        TFHEPacket resPacket = makeResPacket(opt_.numCycles.value());
+        writeToArchive(opt_.outputFile.value(), resPacket);
     }
 };
 

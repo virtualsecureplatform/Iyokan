@@ -16,7 +16,14 @@ public:
     {
         output() = 0_b;
     }
+
+    template <class Archive>
+    void serialize(Archive &ar)
+    {
+        ar(cereal::base_class<TaskDFF<Bit, Bit, PlainWorkerInfo>>(this));
+    }
 };
+CEREAL_REGISTER_TYPE(TaskPlainGateDFF);
 
 class TaskPlainGateWIRE : public TaskMem<Bit, Bit, PlainWorkerInfo> {
 private:
@@ -34,6 +41,10 @@ private:
     }
 
 public:
+    TaskPlainGateWIRE()
+    {
+    }
+
     TaskPlainGateWIRE(bool inputNeeded)
         : TaskMem<Bit, Bit, PlainWorkerInfo>(inputNeeded ? 1 : 0)
     {
@@ -43,7 +54,14 @@ public:
     {
         return true;
     }
+
+    template <class Archive>
+    void serialize(Archive &ar)
+    {
+        ar(cereal::base_class<TaskMem<Bit, Bit, PlainWorkerInfo>>(this));
+    }
 };
+CEREAL_REGISTER_TYPE(TaskPlainGateWIRE);
 
 #define DEFINE_TASK_PLAIN_GATE(name, numInputs, expr)    \
     class TaskPlainGate##name : public TaskPlainGate {   \
@@ -62,7 +80,14 @@ public:
         {                                                \
             return true;                                 \
         }                                                \
-    };
+                                                         \
+        template <class Archive>                         \
+        void serialize(Archive &ar)                      \
+        {                                                \
+            ar(cereal::base_class<TaskPlainGate>(this)); \
+        }                                                \
+    };                                                   \
+    CEREAL_REGISTER_TYPE(TaskPlainGate##name);
 DEFINE_TASK_PLAIN_GATE(AND, 2, (input(0) & input(1)));
 DEFINE_TASK_PLAIN_GATE(NAND, 2, ~(input(0) & input(1)));
 DEFINE_TASK_PLAIN_GATE(ANDNOT, 2, (input(0) & ~input(1)));
@@ -130,6 +155,10 @@ private:
     }
 
 public:
+    TaskPlainROMUX()
+    {
+    }
+
     TaskPlainROMUX(size_t inAddrWidth)
         : Task<Bit, Bit, PlainWorkerInfo>(inAddrWidth),
           inAddrWidth_(inAddrWidth),
@@ -156,7 +185,15 @@ public:
     {
         return true;
     }
+
+    template <class Archive>
+    void serialize(Archive &ar)
+    {
+        ar(cereal::base_class<Task<Bit, Bit, PlainWorkerInfo>>(this),
+           inAddrWidth_, data_);
+    }
 };
+CEREAL_REGISTER_TYPE(TaskPlainROMUX);
 
 class TaskPlainSplitter : public Task<uint32_t, Bit, PlainWorkerInfo> {
 private:
@@ -169,6 +206,10 @@ private:
     }
 
 public:
+    TaskPlainSplitter()
+    {
+    }
+
     TaskPlainSplitter(size_t index)
         : Task<uint32_t, Bit, PlainWorkerInfo>(1), index_(index)
     {
@@ -178,7 +219,15 @@ public:
     {
         return true;
     }
+
+    template <class Archive>
+    void serialize(Archive &ar)
+    {
+        ar(cereal::base_class<Task<uint32_t, Bit, PlainWorkerInfo>>(this),
+           index_);
+    }
 };
+CEREAL_REGISTER_TYPE(TaskPlainSplitter);
 
 class TaskPlainRAM
     : public Task<Bit, uint32_t /* only 8 Bit used */, PlainWorkerInfo> {
@@ -231,7 +280,15 @@ public:
     {
         return true;
     }
+
+    template <class Archive>
+    void serialize(Archive &ar)
+    {
+        ar(cereal::base_class<Task<Bit, uint32_t, PlainWorkerInfo>>(this),
+           data_);
+    }
 };
+CEREAL_REGISTER_TYPE(TaskPlainRAM);
 
 inline TaskNetwork<PlainWorkerInfo> makePlainRAMNetwork(
     const std::string &ramPortName)
