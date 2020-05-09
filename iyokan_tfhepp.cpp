@@ -46,8 +46,9 @@ public:
 class TFHEppFrontend {
 private:
     Name2NetMap name2net_;
-    const Options &opt_;
+    Options opt_;
     TFHEPacket reqPacket_;
+    int currentCycle_;
 
 private:
     template <class T = TaskTFHEppGate>
@@ -129,7 +130,7 @@ private:
                     else
                         assert(ram.size() == dst.size() / 8);
                     for (size_t addr = 0; addr < ram.size(); addr++)
-                        dst.at(addr * 8 + bit) = ram.get(addr);
+                        dst.at(addr * 8 + bit) = *ram.get(addr);
                 }
                 break;
             }
@@ -229,17 +230,17 @@ private:
     }
 
 public:
-    TFHEppFrontend(const Options &opt)
-        : opt_(opt),
-          reqPacket_(readFromArchive<TFHEPacket>(opt.inputFile.value()))
+    TFHEppFrontend()
     {
-        assert(opt.blueprint);
     }
 
-    void go()
+    TFHEppFrontend(const Options &opt)
+        : opt_(opt),
+          reqPacket_(readFromArchive<TFHEPacket>(opt.inputFile.value())),
+          currentCycle_(0)
     {
         // Create network according to blueprint
-        const NetworkBlueprint &bp = *opt_.blueprint;
+        const NetworkBlueprint &bp = opt_.blueprint.value();
 
         // [[file]]
         for (const auto &file : bp.files())
@@ -361,7 +362,15 @@ public:
             for (auto &&p : name2net_)
                 p.second->visit(privis);
         }
+    }
 
+    void mergeOptions(const Options &rhs)
+    {
+        opt_.merge(rhs);
+    }
+
+    void go()
+    {
         // Make runner
         TFHEppWorkerInfo wi{TFHEpp::lweParams{}, reqPacket_.gk, reqPacket_.ck};
         TFHEppNetworkRunner runner{opt_.numCPUWorkers.value(), wi};
@@ -369,36 +378,47 @@ public:
             runner.addNetwork(p.second);
 
         // Reset
-        if (auto reset = maybeGetAt("input", "reset"); reset) {
-            TFHEpp::TLWElvl0 one, zero;
-            TFHEpp::HomCONSTANTONE(one);
-            TFHEpp::HomCONSTANTZERO(zero);
+        if (currentCycle_ == 0) {
+            if (auto reset = maybeGetAt("input", "reset"); reset) {
+                TFHEpp::TLWElvl0 one, zero;
+                TFHEpp::HomCONSTANTONE(one);
+                TFHEpp::HomCONSTANTZERO(zero);
 
-            reset->set(one);
-            runner.run();
-            reset->set(zero);
+                reset->set(one);
+                runner.run();
+                reset->set(zero);
+            }
         }
 
         // Go computing
         {
-            processCycles(opt_.numCycles.value(), [&](int currentCycle) {
-                mayDumpPacket(currentCycle);
+            currentCycle_ = processCycles(
+                opt_.numCycles.value(),
+                [&](int currentCycle) {
+                    mayDumpPacket(currentCycle);
 
-                runner.tick();
+                    runner.tick();
 
-                if (currentCycle == 0)
-                    setInitialRAM();
-                setCircularInputs(currentCycle);
+                    if (currentCycle == 0)
+                        setInitialRAM();
+                    setCircularInputs(currentCycle);
 
-                runner.run();
+                    runner.run();
 
-                return false;
-            });
+                    return false;
+                },
+                currentCycle_);
         }
 
         // Dump result packet
-        TFHEPacket resPacket = makeResPacket(opt_.numCycles.value());
+        TFHEPacket resPacket = makeResPacket(currentCycle_);
         writeToArchive(opt_.outputFile.value(), resPacket);
+    }
+
+    template <class Archive>
+    void serialize(Archive &ar)
+    {
+        ar(name2net_, opt_, reqPacket_, currentCycle_);
     }
 };
 
@@ -432,5 +452,12 @@ void processAllGates(TFHEppNetwork &net, int numWorkers, TFHEppWorkerInfo wi,
 
 void doTFHE(const Options &opt)
 {
-    TFHEppFrontend{opt}.go();
+    auto frontend = opt.resumeFile
+                        ? readFromArchive<TFHEppFrontend>(*opt.resumeFile)
+                        : TFHEppFrontend{opt};
+    if (opt.resumeFile)
+        frontend.mergeOptions(opt);
+    frontend.go();
+    if (opt.snapshotFile)
+        writeToArchive(*opt.snapshotFile, frontend);
 }

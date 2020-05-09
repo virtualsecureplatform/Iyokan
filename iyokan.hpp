@@ -36,6 +36,7 @@
 
 #include <cereal/cereal.hpp>
 #include <cereal/types/array.hpp>
+#include <cereal/types/bitset.hpp>
 #include <cereal/types/memory.hpp>
 #include <cereal/types/optional.hpp>
 #include <cereal/types/tuple.hpp>
@@ -1392,6 +1393,10 @@ private:
     }
 
 public:
+    TaskAsync()
+    {
+    }
+
     TaskAsync(size_t expectedNumInputs)
         : Task<InType, OutType, WorkerInfo>(expectedNumInputs)
     {
@@ -1400,6 +1405,12 @@ public:
     bool hasFinished() const override
     {
         return thr_.hasFinished();
+    }
+
+    template <class Archive>
+    void serialize(Archive &ar)
+    {
+        ar(cereal::base_class<Task<InType, OutType, WorkerInfo>>(this));
     }
 };
 

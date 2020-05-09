@@ -28,7 +28,16 @@ public:
     {
         TFHEpp::HomCONSTANTZERO(output());
     }
+
+    template <class Archive>
+    void serialize(Archive &ar)
+    {
+        ar(cereal::base_class<
+            TaskDFF<TFHEpp::TLWElvl0, TFHEpp::TLWElvl0, TFHEppWorkerInfo>>(
+            this));
+    }
 };
+CEREAL_REGISTER_TYPE(TaskTFHEppGateDFF);
 
 class TaskTFHEppGateWIRE
     : public TaskMem<TFHEpp::TLWElvl0, TFHEpp::TLWElvl0, TFHEppWorkerInfo> {
@@ -50,6 +59,10 @@ private:
     }
 
 public:
+    TaskTFHEppGateWIRE()
+    {
+    }
+
     TaskTFHEppGateWIRE(bool inputNeeded)
         : TaskMem<TFHEpp::TLWElvl0, TFHEpp::TLWElvl0, TFHEppWorkerInfo>(
               inputNeeded ? 1 : 0)
@@ -60,7 +73,16 @@ public:
     {
         return getInputSize() == 0 || thr_.hasFinished();
     }
+
+    template <class Archive>
+    void serialize(Archive &ar)
+    {
+        ar(cereal::base_class<
+            TaskMem<TFHEpp::TLWElvl0, TFHEpp::TLWElvl0, TFHEppWorkerInfo>>(
+            this));
+    }
 };
+CEREAL_REGISTER_TYPE(TaskTFHEppGateWIRE);
 
 #define DEFINE_TASK_GATE(name, numInputs, expr)             \
     class TaskTFHEppGate##name : public TaskAsyncTFHEpp {   \
@@ -75,7 +97,14 @@ public:
         TaskTFHEppGate##name() : TaskAsyncTFHEpp(numInputs) \
         {                                                   \
         }                                                   \
-    };
+                                                            \
+        template <class Archive>                            \
+        void serialize(Archive &ar)                         \
+        {                                                   \
+            ar(cereal::base_class<TaskAsyncTFHEpp>(this));  \
+        }                                                   \
+    };                                                      \
+    CEREAL_REGISTER_TYPE(TaskTFHEppGate##name);
 DEFINE_TASK_GATE(AND, 2, TFHEpp::HomAND(output(), input(0), input(1), *gk));
 DEFINE_TASK_GATE(NAND, 2, TFHEpp::HomNAND(output(), input(0), input(1), *gk));
 DEFINE_TASK_GATE(ANDNOT, 2,
@@ -149,7 +178,15 @@ public:
         : TaskAsync<TFHEpp::TLWElvl0, TFHEpp::TRGSWFFTlvl1, TFHEppWorkerInfo>(1)
     {
     }
+
+    template <class Archive>
+    void serialize(Archive &ar)
+    {
+        ar(cereal::base_class<TaskAsync<TFHEpp::TLWElvl0, TFHEpp::TRGSWFFTlvl1,
+                                        TFHEppWorkerInfo>>(this));
+    }
 };
+CEREAL_REGISTER_TYPE(TaskTFHEppCB);
 
 class TaskTFHEppCBInv : public TaskAsync<TFHEpp::TLWElvl0, TFHEpp::TRGSWFFTlvl1,
                                          TFHEppWorkerInfo> {
@@ -166,7 +203,15 @@ public:
         : TaskAsync<TFHEpp::TLWElvl0, TFHEpp::TRGSWFFTlvl1, TFHEppWorkerInfo>(1)
     {
     }
+
+    template <class Archive>
+    void serialize(Archive &ar)
+    {
+        ar(cereal::base_class<TaskAsync<TFHEpp::TLWElvl0, TFHEpp::TRGSWFFTlvl1,
+                                        TFHEppWorkerInfo>>(this));
+    }
 };
+CEREAL_REGISTER_TYPE(TaskTFHEppCBInv);
 
 class TaskTFHEppROMUX : public TaskAsync<TFHEpp::TRGSWFFTlvl1,
                                          TFHEpp::TRLWElvl1, TFHEppWorkerInfo> {
@@ -249,6 +294,10 @@ private:
     }
 
 public:
+    TaskTFHEppROMUX()
+    {
+    }
+
     TaskTFHEppROMUX(size_t inAddrWidth, size_t log2OutRdataWidth)
         : TaskAsync<TFHEpp::TRGSWFFTlvl1, TFHEpp::TRLWElvl1, TFHEppWorkerInfo>(
               inAddrWidth),
@@ -271,7 +320,16 @@ public:
     {
         data_.at(index) = val;
     }
+
+    template <class Archive>
+    void serialize(Archive &ar)
+    {
+        ar(cereal::base_class<TaskAsync<TFHEpp::TRGSWFFTlvl1, TFHEpp::TRLWElvl1,
+                                        TFHEppWorkerInfo>>(this),
+           inAddrWidth_, numWordsPerTRLWE_, log2NumWordsPerTRLWE_, data_);
+    }
 };
+CEREAL_REGISTER_TYPE(TaskTFHEppROMUX);
 
 class TaskTFHEppSEI
     : public TaskAsync<TFHEpp::TRLWElvl1, TFHEpp::TLWElvl0, TFHEppWorkerInfo> {
@@ -290,15 +348,34 @@ private:
     }
 
 public:
+    TaskTFHEppSEI()
+    {
+    }
+
     TaskTFHEppSEI(size_t index)
         : TaskAsync<TFHEpp::TRLWElvl1, TFHEpp::TLWElvl0, TFHEppWorkerInfo>(1),
           index_(index)
     {
     }
+
+    template <class Archive>
+    void serialize(Archive &ar)
+    {
+        ar(cereal::base_class<TaskAsync<TFHEpp::TRLWElvl1, TFHEpp::TLWElvl0,
+                                        TFHEppWorkerInfo>>(this),
+           index_);
+    }
 };
+CEREAL_REGISTER_TYPE(TaskTFHEppSEI);
 
 struct TRGSWFFTlvl1Pair {
     TFHEpp::TRGSWFFTlvl1 normal, inverted;
+
+    template <class Archive>
+    void serialize(Archive &ar)
+    {
+        ar(normal, inverted);
+    }
 };
 
 class TaskTFHEppCBWithInv
@@ -317,7 +394,16 @@ public:
         : TaskAsync<TFHEpp::TLWElvl0, TRGSWFFTlvl1Pair, TFHEppWorkerInfo>(1)
     {
     }
+
+    template <class Archive>
+    void serialize(Archive &ar)
+    {
+        ar(cereal::base_class<
+            TaskAsync<TFHEpp::TLWElvl0, TRGSWFFTlvl1Pair, TFHEppWorkerInfo>>(
+            this));
+    }
 };
+CEREAL_REGISTER_TYPE(TaskTFHEppCBWithInv);
 
 class TaskTFHEppRAMUX
     : public TaskAsync<TRGSWFFTlvl1Pair, TFHEpp::TRLWElvl1, TFHEppWorkerInfo> {
@@ -325,7 +411,7 @@ public:
     const static size_t ADDRESS_BIT = 8;
 
 private:
-    std::vector<TFHEpp::TRLWElvl1> data_;
+    std::vector<std::shared_ptr<TFHEpp::TRLWElvl1>> data_;
 
 private:
     void RAMUX()
@@ -337,8 +423,8 @@ private:
         };
 
         for (uint32_t index = 0; index < num_trlwe / 2; index++) {
-            TFHEpp::CMUXFFTlvl1(temp[index], addr(0), data_[2 * index],
-                                data_[2 * index + 1]);
+            TFHEpp::CMUXFFTlvl1(temp[index], addr(0), *data_[2 * index],
+                                *data_[2 * index + 1]);
         }
 
         for (uint32_t bit = 0; bit < (ADDRESS_BIT - 2); bit++) {
@@ -367,6 +453,8 @@ public:
               ADDRESS_BIT),
           data_(1 << ADDRESS_BIT)
     {
+        for (auto &p : data_)
+            p = std::make_shared<TFHEpp::TRLWElvl1>();
     }
 
     size_t size() const
@@ -374,21 +462,30 @@ public:
         return 1 << ADDRESS_BIT;
     }
 
-    const TFHEpp::TRLWElvl1 &get(size_t addr) const
+    std::shared_ptr<const TFHEpp::TRLWElvl1> get(size_t addr) const
     {
         return data_.at(addr);
     }
 
-    TFHEpp::TRLWElvl1 &get(size_t addr)
+    std::shared_ptr<TFHEpp::TRLWElvl1> &get(size_t addr)
     {
         return data_.at(addr);
     }
 
     void set(size_t addr, TFHEpp::TRLWElvl1 val)
     {
-        data_.at(addr) = std::move(val);
+        *data_.at(addr) = std::move(val);
+    }
+
+    template <class Archive>
+    void serialize(Archive &ar)
+    {
+        ar(cereal::base_class<TaskAsync<TRGSWFFTlvl1Pair, TFHEpp::TRLWElvl1,
+                                        TFHEppWorkerInfo>>(this),
+           data_);
     }
 };
+CEREAL_REGISTER_TYPE(TaskTFHEppRAMUX);
 
 class TaskTFHEppGateMUXWoSE
     : public TaskAsync<TFHEpp::TLWElvl0, TFHEpp::TRLWElvl1, TFHEppWorkerInfo> {
@@ -404,7 +501,16 @@ public:
         : TaskAsync<TFHEpp::TLWElvl0, TFHEpp::TRLWElvl1, TFHEppWorkerInfo>(3)
     {
     }
+
+    template <class Archive>
+    void serialize(Archive &ar)
+    {
+        ar(cereal::base_class<
+            TaskAsync<TFHEpp::TLWElvl0, TFHEpp::TRLWElvl1, TFHEppWorkerInfo>>(
+            this));
+    }
 };
+CEREAL_REGISTER_TYPE(TaskTFHEppGateMUXWoSE);
 
 class TaskTFHEppRAMCMUXs : public TaskBase<TFHEppWorkerInfo> {
 private:
@@ -413,17 +519,22 @@ private:
     std::vector<std::weak_ptr<const TRGSWFFTlvl1Pair>> inputAddrs_;
     std::weak_ptr<const TFHEpp::TRLWElvl1> inputWritten_;
 
-    const TFHEpp::TRLWElvl1 &mem_;
-    const std::bitset<TaskTFHEppRAMUX::ADDRESS_BIT> addrBitset_;
+    std::weak_ptr<const TFHEpp::TRLWElvl1> mem_;
+    std::bitset<TaskTFHEppRAMUX::ADDRESS_BIT> addrBitset_;
 
     AsyncThread thr_;
 
 public:
-    TaskTFHEppRAMCMUXs(const TFHEpp::TRLWElvl1 &mem, size_t memIndex)
+    TaskTFHEppRAMCMUXs()
+    {
+    }
+
+    TaskTFHEppRAMCMUXs(std::weak_ptr<const TFHEpp::TRLWElvl1> mem,
+                       size_t memIndex)
         : numReadyInputs_(0),
           output_(std::make_shared<TFHEpp::TRLWElvl1>()),
           inputAddrs_(TaskTFHEppRAMUX::ADDRESS_BIT),
-          mem_(mem),
+          mem_(std::move(mem)),
           addrBitset_(memIndex)
     {
     }
@@ -496,32 +607,54 @@ public:
                 const TFHEpp::TRGSWFFTlvl1 &in =
                     addrBitset_[j] != 0 ? inputAddrs_[j].lock()->normal
                                         : inputAddrs_[j].lock()->inverted;
-                TFHEpp::CMUXFFTlvl1(*output_, in, *output_, mem_);
+                TFHEpp::CMUXFFTlvl1(*output_, in, *output_, *mem_.lock());
             }
         };
     }
+
+    template <class Archive>
+    void serialize(Archive &ar)
+    {
+        ar(cereal::base_class<TaskBase<TFHEppWorkerInfo>>(this),
+           numReadyInputs_, output_, inputAddrs_, inputWritten_, mem_,
+           addrBitset_);
+    }
 };
+CEREAL_REGISTER_TYPE(TaskTFHEppRAMCMUXs);
 
 class TaskTFHEppRAMGateBootstrapping
     : public TaskAsync<TFHEpp::TLWElvl0, uint8_t /* dummy */,
                        TFHEppWorkerInfo> {
 private:
-    TFHEpp::TRLWElvl1 &mem_;
+    std::weak_ptr<TFHEpp::TRLWElvl1> mem_;
 
 private:
     void startSync(TFHEppWorkerInfo wi) override
     {
         const TFHEpp::GateKey &gk = *wi.gateKey;
-        TFHEpp::GateBootstrappingTLWE2TRLWEFFTlvl01(mem_, input(0), gk);
+        TFHEpp::GateBootstrappingTLWE2TRLWEFFTlvl01(*mem_.lock(), input(0), gk);
     }
 
 public:
-    TaskTFHEppRAMGateBootstrapping(TFHEpp::TRLWElvl1 &mem)
-        : TaskAsync<TFHEpp::TLWElvl0, uint8_t /* dummy */, TFHEppWorkerInfo>(1),
-          mem_(mem)
+    TaskTFHEppRAMGateBootstrapping()
     {
     }
+
+    TaskTFHEppRAMGateBootstrapping(std::weak_ptr<TFHEpp::TRLWElvl1> mem)
+        : TaskAsync<TFHEpp::TLWElvl0, uint8_t /* dummy */, TFHEppWorkerInfo>(1),
+          mem_(std::move(mem))
+    {
+    }
+
+    template <class Archive>
+    void serialize(Archive &ar)
+    {
+        ar(cereal::base_class<
+               TaskAsync<TFHEpp::TLWElvl0, uint8_t, TFHEppWorkerInfo>>(this),
+           mem_);
+    }
 };
+CEREAL_REGISTER_TYPE(TaskTFHEppRAMGateBootstrapping);
 
 inline void makeTFHEppRAMNetworkImpl(
     NetworkBuilderBase<TFHEppWorkerInfo> &builder,

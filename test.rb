@@ -152,7 +152,8 @@ def test_in_out(blueprint, in_file, out_file, args0 = [], args1 = [], args2 = []
   res_file = "_test_res_packet"
   secret_key = "_test_sk"
   bootstrapping_key = "_test_bk"
-  snapshot = "_test_snapshot"
+  snapshot0 = "_test_snapshot0"
+  snapshot1 = "_test_snapshot1"
   cycles = -1
 
   run_iyokan_packet ["toml2packet",
@@ -160,34 +161,33 @@ def test_in_out(blueprint, in_file, out_file, args0 = [], args1 = [], args2 = []
                      "--out", plain_req_file]
 
   ## Check plain mode
-  run_iyokan ["plain",
-              "--blueprint", blueprint,
-              "-i", plain_req_file,
-              "-o", plain_res_file] + args0
+  if args0.empty? and not block_given?
+    ## Use snapshot
+    run_iyokan ["plain",
+                "--blueprint", blueprint,
+                "-i", plain_req_file,
+                "-o", plain_res_file,
+                "-c", 1,
+                "--snapshot", snapshot0]
+    run_iyokan ["plain",
+                "--resume", snapshot0,
+                "--snapshot", snapshot1]
+    run_iyokan ["plain",
+                "-c", 10000000,
+                "--resume", snapshot1]
+  else
+    ## Don't use snapshot in complex situations
+    run_iyokan ["plain",
+                "--blueprint", blueprint,
+                "-i", plain_req_file,
+                "-o", plain_res_file] + args0
+  end
   r = run_iyokan_packet ["packet2toml", "--in", plain_res_file]
   got = TomlRB.parse(r)
   expected = TomlRB.load_file(out_file)
   assert_equal_packet got, expected
   yield 0 if block_given?
   cycles = got["cycles"]  # Get # of cycles for the rest
-
-  ## Check plain mode with snapshot. Only enabled when args0 is empty and block not given
-  ## in order to avoid complex situations.
-  if args0.empty? and not block_given?
-    run_iyokan ["plain",
-                "--blueprint", blueprint,
-                "-i", plain_req_file,
-                "-o", plain_res_file,
-                "-c", cycles / 2,
-                "--snapshot", snapshot]
-    run_iyokan ["plain",
-                "-c", cycles - cycles / 2,
-                "--resume", snapshot]
-    r = run_iyokan_packet ["packet2toml", "--in", plain_res_file]
-    got = TomlRB.parse(r)
-    expected = TomlRB.load_file(out_file)
-    assert_equal_packet got, expected
-  end
 
   if $SLOW_MODE_ENABLED
     run_iyokan_packet ["enc",
@@ -198,11 +198,28 @@ def test_in_out(blueprint, in_file, out_file, args0 = [], args1 = [], args2 = []
 
     unless args1.nil?
       ## Check TFHE mode
-      run_iyokan ["tfhe",
-                  "--blueprint", blueprint,
-                  "-c", cycles,
-                  "-i", req_file,
-                  "-o", res_file] + args1
+      if args1.empty? and not block_given?
+        ## Use snapshot
+        run_iyokan ["tfhe",
+                    "--blueprint", blueprint,
+                    "-c", 1,
+                    "-i", req_file,
+                    "-o", res_file,
+                    "--snapshot", snapshot0]
+        run_iyokan ["tfhe",
+                    "--resume", snapshot0,
+                    "--snapshot", snapshot1]
+        run_iyokan ["tfhe",
+                    "--resume", snapshot1,
+                    "-c", cycles - 2]
+      else
+        ## Don't use snapshot in complex situations
+        run_iyokan ["tfhe",
+                    "--blueprint", blueprint,
+                    "-c", cycles,
+                    "-i", req_file,
+                    "-o", res_file] + args1
+      end
       run_iyokan_packet ["dec",
                          "--key", secret_key,
                          "--in", res_file,
