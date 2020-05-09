@@ -173,7 +173,7 @@ def test_in_out(blueprint, in_file, out_file, args0 = [], args1 = [], args2 = []
                 "--resume", snapshot0,
                 "--snapshot", snapshot1]
     run_iyokan ["plain",
-                "-c", 10000000,
+                "-c", -1,
                 "--resume", snapshot1]
   else
     ## Don't use snapshot in complex situations

@@ -351,8 +351,9 @@ public:
         }
 
         // Get # of cycles
-        int numCycles =
-            opt_.numCycles.value_or(std::numeric_limits<int>::max());
+        int numCycles = opt_.numCycles.value_or(-1);
+        if (numCycles < 0)
+            numCycles = std::numeric_limits<int>::max() / 2;
 
         // Go computing
         {
