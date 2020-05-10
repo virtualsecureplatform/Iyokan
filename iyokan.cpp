@@ -72,7 +72,6 @@ int main(int argc, char **argv)
             ->needs("--secret-key");
 
 #ifdef IYOKAN_CUDA_ENABLED
-        tfhe->add_flag("--enable-gpu", enableGPU, "");
         tfhe->add_option("--gpu", opt.numGPUWorkers, "")
             ->check(CLI::PositiveNumber);
         tfhe->add_option("--gpu_num", opt.numGPU, "")
@@ -91,6 +90,9 @@ int main(int argc, char **argv)
             ->required()
             ->needs(optC, optO)
             ->check(CLI::ExistingFile);
+#ifdef IYOKAN_CUDA_ENABLED
+        newRun->add_flag("--enable-gpu", enableGPU, "");
+#endif
 
         auto resume =
             ogroups->add_option_group("resume", "Resume from a saved snapshot");
