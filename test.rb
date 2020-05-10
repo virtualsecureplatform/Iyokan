@@ -234,12 +234,30 @@ def test_in_out(blueprint, in_file, out_file, args0 = [], args1 = [], args2 = []
     if $CUDA_MODE_ENABLED
       unless args2.nil?
         ## Check cuFHE mode
-        run_iyokan ["tfhe",
-                    "--enable-gpu",
-                    "--blueprint", blueprint,
-                    "-c", cycles,
-                    "-i", req_file,
-                    "-o", res_file] + args2
+        if args2.empty? and not block_given?
+          ## Use snapshot
+          run_iyokan ["tfhe",
+                      "--enable-gpu",
+                      "--blueprint", blueprint,
+                      "-c", 1,
+                      "-i", req_file,
+                      "-o", res_file,
+                      "--snapshot", snapshot0]
+          run_iyokan ["tfhe",
+                      "--resume", snapshot0,
+                      "--snapshot", snapshot1]
+          run_iyokan ["tfhe",
+                      "--resume", snapshot1,
+                      "-c", cycles - 2]
+        else
+          ## Dont use snapshot in complex situations.
+          run_iyokan ["tfhe",
+                      "--enable-gpu",
+                      "--blueprint", blueprint,
+                      "-c", cycles,
+                      "-i", req_file,
+                      "-o", res_file] + args2
+        end
         run_iyokan_packet ["dec",
                            "--key", secret_key,
                            "--in", res_file,
