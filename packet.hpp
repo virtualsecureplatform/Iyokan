@@ -391,6 +391,7 @@ void writeToArchive(const std::string& path, const T& src)
         return writeToArchive(ofs, src);
     }
     catch (std::exception& ex) {
+        spdlog::error(ex.what());
         error::die("Unable to write into archive: ", path);
     }
 }

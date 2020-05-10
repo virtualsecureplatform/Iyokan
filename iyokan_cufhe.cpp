@@ -301,8 +301,8 @@ void makeTFHEppRAMNetworkForCUFHEImpl(
     for (int i = 0; i < (1 << TaskCUFHERAMUX::ADDRESS_BIT); i++) {
         // Create components...
         auto taskCMUXs = bt.emplaceTask<TaskTFHEppRAMCMUXsForCUFHE>(
-            NodeLabel{"CMUXs", utility::fok("[", i, "]")},
-            taskRAMUX->get(i).trlwehost, i);
+            NodeLabel{"CMUXs", utility::fok("[", i, "]")}, taskRAMUX->get(i),
+            i);
 
         auto taskSEIAndKS = bc.emplaceTask<TaskCUFHERAMSEIAndKS>(
             NodeLabel{"SEI&KS", utility::fok("[", i, "]")});
@@ -377,8 +377,10 @@ private:
     Name2CUFHENetMap name2cnet_;
     std::vector<std::shared_ptr<CUFHE2TFHEppBridge>> bridges0_;
     std::vector<std::shared_ptr<TFHEpp2CUFHEBridge>> bridges1_;
-    const Options& opt_;
+    Options opt_;
     TFHEPacket reqPacket_;
+    int currentCycle_;
+    bool cufheInitialized_;
 
 private:
     template <class T = TaskCUFHEGate>
@@ -488,7 +490,7 @@ private:
                     else
                         assert(ram.size() == dst.size() / 8);
                     for (size_t addr = 0; addr < ram.size(); addr++)
-                        dst.at(addr * 8 + bit) = ram.get(addr).trlwehost;
+                        dst.at(addr * 8 + bit) = ram.get(addr)->trlwehost;
                 }
                 break;
             }
@@ -587,22 +589,32 @@ private:
                        packet);
     }
 
-public:
-    CUFHEFrontend(const Options& opt)
-        : opt_(opt),
-          reqPacket_(readFromArchive<TFHEPacket>(opt.inputFile.value()))
+    void initializeCUFHE()
     {
-        assert(opt.blueprint);
-    }
-
-    void go()
-    {
-        const NetworkBlueprint& bp = *opt_.blueprint;
-
-        // Prepare cuFHE
+        assert(!cufheInitialized_);
         cufhe::SetGPUNum(opt_.numGPU.value());
         cufhe::SetSeed();
         cufhe::Initialize(*tfhepp2cufhe(*reqPacket_.gk));
+        cufheInitialized_ = true;
+    }
+
+public:
+    CUFHEFrontend() : cufheInitialized_(false)
+    {
+    }
+
+    CUFHEFrontend(const Options& opt)
+        : opt_(opt),
+          reqPacket_(readFromArchive<TFHEPacket>(opt.inputFile.value())),
+          currentCycle_(0),
+          cufheInitialized_(false)
+    {
+        assert(opt.blueprint);
+
+        // Prepare cuFHE
+        initializeCUFHE();
+
+        const NetworkBlueprint& bp = *opt_.blueprint;
 
         // [[file]]
         for (const auto& file : bp.files())
@@ -745,7 +757,21 @@ public:
             for (auto&& p : name2cnet_)
                 p.second->visit(privis);
         }
+    }
 
+    ~CUFHEFrontend()
+    {
+        if (cufheInitialized_)
+            cufhe::CleanUp();
+    }
+
+    void mergeOptions(const Options& rhs)
+    {
+        opt_.merge(rhs);
+    }
+
+    void go()
+    {
         // Make runner
         CUFHENetworkRunner runner{
             opt_.numGPUWorkers.value(), opt_.numCPUWorkers.value(),
@@ -761,39 +787,56 @@ public:
             runner.addBridge(bridge1);
 
         // Reset
-        if (auto reset = maybeGetAt("input", "reset"); reset) {
-            cufhe::Ctxt one, zero;
-            cufhe::ConstantOne(one);
-            cufhe::ConstantZero(zero);
-            cufhe::Synchronize();
+        if (currentCycle_ == 0) {
+            if (auto reset = maybeGetAt("input", "reset"); reset) {
+                cufhe::Ctxt one, zero;
+                cufhe::ConstantOne(one);
+                cufhe::ConstantZero(zero);
+                cufhe::Synchronize();
 
-            reset->set(one);
-            runner.run();
-            reset->set(zero);
+                reset->set(one);
+                runner.run();
+                reset->set(zero);
+            }
         }
 
         // Go computing
         {
-            processCycles(opt_.numCycles.value(), [&](int currentCycle) {
-                mayDumpPacket(currentCycle);
+            currentCycle_ = processCycles(
+                opt_.numCycles.value(),
+                [&](int currentCycle) {
+                    mayDumpPacket(currentCycle);
 
-                runner.tick();
+                    runner.tick();
 
-                if (currentCycle == 0)
-                    setInitialRAM();
-                setCircularInputs(currentCycle);
+                    if (currentCycle == 0)
+                        setInitialRAM();
+                    setCircularInputs(currentCycle);
 
-                runner.run();
-                return false;
-            });
+                    runner.run();
+                    return false;
+                },
+                currentCycle_);
         }
 
         // Dump result packet
-        TFHEPacket resPacket = makeResPacket(opt_.numCycles.value());
+        TFHEPacket resPacket = makeResPacket(currentCycle_);
         writeToArchive(opt_.outputFile.value(), resPacket);
+    }
 
-        // Clean cuFHE up
-        cufhe::CleanUp();
+    template <class Archive>
+    void load(Archive& ar)
+    {
+        ar(opt_, reqPacket_);
+        initializeCUFHE();
+        ar(name2tnet_, name2cnet_, bridges0_, bridges1_, currentCycle_);
+    }
+
+    template <class Archive>
+    void save(Archive& ar) const
+    {
+        ar(opt_, reqPacket_);
+        ar(name2tnet_, name2cnet_, bridges0_, bridges1_, currentCycle_);
     }
 };
 
@@ -827,5 +870,12 @@ void processAllGates(CUFHENetwork& net, int numWorkers,
 
 void doCUFHE(const Options& opt)
 {
-    CUFHEFrontend{opt}.go();
+    auto frontend = opt.resumeFile
+                        ? readFromArchive<CUFHEFrontend>(*opt.resumeFile)
+                        : CUFHEFrontend{opt};
+    if (opt.resumeFile)
+        frontend.mergeOptions(opt);
+    frontend.go();
+    if (opt.snapshotFile)
+        writeToArchive(*opt.snapshotFile, frontend);
 }

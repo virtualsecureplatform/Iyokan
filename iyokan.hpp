@@ -1420,6 +1420,10 @@ private:
     int numInputs_, numReadyInputs_;
 
 public:
+    TaskBlackHole()
+    {
+    }
+
     TaskBlackHole(int numInputs) : numInputs_(numInputs), numReadyInputs_(0)
     {
     }
@@ -1459,6 +1463,13 @@ public:
     {
         numReadyInputs_ = 0;
     }
+
+    template <class Archive>
+    void serialize(Archive &ar)
+    {
+        ar(cereal::base_class<TaskBase<WorkerInfo>>(this), numInputs_,
+           numReadyInputs_);
+    }
 };
 
 /*
@@ -1485,6 +1496,10 @@ private:
     std::weak_ptr<ReadyQueue<OutWorkerInfo>> outReadyQueue_;
 
 public:
+    BridgeDepNode()
+    {
+    }
+
     BridgeDepNode(std::shared_ptr<DepNode<OutWorkerInfo>> src)
         : DepNode<InWorkerInfo>(
               std::make_shared<TaskBlackHole<InWorkerInfo>>(1),
@@ -1518,6 +1533,12 @@ public:
         if (visitor.getStrategy() == GraphVisitor::STRATEGY::DFS)
             src_->visit(visitor);
         visitor.end();
+    }
+
+    template <class Archive>
+    void serialize(Archive &ar)
+    {
+        ar(cereal::base_class<DepNode<InWorkerInfo>>(this), src_);
     }
 };
 
