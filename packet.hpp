@@ -396,4 +396,20 @@ void writeToArchive(const std::string& path, const T& src)
     }
 }
 
+template <class T>
+bool isCorrectArchive(const std::string& path)
+{
+    try {
+        std::ifstream ifs{path, std::ios::binary};
+        if (!ifs)
+            return false;
+        T cont;
+        readFromArchive<T>(cont, ifs);
+        return true;
+    }
+    catch (std::exception& ex) {
+        return false;
+    }
+}
+
 #endif

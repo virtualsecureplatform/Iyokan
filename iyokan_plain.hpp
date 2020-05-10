@@ -367,6 +367,7 @@ inline TaskNetwork<PlainWorkerInfo> makePlainROMNetwork(size_t inAddrWidth,
     return TaskNetwork<PlainWorkerInfo>(std::move(builder));
 }
 
+bool isSerializedPlainFrontend(const std::string &filepath);
 void doPlain(const Options &opt);
 void processAllGates(PlainNetwork &net, int numWorkers,
                      std::shared_ptr<ProgressGraphMaker> graph = nullptr);

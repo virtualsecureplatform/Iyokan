@@ -434,3 +434,8 @@ void doPlain(const Options &opt)
     if (opt.snapshotFile)
         writeToArchive(*opt.snapshotFile, frontend);
 }
+
+bool isSerializedPlainFrontend(const std::string &filepath)
+{
+    return isCorrectArchive<PlainFrontend>(filepath);
+}

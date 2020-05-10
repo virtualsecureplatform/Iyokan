@@ -879,3 +879,8 @@ void doCUFHE(const Options& opt)
     if (opt.snapshotFile)
         writeToArchive(*opt.snapshotFile, frontend);
 }
+
+bool isSerializedCUFHEFrontend(const std::string& path)
+{
+    return isCorrectArchive<CUFHEFrontend>(path);
+}

@@ -873,6 +873,7 @@ inline TaskNetwork<TFHEppWorkerInfo> makeTFHEppROMNetwork(
     return TaskNetwork<TFHEppWorkerInfo>(std::move(builder));
 }
 
+bool isSerializedTFHEppFrontend(const std::string &filepath);
 void doTFHE(const Options &opt);
 void processAllGates(TFHEppNetwork &net, int numWorkers, TFHEppWorkerInfo wi,
                      std::shared_ptr<ProgressGraphMaker> graph = nullptr);

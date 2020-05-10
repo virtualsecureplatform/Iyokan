@@ -104,6 +104,29 @@ int main(int argc, char **argv)
 
     AsyncThread::setNumThreads(opt.numCPUWorkers.value());
 
+    if (opt.resumeFile) {
+        switch (type) {
+        case TYPE::PLAIN:
+            if (!isSerializedPlainFrontend(*opt.resumeFile))
+                error::die("Invalid resume file: ", *opt.resumeFile);
+            break;
+
+        case TYPE::TFHE:
+#ifdef IYOKAN_CUDA_ENABLED
+            if (!isSerializedTFHEppFrontend(*opt.resumeFile)) {
+                if (!isSerializedCUFHEFrontend(*opt.resumeFile))
+                    error::die("Invalid resume file: ", *opt.resumeFile);
+                enableGPU = true;
+            }
+            break;
+#else
+            if (!isSerializedTFHEppFrontend(*opt.resumeFile))
+                error::die("Invalid resume file: ", *opt.resumeFile);
+            break;
+#endif
+        }
+    }
+
     switch (type) {
     case TYPE::PLAIN:
         doPlain(opt);

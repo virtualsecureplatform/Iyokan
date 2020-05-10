@@ -461,3 +461,8 @@ void doTFHE(const Options &opt)
     if (opt.snapshotFile)
         writeToArchive(*opt.snapshotFile, frontend);
 }
+
+bool isSerializedTFHEppFrontend(const std::string &filepath)
+{
+    return isCorrectArchive<TFHEppFrontend>(filepath);
+}
