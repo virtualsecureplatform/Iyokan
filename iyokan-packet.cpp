@@ -334,7 +334,7 @@ int main(int argc, char** argv)
 
     CLI11_PARSE(app, argc, argv);
 
-    spdlog::info("Start {}...", type2str(type));
+    spdlog::info("Starting {}...", type2str(type));
 
     auto start = high_resolution_clock::now();
     switch (type) {
