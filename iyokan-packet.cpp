@@ -347,6 +347,6 @@ int main(int argc, char** argv)
     }
     auto end = std::chrono::high_resolution_clock::now();
 
-    std::cerr << "Done. (" << duration_cast<seconds>(end - start).count()
-              << " seconds)" << std::endl;
+    spdlog::info("Done. ({} seconds)",
+                 duration_cast<seconds>(end - start).count());
 }
