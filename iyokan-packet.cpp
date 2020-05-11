@@ -264,7 +264,7 @@ int main(int argc, char** argv)
     using namespace utility;
     using namespace std::chrono;
 
-    error::initialize();
+    error::initialize("iyokan-packet");
 
     CLI::App app{"A simple toolset for Iyokan's packet"};
     app.require_subcommand();

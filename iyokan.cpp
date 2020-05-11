@@ -11,7 +11,7 @@
 
 int main(int argc, char **argv)
 {
-    error::initialize();
+    error::initialize("iyokan");
 
     CLI::App app{"Prallel FHE circuit evaluation engine."};
     app.require_subcommand();
