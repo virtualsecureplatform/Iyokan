@@ -7,9 +7,17 @@
 
 #include <backward.hpp>
 
+#include <spdlog/sinks/stdout_color_sinks.h>
 #include <spdlog/spdlog.h>
 
 namespace error {
+inline void initialize()
+{
+    spdlog::set_level(spdlog::level::info);
+    spdlog::drop_all();
+    spdlog::set_default_logger(spdlog::stderr_color_mt(""));
+}
+
 template <class... Args>
 [[noreturn]] void die(Args... args)
 {

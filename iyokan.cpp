@@ -11,7 +11,7 @@
 
 int main(int argc, char **argv)
 {
-    spdlog::set_level(spdlog::level::info);
+    error::initialize();
 
     CLI::App app{"Prallel FHE circuit evaluation engine."};
     app.require_subcommand();
