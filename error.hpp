@@ -25,13 +25,15 @@ template <class... Args>
 
     // Print error message
     std::stringstream ss;
-    (ss << ... << args) << std::endl;
+    (ss << ... << args);
 
+#ifndef NDEBUG
     // Print backtrace
     StackTrace st;
     st.load_here(32);
     Printer p;
     p.print(st, ss);
+#endif
 
     // Emit
     spdlog::error(ss.str());
