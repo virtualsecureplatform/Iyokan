@@ -801,22 +801,19 @@ public:
         }
 
         // Go computing
-        {
-            currentCycle_ = processCycles(
-                opt_.numCycles.value(),
-                [&](int currentCycle) {
-                    mayDumpPacket(currentCycle);
+        for (int i = 0; i < opt_.numCycles.value(); i++, currentCycle_++) {
+            spdlog::info("#{}", currentCycle_ + 1);
 
-                    runner.tick();
+            mayDumpPacket(currentCycle_);
 
-                    if (currentCycle == 0)
-                        setInitialRAM();
-                    setCircularInputs(currentCycle);
-
-                    runner.run();
-                    return false;
-                },
-                currentCycle_);
+            auto duration = timeit([&] {
+                runner.tick();
+                if (currentCycle_ == 0)
+                    setInitialRAM();
+                setCircularInputs(currentCycle_);
+                runner.run();
+            });
+            spdlog::info("\tdone. ({} us)", duration.count());
         }
 
         // Dump result packet

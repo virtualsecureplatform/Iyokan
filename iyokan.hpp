@@ -1876,27 +1876,12 @@ struct Options {
 };
 
 template <class Func>
-int processCycles(int numCycles, Func func, int initialCycle = 0)
+std::chrono::microseconds timeit(Func f)
 {
-    for (int i = initialCycle; i < initialCycle + numCycles; i++) {
-        spdlog::info("#{}", i + 1);
-
-        auto begin = std::chrono::high_resolution_clock::now();
-        bool shouldBreak = func(i);
-        auto end = std::chrono::high_resolution_clock::now();
-
-        auto duration =
-            std::chrono::duration_cast<std::chrono::microseconds>(end - begin)
-                .count();
-        spdlog::info("\tdone. ({} us)", duration);
-
-        if (shouldBreak) {
-            spdlog::info("break.");
-            return i + 1;
-        }
-    }
-
-    return initialCycle + numCycles;
+    auto begin = std::chrono::high_resolution_clock::now();
+    f();
+    auto end = std::chrono::high_resolution_clock::now();
+    return std::chrono::duration_cast<std::chrono::microseconds>(end - begin);
 }
 
 template <class WorkerInfo, class WorkerType>

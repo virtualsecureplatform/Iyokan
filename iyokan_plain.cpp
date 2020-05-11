@@ -359,27 +359,29 @@ public:
         {
             auto finflag = maybeGetAt("output", "finflag");
 
-            currentCycle_ = processCycles(
-                numCycles,
-                [&](int currentCycle) {
-                    if (opt_.dumpPrefix)
-                        writeToArchive(
-                            utility::fok(*opt_.dumpPrefix, "-", currentCycle),
-                            makeResPacket(currentCycle));
+            for (int i = 0; i < numCycles; i++, currentCycle_++) {
+                spdlog::info("#{}", currentCycle_ + 1);
 
+                if (opt_.dumpPrefix)
+                    writeToArchive(
+                        utility::fok(*opt_.dumpPrefix, "-", currentCycle_),
+                        makeResPacket(currentCycle_));
+
+                auto duration = timeit([&] {
                     runner.tick();
-
-                    if (currentCycle == 0)
+                    if (currentCycle_ == 0)
                         setInitialRAM();
-                    setCircularInputs(currentCycle);
-
+                    setCircularInputs(currentCycle_);
                     runner.run();
+                });
+                spdlog::info("\tdone. ({} us)", duration.count());
 
-                    if (finflag)
-                        return finflag->get() == 1_b;
-                    return false;
-                },
-                currentCycle_);
+                if (finflag && finflag->get() == 1_b) {
+                    spdlog::info("break.");
+                    currentCycle_++;
+                    break;
+                }
+            }
         }
 
         // Print the results
