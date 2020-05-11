@@ -5,6 +5,16 @@
 
 namespace {
 
+enum class TYPE {
+    GENKEY,
+    GENBKEY,
+    ENC,
+    DEC,
+    PACK,
+    PACKET2TOML,
+    TOML2PACKET,
+} type;
+
 using KeyVal = std::pair<std::string, std::string>;
 
 std::optional<std::vector<KeyVal>> parseKVOpts(const std::string& src)
@@ -211,6 +221,28 @@ void doToml2Packet(const std::string& in, const std::string& out)
     writeToArchive(out, pkt);
 }
 
+std::string type2str(TYPE t)
+{
+    switch (t) {
+    case TYPE::GENKEY:
+        return "genkey";
+    case TYPE::GENBKEY:
+        return "genbkey";
+    case TYPE::ENC:
+        return "enc";
+    case TYPE::DEC:
+        return "dec";
+    case TYPE::PACK:
+        return "pack";
+    case TYPE::PACKET2TOML:
+        return "packet2toml";
+    case TYPE::TOML2PACKET:
+        return "toml2packet";
+    }
+
+    assert(0);
+}
+
 }  // namespace
 
 int main(int argc, char** argv)
@@ -236,16 +268,6 @@ int main(int argc, char** argv)
 
     CLI::App app{"A simple toolset for Iyokan's packet"};
     app.require_subcommand();
-
-    enum class TYPE {
-        GENKEY,
-        GENBKEY,
-        ENC,
-        DEC,
-        PACK,
-        PACKET2TOML,
-        TOML2PACKET,
-    } type;
 
     std::string in = "", out = "", key = "", bkey = "";
     std::optional<std::string> rom, ram, bits;
@@ -347,6 +369,6 @@ int main(int argc, char** argv)
     }
     auto end = std::chrono::high_resolution_clock::now();
 
-    spdlog::info("Done. ({} seconds)",
+    spdlog::info("{} done. ({} seconds)", type2str(type),
                  duration_cast<seconds>(end - start).count());
 }
