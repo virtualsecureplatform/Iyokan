@@ -34,7 +34,7 @@ add_subdirectory(spdlog)
 
 set(IYOKAN_CXXFLAGS -Wall -Wextra -pedantic -Wno-sign-compare -g3)
 set(IYOKAN_CXXFLAGS_DEBUG   ${IYOKAN_CXXFLAGS} -O0)
-set(IYOKAN_CXXFLAGS_RELEASE ${IYOKAN_CXXFLAGS} -O3 -march=native)
+set(IYOKAN_CXXFLAGS_RELEASE ${IYOKAN_CXXFLAGS} -O3 -march=native -DNDEBUG)
 set(IYOKAN_INCLUDE_DIRS
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/picojson>
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/ThreadPool>
