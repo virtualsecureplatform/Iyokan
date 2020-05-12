@@ -2,10 +2,13 @@
 #define VIRTUALSECUREPLATFORM_IYOKAN_UTILITY_HPP
 
 #include <cassert>
+#include <chrono>
 #include <cmath>
 #include <iostream>
 #include <regex>
 #include <vector>
+
+#include <fmt/printf.h>
 
 namespace utility {
 template <class... Args>
@@ -16,14 +19,14 @@ std::string fok(Args... args)
     return ss.str();
 }
 
-inline std::vector<std::string> regexMatch(const std::string &text,
-                                           const std::regex &re)
+inline std::vector<std::string> regexMatch(const std::string& text,
+                                           const std::regex& re)
 {
     std::vector<std::string> ret;
     std::smatch m;
     if (!std::regex_match(text, m, re))
         return ret;
-    for (auto &&elm : m)
+    for (auto&& elm : m)
         ret.push_back(elm.str());
     return ret;
 }
@@ -36,6 +39,24 @@ inline bool isPowerOfTwo(uint64_t n)
 inline uint64_t log2(uint64_t n)
 {
     return std::log2(n);
+}
+
+inline std::ostream& operator<<(std::ostream& os,
+                                const std::chrono::system_clock::time_point& tp)
+{
+    using namespace std::chrono;
+
+    std::time_t tt = system_clock::to_time_t(tp);
+    std::tm* t = std::localtime(&tt);
+    auto fraction = duration_cast<milliseconds>(tp.time_since_epoch()) -
+                    duration_cast<milliseconds>(
+                        duration_cast<seconds>(tp.time_since_epoch()));
+
+    fmt::fprintf(os, "%04d-%02d-%02d %02d:%02d:%02d.%03ld", t->tm_year + 1900,
+                 t->tm_mon + 1, t->tm_mday, t->tm_hour, t->tm_min, t->tm_sec,
+                 fraction.count());
+
+    return os;
 }
 
 }  // namespace utility

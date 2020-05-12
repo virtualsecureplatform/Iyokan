@@ -29,6 +29,10 @@ int main(int argc, char **argv)
             ->check(CLI::PositiveNumber);
         plain->add_option("--dump-prefix", opt.dumpPrefix, "");
         auto optO = plain->add_option("-o,--out", opt.outputFile, "");
+        plain->add_flag_function(
+            "--stdout-csv,!--no-stdout-csv",
+            [&](int64_t count) { opt.stdoutCSV = count > 0 ? true : false; },
+            "");
         plain->add_option("--snapshot", opt.snapshotFile, "");
         plain->add_flag_callback(
             "--quiet", [] { spdlog::set_level(spdlog::level::err); }, "");
@@ -60,6 +64,10 @@ int main(int argc, char **argv)
         tfhe->add_option("--cpu", opt.numCPUWorkers, "")
             ->check(CLI::PositiveNumber);
         auto optO = tfhe->add_option("-o,--out", opt.outputFile, "");
+        tfhe->add_flag_function(
+            "--stdout-csv,!--no-stdout-csv",
+            [&](int64_t count) { opt.stdoutCSV = count > 0 ? true : false; },
+            "");
         tfhe->add_option("--snapshot", opt.snapshotFile, "");
         tfhe->add_flag_callback(
             "--quiet", [] { spdlog::set_level(spdlog::level::err); }, "");

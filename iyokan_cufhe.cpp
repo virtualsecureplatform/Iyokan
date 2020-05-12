@@ -802,7 +802,12 @@ public:
 
         // Go computing
         for (int i = 0; i < opt_.numCycles.value(); i++, currentCycle_++) {
+            using namespace utility;
+
             spdlog::info("#{}", currentCycle_ + 1);
+            if (opt_.stdoutCSV.value_or(false))
+                std::cout << std::chrono::system_clock::now() << ",start,"
+                          << currentCycle_ + 1 << std::endl;
 
             mayDumpPacket(currentCycle_);
 
@@ -814,6 +819,9 @@ public:
                 runner.run();
             });
             spdlog::info("\tdone. ({} us)", duration.count());
+            if (opt_.stdoutCSV.value_or(false))
+                std::cout << std::chrono::system_clock::now() << ",end,"
+                          << currentCycle_ + 1 << std::endl;
         }
 
         // Dump result packet

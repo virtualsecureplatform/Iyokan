@@ -1,5 +1,6 @@
 #include "iyokan_plain.hpp"
 #include "packet.hpp"
+#include "utility.hpp"
 
 namespace {
 
@@ -360,7 +361,12 @@ public:
             auto finflag = maybeGetAt("output", "finflag");
 
             for (int i = 0; i < numCycles; i++, currentCycle_++) {
+                using namespace utility;
+
                 spdlog::info("#{}", currentCycle_ + 1);
+                if (opt_.stdoutCSV.value_or(false))
+                    std::cout << std::chrono::system_clock::now() << ",start,"
+                              << currentCycle_ + 1 << std::endl;
 
                 if (opt_.dumpPrefix)
                     writeToArchive(
@@ -375,6 +381,9 @@ public:
                     runner.run();
                 });
                 spdlog::info("\tdone. ({} us)", duration.count());
+                if (opt_.stdoutCSV.value_or(false))
+                    std::cout << std::chrono::system_clock::now() << ",end,"
+                              << currentCycle_ + 1 << std::endl;
 
                 if (finflag && finflag->get() == 1_b) {
                     spdlog::info("break.");

@@ -1847,12 +1847,14 @@ struct Options {
                        numGPUWorkers = 80 * 10, numGPU = 1, numCycles;
     std::optional<std::string> inputFile, outputFile, secretKey, dumpPrefix,
         snapshotFile, resumeFile;
+    std::optional<bool> stdoutCSV;
 
     template <class Archive>
     void serialize(Archive &ar)
     {
         ar(blueprint, inputFile, outputFile, numCPUWorkers, numGPUWorkers,
-           numGPU, numCycles, secretKey, dumpPrefix, snapshotFile, resumeFile);
+           numGPU, numCycles, secretKey, dumpPrefix, snapshotFile, resumeFile,
+           stdoutCSV);
     }
 
     void merge(const Options &rhs)
