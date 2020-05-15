@@ -1848,33 +1848,6 @@ struct Options {
     std::optional<std::string> inputFile, outputFile, secretKey, dumpPrefix,
         snapshotFile, resumeFile;
     std::optional<bool> stdoutCSV;
-
-    template <class Archive>
-    void serialize(Archive &ar)
-    {
-        ar(blueprint, inputFile, outputFile, numCPUWorkers, numGPUWorkers,
-           numGPU, numCycles, secretKey, dumpPrefix, snapshotFile, resumeFile,
-           stdoutCSV);
-    }
-
-    void merge(const Options &rhs)
-    {
-#define MERGE_ONE(name) \
-    if (rhs.name)       \
-        name = rhs.name;
-        MERGE_ONE(blueprint);
-        MERGE_ONE(numCPUWorkers);
-        MERGE_ONE(numGPUWorkers);
-        MERGE_ONE(numGPU);
-        MERGE_ONE(numCycles);
-        MERGE_ONE(inputFile);
-        MERGE_ONE(outputFile);
-        MERGE_ONE(secretKey);
-        MERGE_ONE(dumpPrefix);
-        MERGE_ONE(snapshotFile);
-        MERGE_ONE(resumeFile);
-#undef MERGE_ONE
-    }
 };
 
 template <class Func>

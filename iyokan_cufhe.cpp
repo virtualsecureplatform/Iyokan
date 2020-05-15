@@ -371,18 +371,77 @@ public:
     }
 };
 
+struct CUFHERunParameter {
+    NetworkBlueprint blueprint;
+    int numCPUWorkers, numGPUWorkers, numGPU, numCycles;
+    std::string inputFile, outputFile;
+    bool stdoutCSV;
+
+    // nullopt means to disable that option.
+    std::optional<std::string> secretKey, dumpPrefix;
+
+    CUFHERunParameter()
+    {
+    }
+
+    CUFHERunParameter(const Options& opt)
+    {
+        blueprint = opt.blueprint.value();
+        numCPUWorkers =
+            opt.numCPUWorkers.value_or(std::thread::hardware_concurrency());
+        numGPUWorkers = opt.numGPUWorkers.value_or(80 * 10);
+        numGPU = opt.numGPU.value_or(1);
+        numCycles = opt.numCycles.value_or(-1);
+        inputFile = opt.inputFile.value();
+        outputFile = opt.outputFile.value();
+        stdoutCSV = opt.stdoutCSV.value_or(false);
+
+        dumpPrefix = opt.dumpPrefix;
+        secretKey = opt.secretKey;
+    }
+
+    void overwrite(const Options& opt)
+    {
+#define OVERWRITE(name) \
+    if (opt.name)       \
+        name = *opt.name;
+        OVERWRITE(blueprint);
+        OVERWRITE(numCPUWorkers);
+        OVERWRITE(numGPUWorkers);
+        OVERWRITE(numGPU);
+        OVERWRITE(numCycles);
+        OVERWRITE(inputFile);
+        OVERWRITE(outputFile);
+        OVERWRITE(stdoutCSV);
+        OVERWRITE(dumpPrefix);
+        OVERWRITE(secretKey);
+#undef OVERWRITE
+    }
+
+    template <class Archive>
+    void serialize(Archive& ar)
+    {
+        ar(blueprint, numCPUWorkers, numGPUWorkers, numGPU, numCycles,
+           inputFile, outputFile, stdoutCSV, secretKey, dumpPrefix);
+    }
+};
+
 class CUFHEFrontend {
 private:
+    CUFHERunParameter pr_;
     Name2TFHEppNetMap name2tnet_;
     Name2CUFHENetMap name2cnet_;
     std::vector<std::shared_ptr<CUFHE2TFHEppBridge>> bridges0_;
     std::vector<std::shared_ptr<TFHEpp2CUFHEBridge>> bridges1_;
-    Options opt_;
     TFHEPacket reqPacket_;
     int currentCycle_;
     bool cufheInitialized_;
 
 private:
+    // Don't allow to copy this object.
+    CUFHEFrontend(const CUFHEFrontend&);
+    CUFHEFrontend& operator=(const CUFHEFrontend&);
+
     template <class T = TaskCUFHEGate>
     std::shared_ptr<T> get(const blueprint::Port& port)
     {
@@ -417,7 +476,7 @@ private:
     std::shared_ptr<T> get_at(const std::string& kind,
                               const std::string& portName, int portBit = 0)
     {
-        auto port = opt_.blueprint->at(portName, portBit);
+        auto port = pr_.blueprint.at(portName, portBit);
         if (!port || port->portLabel.kind != kind)
             error::die("Invalid network. Not found: ", portName, "[", portBit,
                        "]");
@@ -452,7 +511,7 @@ private:
     std::shared_ptr<T> maybeGetAt(const std::string& kind,
                                   const std::string& portName, int portBit = 0)
     {
-        auto port = opt_.blueprint->at(portName, portBit);
+        auto port = pr_.blueprint.at(portName, portBit);
         if (!port || port->portLabel.kind != kind)
             return nullptr;
         return std::dynamic_pointer_cast<T>(maybeGet(*port));
@@ -464,7 +523,7 @@ private:
         resPacket.numCycles = numCycles;
 
         // Get values of output @port
-        for (auto&& [key, port] : opt_.blueprint->atPorts()) {
+        for (auto&& [key, port] : pr_.blueprint.atPorts()) {
             if (port.portLabel.kind != "output")
                 continue;
             auto& [atPortName, atPortBit] = key;
@@ -476,7 +535,7 @@ private:
         }
         // Get values of RAM
         // FIXME: subset of RAMs?
-        for (auto&& bp : opt_.blueprint->builtinRAMs()) {
+        for (auto&& bp : pr_.blueprint.builtinRAMs()) {
             using RAM_TYPE = blueprint::BuiltinRAM::TYPE;
             switch (bp.type) {
             case RAM_TYPE::CMUX_MEMORY: {
@@ -514,7 +573,7 @@ private:
 
     void setInitialRAM()
     {
-        for (const auto& bpram : opt_.blueprint->builtinRAMs()) {
+        for (const auto& bpram : pr_.blueprint.builtinRAMs()) {
             using RAM_TYPE = blueprint::BuiltinRAM::TYPE;
             switch (bpram.type) {
             case RAM_TYPE::CMUX_MEMORY: {
@@ -559,7 +618,7 @@ private:
     void setCircularInputs(int currentCycle)
     {
         // Find input @port
-        for (auto&& [key, port] : opt_.blueprint->atPorts()) {
+        for (auto&& [key, port] : pr_.blueprint.atPorts()) {
             if (port.portLabel.kind != "input")
                 continue;
             auto& [atPortName, atPortBit] = key;
@@ -570,7 +629,7 @@ private:
 
             // Calculate the index in the bit stream for the port.
             size_t index =
-                (opt_.blueprint->atPortWidths().at(atPortName) * currentCycle +
+                (pr_.blueprint.atPortWidths().at(atPortName) * currentCycle +
                  atPortBit) %
                 bits.size();
 
@@ -580,19 +639,19 @@ private:
 
     void mayDumpPacket(int currentCycle)
     {
-        if (!opt_.dumpPrefix)
+        if (!pr_.dumpPrefix)
             return;
         auto sk = std::make_shared<TFHEpp::SecretKey>();
-        readFromArchive(*sk, opt_.secretKey.value());
+        readFromArchive(*sk, pr_.secretKey.value());
         PlainPacket packet = makeResPacket(currentCycle).decrypt(*sk);
-        writeToArchive(utility::fok(*opt_.dumpPrefix, "-", currentCycle),
+        writeToArchive(utility::fok(*pr_.dumpPrefix, "-", currentCycle),
                        packet);
     }
 
     void initializeCUFHE()
     {
         assert(!cufheInitialized_);
-        cufhe::SetGPUNum(opt_.numGPU.value());
+        cufhe::SetGPUNum(pr_.numGPU);
         cufhe::SetSeed();
         cufhe::Initialize(*tfhepp2cufhe(*reqPacket_.gk));
         cufheInitialized_ = true;
@@ -604,17 +663,14 @@ public:
     }
 
     CUFHEFrontend(const Options& opt)
-        : opt_(opt),
-          reqPacket_(readFromArchive<TFHEPacket>(opt.inputFile.value())),
-          currentCycle_(0),
-          cufheInitialized_(false)
+        : pr_(opt), currentCycle_(0), cufheInitialized_(false)
     {
-        assert(opt.blueprint);
+        reqPacket_ = readFromArchive<TFHEPacket>(pr_.inputFile);
 
         // Prepare cuFHE
         initializeCUFHE();
 
-        const NetworkBlueprint& bp = *opt_.blueprint;
+        const NetworkBlueprint& bp = pr_.blueprint;
 
         // [[file]]
         for (const auto& file : bp.files())
@@ -765,16 +821,16 @@ public:
             cufhe::CleanUp();
     }
 
-    void mergeOptions(const Options& rhs)
+    void overwriteParams(const Options& rhs)
     {
-        opt_.merge(rhs);
+        pr_.overwrite(rhs);
     }
 
     void go()
     {
         // Make runner
         CUFHENetworkRunner runner{
-            opt_.numGPUWorkers.value(), opt_.numCPUWorkers.value(),
+            pr_.numGPUWorkers, pr_.numCPUWorkers,
             TFHEppWorkerInfo{TFHEpp::lweParams{}, reqPacket_.gk,
                              reqPacket_.ck}};
         for (auto&& p : name2cnet_)
@@ -801,11 +857,11 @@ public:
         }
 
         // Go computing
-        for (int i = 0; i < opt_.numCycles.value(); i++, currentCycle_++) {
+        for (int i = 0; i < pr_.numCycles; i++, currentCycle_++) {
             using namespace utility;
 
             spdlog::info("#{}", currentCycle_ + 1);
-            if (opt_.stdoutCSV.value_or(false))
+            if (pr_.stdoutCSV)
                 std::cout << std::chrono::system_clock::now() << ",start,"
                           << currentCycle_ + 1 << std::endl;
 
@@ -819,20 +875,20 @@ public:
                 runner.run();
             });
             spdlog::info("\tdone. ({} us)", duration.count());
-            if (opt_.stdoutCSV.value_or(false))
+            if (pr_.stdoutCSV)
                 std::cout << std::chrono::system_clock::now() << ",end,"
                           << currentCycle_ + 1 << std::endl;
         }
 
         // Dump result packet
         TFHEPacket resPacket = makeResPacket(currentCycle_);
-        writeToArchive(opt_.outputFile.value(), resPacket);
+        writeToArchive(pr_.outputFile, resPacket);
     }
 
     template <class Archive>
     void load(Archive& ar)
     {
-        ar(opt_, reqPacket_);
+        ar(pr_, reqPacket_);
         initializeCUFHE();
         ar(name2tnet_, name2cnet_, bridges0_, bridges1_, currentCycle_);
     }
@@ -840,7 +896,7 @@ public:
     template <class Archive>
     void save(Archive& ar) const
     {
-        ar(opt_, reqPacket_);
+        ar(pr_, reqPacket_);
         ar(name2tnet_, name2cnet_, bridges0_, bridges1_, currentCycle_);
     }
 };
@@ -875,14 +931,18 @@ void processAllGates(CUFHENetwork& net, int numWorkers,
 
 void doCUFHE(const Options& opt)
 {
-    auto frontend = opt.resumeFile
-                        ? readFromArchive<CUFHEFrontend>(*opt.resumeFile)
-                        : CUFHEFrontend{opt};
-    if (opt.resumeFile)
-        frontend.mergeOptions(opt);
-    frontend.go();
+    std::optional<CUFHEFrontend> frontend;
+    if (opt.resumeFile) {
+        frontend.emplace();
+        readFromArchive<CUFHEFrontend>(*frontend, *opt.resumeFile);
+        frontend->overwriteParams(opt);
+    }
+    else {
+        frontend.emplace(opt);
+    }
+    frontend->go();
     if (opt.snapshotFile)
-        writeToArchive(*opt.snapshotFile, frontend);
+        writeToArchive(*opt.snapshotFile, *frontend);
 }
 
 bool isSerializedCUFHEFrontend(const std::string& path)
