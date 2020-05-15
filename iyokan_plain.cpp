@@ -44,14 +44,66 @@ public:
     }
 };
 
+struct PlainRunParameter {
+    NetworkBlueprint blueprint;
+    int numCPUWorkers, numCycles;
+    std::string inputFile, outputFile;
+    bool stdoutCSV;
+
+    // nullopt means to disable that option.
+    std::optional<std::string> dumpPrefix;
+
+    PlainRunParameter()
+    {
+    }
+
+    PlainRunParameter(const Options &opt)
+    {
+        blueprint = opt.blueprint.value();
+        numCPUWorkers =
+            opt.numCPUWorkers.value_or(std::thread::hardware_concurrency());
+        numCycles = opt.numCycles.value_or(-1);
+        inputFile = opt.inputFile.value();
+        outputFile = opt.outputFile.value();
+        stdoutCSV = opt.stdoutCSV.value_or(false);
+
+        dumpPrefix = opt.dumpPrefix;
+    }
+
+    void overwrite(const Options &opt)
+    {
+#define OVERWRITE(name) \
+    if (opt.name)       \
+        name = *opt.name;
+        OVERWRITE(blueprint);
+        OVERWRITE(numCPUWorkers);
+        OVERWRITE(numCycles);
+        OVERWRITE(inputFile);
+        OVERWRITE(outputFile);
+        OVERWRITE(stdoutCSV);
+        OVERWRITE(dumpPrefix);
+#undef OVERWRITE
+    }
+
+    template <class Archive>
+    void serialize(Archive &ar)
+    {
+        ar(blueprint, numCPUWorkers, numCycles, inputFile, outputFile,
+           stdoutCSV, dumpPrefix);
+    }
+};
+
 class PlainFrontend {
 private:
+    PlainRunParameter pr_;
     Name2NetMap name2net_;
-    Options opt_;
     PlainPacket reqPacket_;
     int currentCycle_;
 
 private:
+    PlainFrontend(const PlainFrontend &);
+    PlainFrontend &operator=(const PlainFrontend &);
+
     template <class T = TaskPlainGate>
     std::shared_ptr<T> get(const blueprint::Port &port)
     {
@@ -70,7 +122,7 @@ private:
     std::shared_ptr<T> get_at(const std::string &kind,
                               const std::string &portName, int portBit = 0)
     {
-        auto port = opt_.blueprint->at(portName, portBit);
+        auto port = pr_.blueprint.at(portName, portBit);
         if (!port || port->portLabel.kind != kind)
             error::die("Invalid network. Not found: ", portName, "[", portBit,
                        "]");
@@ -94,7 +146,7 @@ private:
     std::shared_ptr<T> maybeGetAt(const std::string &kind,
                                   const std::string &portName, int portBit = 0)
     {
-        auto port = opt_.blueprint->at(portName, portBit);
+        auto port = pr_.blueprint.at(portName, portBit);
         if (!port || port->portLabel.kind != kind)
             return nullptr;
         return std::dynamic_pointer_cast<T>(maybeGet(*port));
@@ -105,7 +157,7 @@ private:
         PlainPacket resPacket;
         resPacket.numCycles = numCycles;
         // Get values of output @port
-        for (auto &&[key, port] : opt_.blueprint->atPorts()) {
+        for (auto &&[key, port] : pr_.blueprint.atPorts()) {
             if (port.portLabel.kind != "output")
                 continue;
             auto &[atPortName, atPortBit] = key;
@@ -116,7 +168,7 @@ private:
         }
         // Get values of RAM
         // FIXME: subset of RAMs?
-        for (auto &&bp : opt_.blueprint->builtinRAMs()) {
+        for (auto &&bp : pr_.blueprint.builtinRAMs()) {
             using RAM_TYPE = blueprint::BuiltinRAM::TYPE;
             switch (bp.type) {
             case RAM_TYPE::CMUX_MEMORY: {
@@ -175,7 +227,7 @@ private:
     void setCircularInputs(int currentCycle)
     {
         // Find input @port
-        for (auto &&[key, port] : opt_.blueprint->atPorts()) {
+        for (auto &&[key, port] : pr_.blueprint.atPorts()) {
             if (port.portLabel.kind != "input")
                 continue;
             auto &[atPortName, atPortBit] = key;
@@ -186,7 +238,7 @@ private:
 
             // Calculate the index in the bit stream for the port.
             size_t index =
-                (opt_.blueprint->atPortWidths().at(atPortName) * currentCycle +
+                (pr_.blueprint.atPortWidths().at(atPortName) * currentCycle +
                  atPortBit) %
                 bits.size();
 
@@ -199,15 +251,12 @@ public:
     {
     }
 
-    PlainFrontend(const Options &opt)
-        : opt_(opt),
-          reqPacket_(readFromArchive<PlainPacket>(opt.inputFile.value())),
-          currentCycle_(0)
+    PlainFrontend(const Options &opt) : pr_(opt), currentCycle_(0)
     {
-        assert(opt.blueprint);
+        reqPacket_ = readFromArchive<PlainPacket>(pr_.inputFile);
 
         // Create network according to blueprint and request packet
-        const NetworkBlueprint &bp = *opt_.blueprint;
+        const NetworkBlueprint &bp = pr_.blueprint;
 
         // [[file]]
         for (const auto &file : bp.files())
@@ -330,15 +379,15 @@ public:
         }
     }
 
-    void mergeOptions(const Options &rhs)
+    void overwriteParams(const Options &rhs)
     {
-        opt_.merge(rhs);
+        pr_.overwrite(rhs);
     }
 
     void go()
     {
         // Make runner
-        PlainNetworkRunner runner{opt_.numCPUWorkers.value()};
+        PlainNetworkRunner runner{pr_.numCPUWorkers};
         for (auto &&p : name2net_)
             runner.addNetwork(p.second);
 
@@ -352,9 +401,9 @@ public:
         }
 
         // Get # of cycles
-        int numCycles = opt_.numCycles.value_or(-1);
+        int numCycles = pr_.numCycles;
         if (numCycles < 0)
-            numCycles = std::numeric_limits<int>::max() / 2;
+            numCycles = std::numeric_limits<int>::max();
 
         // Go computing
         {
@@ -364,13 +413,13 @@ public:
                 using namespace utility;
 
                 spdlog::info("#{}", currentCycle_ + 1);
-                if (opt_.stdoutCSV.value_or(false))
+                if (pr_.stdoutCSV)
                     std::cout << std::chrono::system_clock::now() << ",start,"
                               << currentCycle_ + 1 << std::endl;
 
-                if (opt_.dumpPrefix)
+                if (pr_.dumpPrefix)
                     writeToArchive(
-                        utility::fok(*opt_.dumpPrefix, "-", currentCycle_),
+                        utility::fok(*pr_.dumpPrefix, "-", currentCycle_),
                         makeResPacket(currentCycle_));
 
                 auto duration = timeit([&] {
@@ -381,7 +430,7 @@ public:
                     runner.run();
                 });
                 spdlog::info("\tdone. ({} us)", duration.count());
-                if (opt_.stdoutCSV.value_or(false))
+                if (pr_.stdoutCSV)
                     std::cout << std::chrono::system_clock::now() << ",end,"
                               << currentCycle_ + 1 << std::endl;
 
@@ -395,13 +444,13 @@ public:
 
         // Print the results
         PlainPacket resPacket = makeResPacket(currentCycle_);
-        writeToArchive(opt_.outputFile.value(), resPacket);
+        writeToArchive(pr_.outputFile, resPacket);
     }
 
     template <class Archive>
     void serialize(Archive &ar)
     {
-        ar(name2net_, opt_, reqPacket_, currentCycle_);
+        ar(pr_, name2net_, reqPacket_, currentCycle_);
     }
 };
 
@@ -433,17 +482,20 @@ void processAllGates(PlainNetwork &net, int numWorkers,
     assert(readyQueue.empty());
 }
 
-#include <cereal/archives/portable_binary.hpp>
 void doPlain(const Options &opt)
 {
-    auto frontend = opt.resumeFile
-                        ? readFromArchive<PlainFrontend>(*opt.resumeFile)
-                        : PlainFrontend{opt};
-    if (opt.resumeFile)
-        frontend.mergeOptions(opt);
-    frontend.go();
+    std::optional<PlainFrontend> frontend;
+    if (opt.resumeFile) {
+        frontend.emplace();
+        readFromArchive<PlainFrontend>(*frontend, *opt.resumeFile);
+        frontend->overwriteParams(opt);
+    }
+    else {
+        frontend.emplace(opt);
+    }
+    frontend->go();
     if (opt.snapshotFile)
-        writeToArchive(*opt.snapshotFile, frontend);
+        writeToArchive(*opt.snapshotFile, *frontend);
 }
 
 bool isSerializedPlainFrontend(const std::string &filepath)
