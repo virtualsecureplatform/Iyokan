@@ -43,14 +43,69 @@ public:
     }
 };
 
+struct TFHEppRunParameter {
+    NetworkBlueprint blueprint;
+    int numCPUWorkers, numCycles;
+    std::string inputFile, outputFile;
+    bool stdoutCSV;
+
+    // nullopt means to disable that option.
+    std::optional<std::string> secretKey, dumpPrefix;
+
+    TFHEppRunParameter()
+    {
+    }
+
+    TFHEppRunParameter(const Options &opt)
+    {
+        blueprint = opt.blueprint.value();
+        numCPUWorkers =
+            opt.numCPUWorkers.value_or(std::thread::hardware_concurrency());
+        numCycles = opt.numCycles.value_or(-1);
+        inputFile = opt.inputFile.value();
+        outputFile = opt.outputFile.value();
+        stdoutCSV = opt.stdoutCSV.value_or(false);
+
+        dumpPrefix = opt.dumpPrefix;
+        secretKey = opt.secretKey;
+    }
+
+    void overwrite(const Options &opt)
+    {
+#define OVERWRITE(name) \
+    if (opt.name)       \
+        name = *opt.name;
+        OVERWRITE(blueprint);
+        OVERWRITE(numCPUWorkers);
+        OVERWRITE(numCycles);
+        OVERWRITE(inputFile);
+        OVERWRITE(outputFile);
+        OVERWRITE(stdoutCSV);
+        OVERWRITE(dumpPrefix);
+        OVERWRITE(secretKey);
+#undef OVERWRITE
+    }
+
+    template <class Archive>
+    void serialize(Archive &ar)
+    {
+        ar(blueprint, numCPUWorkers, numCycles, inputFile, outputFile,
+           stdoutCSV, dumpPrefix, secretKey);
+    }
+};
+
 class TFHEppFrontend {
 private:
+    TFHEppRunParameter pr_;
     Name2NetMap name2net_;
-    Options opt_;
     TFHEPacket reqPacket_;
     int currentCycle_;
 
 private:
+    // Don't allow to copy this object.
+    TFHEppFrontend(const TFHEppFrontend &);
+    TFHEppFrontend &operator=(const TFHEppFrontend &);
+
     template <class T = TaskTFHEppGate>
     std::shared_ptr<T> get(const blueprint::Port &port)
     {
@@ -69,7 +124,7 @@ private:
     std::shared_ptr<T> get_at(const std::string &kind,
                               const std::string &portName, int portBit = 0)
     {
-        auto port = opt_.blueprint->at(portName, portBit);
+        auto port = pr_.blueprint.at(portName, portBit);
         if (!port || port->portLabel.kind != kind)
             error::die("Invalid network. Not found: ", portName, "[", portBit,
                        "]");
@@ -93,7 +148,7 @@ private:
     std::shared_ptr<T> maybeGetAt(const std::string &kind,
                                   const std::string &portName, int portBit = 0)
     {
-        auto port = opt_.blueprint->at(portName, portBit);
+        auto port = pr_.blueprint.at(portName, portBit);
         if (!port || port->portLabel.kind != kind)
             return nullptr;
         return std::dynamic_pointer_cast<T>(maybeGet(*port));
@@ -105,7 +160,7 @@ private:
         resPacket.numCycles = numCycles;
 
         // Get values of output @port
-        for (auto &&[key, port] : opt_.blueprint->atPorts()) {
+        for (auto &&[key, port] : pr_.blueprint.atPorts()) {
             if (port.portLabel.kind != "output")
                 continue;
             auto &[atPortName, atPortBit] = key;
@@ -116,7 +171,7 @@ private:
         }
         // Get values of RAM
         // FIXME: subset of RAMs?
-        for (auto &&bp : opt_.blueprint->builtinRAMs()) {
+        for (auto &&bp : pr_.blueprint.builtinRAMs()) {
             using RAM_TYPE = blueprint::BuiltinRAM::TYPE;
             switch (bp.type) {
             case RAM_TYPE::CMUX_MEMORY: {
@@ -154,7 +209,7 @@ private:
 
     void setInitialRAM()
     {
-        for (const auto &bpram : opt_.blueprint->builtinRAMs()) {
+        for (const auto &bpram : pr_.blueprint.builtinRAMs()) {
             using RAM_TYPE = blueprint::BuiltinRAM::TYPE;
             switch (bpram.type) {
             case RAM_TYPE::CMUX_MEMORY: {
@@ -199,7 +254,7 @@ private:
     void setCircularInputs(int currentCycle)
     {
         // Find input @port
-        for (auto &&[key, port] : opt_.blueprint->atPorts()) {
+        for (auto &&[key, port] : pr_.blueprint.atPorts()) {
             if (port.portLabel.kind != "input")
                 continue;
             auto &[atPortName, atPortBit] = key;
@@ -210,7 +265,7 @@ private:
 
             // Calculate the index in the bit stream for the port.
             size_t index =
-                (opt_.blueprint->atPortWidths().at(atPortName) * currentCycle +
+                (pr_.blueprint.atPortWidths().at(atPortName) * currentCycle +
                  atPortBit) %
                 bits.size();
 
@@ -220,12 +275,12 @@ private:
 
     void mayDumpPacket(int currentCycle)
     {
-        if (!opt_.dumpPrefix)
+        if (!pr_.dumpPrefix)
             return;
         auto sk = std::make_shared<TFHEpp::SecretKey>();
-        readFromArchive(*sk, opt_.secretKey.value());
+        readFromArchive(*sk, pr_.secretKey.value());
         PlainPacket packet = makeResPacket(currentCycle).decrypt(*sk);
-        writeToArchive(utility::fok(*opt_.dumpPrefix, "-", currentCycle),
+        writeToArchive(utility::fok(*pr_.dumpPrefix, "-", currentCycle),
                        packet);
     }
 
@@ -234,13 +289,12 @@ public:
     {
     }
 
-    TFHEppFrontend(const Options &opt)
-        : opt_(opt),
-          reqPacket_(readFromArchive<TFHEPacket>(opt.inputFile.value())),
-          currentCycle_(0)
+    TFHEppFrontend(const Options &opt) : pr_(opt), currentCycle_(0)
     {
+        reqPacket_ = readFromArchive<TFHEPacket>(pr_.inputFile);
+
         // Create network according to blueprint
-        const NetworkBlueprint &bp = opt_.blueprint.value();
+        const NetworkBlueprint &bp = pr_.blueprint;
 
         // [[file]]
         for (const auto &file : bp.files())
@@ -364,16 +418,16 @@ public:
         }
     }
 
-    void mergeOptions(const Options &rhs)
+    void overwriteParams(const Options &rhs)
     {
-        opt_.merge(rhs);
+        pr_.overwrite(rhs);
     }
 
     void go()
     {
         // Make runner
         TFHEppWorkerInfo wi{TFHEpp::lweParams{}, reqPacket_.gk, reqPacket_.ck};
-        TFHEppNetworkRunner runner{opt_.numCPUWorkers.value(), wi};
+        TFHEppNetworkRunner runner{pr_.numCPUWorkers, wi};
         for (auto &&p : name2net_)
             runner.addNetwork(p.second);
 
@@ -391,11 +445,11 @@ public:
         }
 
         // Go computing
-        for (int i = 0; i < opt_.numCycles.value(); i++, currentCycle_++) {
+        for (int i = 0; i < pr_.numCycles; i++, currentCycle_++) {
             using namespace utility;
 
             spdlog::info("#{}", currentCycle_ + 1);
-            if (opt_.stdoutCSV.value_or(false))
+            if (pr_.stdoutCSV)
                 std::cout << std::chrono::system_clock::now() << ",start,"
                           << currentCycle_ + 1 << std::endl;
 
@@ -409,20 +463,20 @@ public:
                 runner.run();
             });
             spdlog::info("\tdone. ({} us)", duration.count());
-            if (opt_.stdoutCSV.value_or(false))
+            if (pr_.stdoutCSV)
                 std::cout << std::chrono::system_clock::now() << ",end,"
                           << currentCycle_ + 1 << std::endl;
         }
 
         // Dump result packet
         TFHEPacket resPacket = makeResPacket(currentCycle_);
-        writeToArchive(opt_.outputFile.value(), resPacket);
+        writeToArchive(pr_.outputFile, resPacket);
     }
 
     template <class Archive>
     void serialize(Archive &ar)
     {
-        ar(name2net_, opt_, reqPacket_, currentCycle_);
+        ar(pr_, name2net_, reqPacket_, currentCycle_);
     }
 };
 
@@ -456,14 +510,18 @@ void processAllGates(TFHEppNetwork &net, int numWorkers, TFHEppWorkerInfo wi,
 
 void doTFHE(const Options &opt)
 {
-    auto frontend = opt.resumeFile
-                        ? readFromArchive<TFHEppFrontend>(*opt.resumeFile)
-                        : TFHEppFrontend{opt};
-    if (opt.resumeFile)
-        frontend.mergeOptions(opt);
-    frontend.go();
+    std::optional<TFHEppFrontend> frontend;
+    if (opt.resumeFile) {
+        frontend.emplace();
+        readFromArchive<TFHEppFrontend>(*frontend, *opt.resumeFile);
+        frontend->overwriteParams(opt);
+    }
+    else {
+        frontend.emplace(opt);
+    }
+    frontend->go();
     if (opt.snapshotFile)
-        writeToArchive(*opt.snapshotFile, frontend);
+        writeToArchive(*opt.snapshotFile, *frontend);
 }
 
 bool isSerializedTFHEppFrontend(const std::string &filepath)
