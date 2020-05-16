@@ -85,6 +85,19 @@ struct PlainRunParameter {
 #undef OVERWRITE
     }
 
+    void print() const
+    {
+        spdlog::info("Run Parameters");
+        spdlog::info("\tMode: Plain");
+        spdlog::info("\tBlueprint: {}", blueprint.sourceFile());
+        spdlog::info("\t# of CPU workers: {}", numCPUWorkers);
+        spdlog::info("\t# of cycles: {}", numCycles);
+        spdlog::info("\tInput file (request packet): {}", inputFile);
+        spdlog::info("\tOutput file (result packet): {}", outputFile);
+        spdlog::info("\t--stdoutCSV: {}", stdoutCSV);
+        spdlog::info("\t--dump-prefix: {}", dumpPrefix.value_or("(none)"));
+    }
+
     template <class Archive>
     void serialize(Archive &ar)
     {
@@ -386,6 +399,8 @@ public:
 
     void go()
     {
+        pr_.print();
+
         // Make runner
         PlainNetworkRunner runner{pr_.numCPUWorkers};
         for (auto &&p : name2net_)
@@ -484,6 +499,8 @@ void processAllGates(PlainNetwork &net, int numWorkers,
 
 void doPlain(const Options &opt)
 {
+    opt.print();
+
     std::optional<PlainFrontend> frontend;
     if (opt.resumeFile) {
         frontend.emplace();

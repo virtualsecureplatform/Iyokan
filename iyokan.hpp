@@ -1616,6 +1616,7 @@ struct Port {
 
 class NetworkBlueprint {
 private:
+    std::string sourceFile_;
     std::vector<blueprint::File> files_;
     std::vector<blueprint::BuiltinROM> builtinROMs_;
     std::vector<blueprint::BuiltinRAM> builtinRAMs_;
@@ -1628,7 +1629,8 @@ public:
     template <class Archive>
     void serialize(Archive &ar)
     {
-        ar(files_, builtinROMs_, builtinRAMs_, edges_, atPorts_, atPortWidths_);
+        ar(sourceFile_, files_, builtinROMs_, builtinRAMs_, edges_, atPorts_,
+           atPortWidths_);
     }
 
 private:
@@ -1672,7 +1674,7 @@ public:
     {
     }
 
-    NetworkBlueprint(const std::string &fileName)
+    NetworkBlueprint(const std::string &fileName) : sourceFile_(fileName)
     {
         namespace fs = std::filesystem;
 
@@ -1799,6 +1801,11 @@ public:
         }
     }
 
+    const std::string &sourceFile() const
+    {
+        return sourceFile_;
+    }
+
     const std::vector<blueprint::File> &files() const
     {
         return files_;
@@ -1847,6 +1854,35 @@ struct Options {
     std::optional<std::string> inputFile, outputFile, secretKey, dumpPrefix,
         snapshotFile, resumeFile;
     std::optional<bool> stdoutCSV;
+
+    void print() const
+    {
+        spdlog::info("Options");
+        if (blueprint)
+            spdlog::info("\tBlueprint: {}", blueprint->sourceFile());
+        if (numCPUWorkers)
+            spdlog::info("\t# of CPU workers: {}", *numCPUWorkers);
+        if (numGPUWorkers)
+            spdlog::info("\t# of GPU workers: {}", *numGPUWorkers);
+        if (numGPU)
+            spdlog::info("\t# of GPUs: {}", *numGPU);
+        if (numCycles)
+            spdlog::info("\t# of cycles: {}", *numCycles);
+        if (inputFile)
+            spdlog::info("\tInput file (request packet): {}", *inputFile);
+        if (outputFile)
+            spdlog::info("\tOutput file (result packet): {}", *outputFile);
+        if (secretKey)
+            spdlog::info("\t--secret-key: {}", *secretKey);
+        if (dumpPrefix)
+            spdlog::info("\t--dump-prefix: {}", *dumpPrefix);
+        if (snapshotFile)
+            spdlog::info("\t--snapshot: {}", *snapshotFile);
+        if (resumeFile)
+            spdlog::info("\t--resume: {}", *resumeFile);
+        if (stdoutCSV)
+            spdlog::info("\t--stdoutCSV: {}", *stdoutCSV);
+    }
 };
 
 template <class Func>

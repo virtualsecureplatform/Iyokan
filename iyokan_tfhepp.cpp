@@ -86,6 +86,20 @@ struct TFHEppRunParameter {
 #undef OVERWRITE
     }
 
+    void print() const
+    {
+        spdlog::info("Run Parameters");
+        spdlog::info("\tMode: TFHEpp");
+        spdlog::info("\tBlueprint: {}", blueprint.sourceFile());
+        spdlog::info("\t# of CPU workers: {}", numCPUWorkers);
+        spdlog::info("\t# of cycles: {}", numCycles);
+        spdlog::info("\tInput file (request packet): {}", inputFile);
+        spdlog::info("\tOutput file (result packet): {}", outputFile);
+        spdlog::info("\t--stdoutCSV: {}", stdoutCSV);
+        spdlog::info("\t--secret-key: {}", secretKey.value_or("(none)"));
+        spdlog::info("\t--dump-prefix: {}", dumpPrefix.value_or("(none)"));
+    }
+
     template <class Archive>
     void serialize(Archive &ar)
     {
@@ -425,6 +439,8 @@ public:
 
     void go()
     {
+        pr_.print();
+
         // Make runner
         TFHEppWorkerInfo wi{TFHEpp::lweParams{}, reqPacket_.gk, reqPacket_.ck};
         TFHEppNetworkRunner runner{pr_.numCPUWorkers, wi};
@@ -510,6 +526,8 @@ void processAllGates(TFHEppNetwork &net, int numWorkers, TFHEppWorkerInfo wi,
 
 void doTFHE(const Options &opt)
 {
+    opt.print();
+
     std::optional<TFHEppFrontend> frontend;
     if (opt.resumeFile) {
         frontend.emplace();

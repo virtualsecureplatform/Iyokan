@@ -418,6 +418,22 @@ struct CUFHERunParameter {
 #undef OVERWRITE
     }
 
+    void print() const
+    {
+        spdlog::info("Run Parameters");
+        spdlog::info("\tMode: cuFHE");
+        spdlog::info("\tBlueprint: {}", blueprint.sourceFile());
+        spdlog::info("\t# of CPU workers: {}", numCPUWorkers);
+        spdlog::info("\t# of GPU workers: {}", numGPUWorkers);
+        spdlog::info("\t# of GPUs: {}", numGPU);
+        spdlog::info("\t# of cycles: {}", numCycles);
+        spdlog::info("\tInput file (request packet): {}", inputFile);
+        spdlog::info("\tOutput file (result packet): {}", outputFile);
+        spdlog::info("\t--stdoutCSV: {}", stdoutCSV);
+        spdlog::info("\t--secret-key: {}", secretKey.value_or("(none)"));
+        spdlog::info("\t--dump-prefix: {}", dumpPrefix.value_or("(none)"));
+    }
+
     template <class Archive>
     void serialize(Archive& ar)
     {
@@ -828,6 +844,8 @@ public:
 
     void go()
     {
+        pr_.print();
+
         // Make runner
         CUFHENetworkRunner runner{
             pr_.numGPUWorkers, pr_.numCPUWorkers,
@@ -931,6 +949,8 @@ void processAllGates(CUFHENetwork& net, int numWorkers,
 
 void doCUFHE(const Options& opt)
 {
+    opt.print();
+
     std::optional<CUFHEFrontend> frontend;
     if (opt.resumeFile) {
         frontend.emplace();
