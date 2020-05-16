@@ -1843,8 +1843,7 @@ public:
 
 struct Options {
     std::optional<NetworkBlueprint> blueprint;
-    std::optional<int> numCPUWorkers = std::thread::hardware_concurrency(),
-                       numGPUWorkers = 80 * 10, numGPU = 1, numCycles;
+    std::optional<int> numCPUWorkers, numGPUWorkers, numGPU, numCycles;
     std::optional<std::string> inputFile, outputFile, secretKey, dumpPrefix,
         snapshotFile, resumeFile;
     std::optional<bool> stdoutCSV;

@@ -19,7 +19,6 @@ int main(int argc, char **argv)
     enum class TYPE { PLAIN, TFHE } type;
     Options opt;
     bool enableGPU = false;
-    std::optional<std::string> blueprintFilePath;
 
     {
         CLI::App *plain = app.add_subcommand("plain", "");
@@ -44,7 +43,12 @@ int main(int argc, char **argv)
         ogroups->require_option(1);
 
         auto newRun = ogroups->add_option_group("new run", "A new run");
-        newRun->add_option("--blueprint", blueprintFilePath, "")
+        newRun
+            ->add_option_function<std::string>(
+                "--blueprint",
+                [&](auto &&filepath) {
+                    opt.blueprint = NetworkBlueprint{filepath};
+                })
             ->required()
             ->check(CLI::ExistingFile);
         newRun->add_option("-i,--in", opt.inputFile, "")
@@ -91,7 +95,12 @@ int main(int argc, char **argv)
         ogroups->require_option(1);
 
         auto newRun = ogroups->add_option_group("new run", "A new run");
-        newRun->add_option("--blueprint", blueprintFilePath, "")
+        newRun
+            ->add_option_function<std::string>(
+                "--blueprint",
+                [&](auto &&filepath) {
+                    opt.blueprint = NetworkBlueprint{filepath};
+                })
             ->required()
             ->check(CLI::ExistingFile);
         newRun->add_option("-i,--in", opt.inputFile, "")
@@ -109,11 +118,6 @@ int main(int argc, char **argv)
 
     CLI11_PARSE(app, argc, argv);
 
-    if (blueprintFilePath)
-        opt.blueprint = NetworkBlueprint{*blueprintFilePath};
-
-    AsyncThread::setNumThreads(opt.numCPUWorkers.value());
-
     if (opt.resumeFile) {
         switch (type) {
         case TYPE::PLAIN:
@@ -122,20 +126,19 @@ int main(int argc, char **argv)
             break;
 
         case TYPE::TFHE:
-#ifdef IYOKAN_CUDA_ENABLED
             if (!isSerializedTFHEppFrontend(*opt.resumeFile)) {
-                if (!isSerializedCUFHEFrontend(*opt.resumeFile))
+#ifdef IYOKAN_CUDA_ENABLED
+                if (isSerializedCUFHEFrontend(*opt.resumeFile))
+                    enableGPU = true;
+                else
+#endif
                     error::die("Invalid resume file: ", *opt.resumeFile);
-                enableGPU = true;
             }
             break;
-#else
-            if (!isSerializedTFHEppFrontend(*opt.resumeFile))
-                error::die("Invalid resume file: ", *opt.resumeFile);
-            break;
-#endif
         }
     }
+
+    AsyncThread::setNumThreads(std::thread::hardware_concurrency());
 
     switch (type) {
     case TYPE::PLAIN:
