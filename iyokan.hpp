@@ -1801,6 +1801,17 @@ public:
         }
     }
 
+    bool needsCircuitKey() const
+    {
+        for (const auto &bprom : builtinROMs_)
+            if (bprom.type == blueprint::BuiltinROM::TYPE::CMUX_MEMORY)
+                return true;
+        for (const auto &bpram : builtinRAMs_)
+            if (bpram.type == blueprint::BuiltinRAM::TYPE::CMUX_MEMORY)
+                return true;
+        return false;
+    }
+
     const std::string &sourceFile() const
     {
         return sourceFile_;
@@ -1851,8 +1862,8 @@ public:
 struct Options {
     std::optional<NetworkBlueprint> blueprint;
     std::optional<int> numCPUWorkers, numGPUWorkers, numGPU, numCycles;
-    std::optional<std::string> inputFile, outputFile, secretKey, dumpPrefix,
-        snapshotFile, resumeFile;
+    std::optional<std::string> bkeyFile, inputFile, outputFile, secretKey,
+        dumpPrefix, snapshotFile, resumeFile;
     std::optional<bool> stdoutCSV;
 
     void print() const
@@ -1868,6 +1879,8 @@ struct Options {
             spdlog::info("\t# of GPUs: {}", *numGPU);
         if (numCycles)
             spdlog::info("\t# of cycles: {}", *numCycles);
+        if (bkeyFile)
+            spdlog::info("\tBKey file: {}", *bkeyFile);
         if (inputFile)
             spdlog::info("\tInput file (request packet): {}", *inputFile);
         if (outputFile)

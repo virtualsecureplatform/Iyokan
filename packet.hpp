@@ -253,13 +253,10 @@ struct PlainPacket {
         ar(ram, rom, bits, numCycles);
     }
 
-    inline TFHEPacket encrypt(const TFHEpp::SecretKey& key,
-                              const TFHEppBKey& bkey) const;
+    inline TFHEPacket encrypt(const TFHEpp::SecretKey& key) const;
 };
 
 struct TFHEPacket {
-    std::shared_ptr<TFHEpp::GateKey> gk;
-    std::shared_ptr<TFHEpp::CircuitKey> ck;
     std::unordered_map<std::string, std::vector<TFHEpp::TRLWElvl1>> ram;
     std::unordered_map<std::string, std::vector<TFHEpp::TLWElvl0>> ramInTLWE;
     std::unordered_map<std::string, std::vector<TFHEpp::TRLWElvl1>> rom;
@@ -270,16 +267,15 @@ struct TFHEPacket {
     template <class Archive>
     void serialize(Archive& ar)
     {
-        ar(gk, ck, ram, ramInTLWE, rom, romInTLWE, bits, numCycles);
+        ar(ram, ramInTLWE, rom, romInTLWE, bits, numCycles);
     }
 
     inline PlainPacket decrypt(const TFHEpp::SecretKey& key) const;
 };
 
-TFHEPacket PlainPacket::encrypt(const TFHEpp::SecretKey& key,
-                                const TFHEppBKey& bkey) const
+TFHEPacket PlainPacket::encrypt(const TFHEpp::SecretKey& key) const
 {
-    TFHEPacket tfhe{bkey.gk, bkey.ck, {}, {}, {}, {}, {}, numCycles};
+    TFHEPacket tfhe{{}, {}, {}, {}, {}, numCycles};
 
     // Encrypt RAM
     for (auto&& [name, src] : ram) {

@@ -64,6 +64,7 @@ int main(int argc, char **argv)
     {
         CLI::App *tfhe = app.add_subcommand("tfhe", "");
         tfhe->parse_complete_callback([&] { type = TYPE::TFHE; });
+        tfhe->add_option("--bkey", opt.bkeyFile, "")->required();
         auto optC = tfhe->add_option("-c", opt.numCycles, "");
         tfhe->add_option("--cpu", opt.numCPUWorkers, "")
             ->check(CLI::PositiveNumber);

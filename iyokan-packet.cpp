@@ -152,12 +152,12 @@ void doGenBKeyTFHEpp(const std::string& in, const std::string& out)
     writeToArchive(out, bk);
 }
 
-void doEnc(const std::string& key, const std::string& bkey,
-           const std::string& in, const std::string& out)
+void doEnc(const std::string& key, const std::string& in,
+           const std::string& out)
 {
     auto sk = readFromArchive<TFHEpp::SecretKey>(key);
     auto pkt = readFromArchive<PlainPacket>(in);
-    auto encPkt = pkt.encrypt(sk, readFromArchive<TFHEppBKey>(bkey));
+    auto encPkt = pkt.encrypt(sk);
     writeToArchive(out, encPkt);
 }
 
@@ -297,7 +297,6 @@ int main(int argc, char** argv)
         CLI::App* sub = app.add_subcommand("enc", "");
         sub->parse_complete_callback([&] { type = TYPE::ENC; });
         sub->add_option("--key", key)->required();
-        sub->add_option("--bkey", bkey)->required();
         sub->add_option("-i,--in", in)->required();
         sub->add_option("-o,--out", out)->required();
     }
@@ -349,7 +348,7 @@ int main(int argc, char** argv)
 
     case TYPE::ENC:
         // FIXME: Assume the key type is TFHEpp
-        doEnc(key, bkey, in, out);
+        doEnc(key, in, out);
         break;
 
     case TYPE::DEC:

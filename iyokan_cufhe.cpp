@@ -374,7 +374,7 @@ public:
 struct CUFHERunParameter {
     NetworkBlueprint blueprint;
     int numCPUWorkers, numGPUWorkers, numGPU, numCycles;
-    std::string inputFile, outputFile;
+    std::string bkeyFile, inputFile, outputFile;
     bool stdoutCSV;
 
     // nullopt means to disable that option.
@@ -392,6 +392,7 @@ struct CUFHERunParameter {
         numGPUWorkers = opt.numGPUWorkers.value_or(80 * 10);
         numGPU = opt.numGPU.value_or(1);
         numCycles = opt.numCycles.value_or(-1);
+        bkeyFile = opt.bkeyFile.value();
         inputFile = opt.inputFile.value();
         outputFile = opt.outputFile.value();
         stdoutCSV = opt.stdoutCSV.value_or(false);
@@ -410,6 +411,7 @@ struct CUFHERunParameter {
         OVERWRITE(numGPUWorkers);
         OVERWRITE(numGPU);
         OVERWRITE(numCycles);
+        OVERWRITE(bkeyFile);
         OVERWRITE(inputFile);
         OVERWRITE(outputFile);
         OVERWRITE(stdoutCSV);
@@ -427,6 +429,7 @@ struct CUFHERunParameter {
         spdlog::info("\t# of GPU workers: {}", numGPUWorkers);
         spdlog::info("\t# of GPUs: {}", numGPU);
         spdlog::info("\t# of cycles: {}", numCycles);
+        spdlog::info("\tBKey file: {}", bkeyFile);
         spdlog::info("\tInput file (request packet): {}", inputFile);
         spdlog::info("\tOutput file (result packet): {}", outputFile);
         spdlog::info("\t--stdoutCSV: {}", stdoutCSV);
@@ -437,7 +440,7 @@ struct CUFHERunParameter {
     template <class Archive>
     void serialize(Archive& ar)
     {
-        ar(blueprint, numCPUWorkers, numGPUWorkers, numGPU, numCycles,
+        ar(blueprint, numCPUWorkers, numGPUWorkers, numGPU, numCycles, bkeyFile,
            inputFile, outputFile, stdoutCSV, secretKey, dumpPrefix);
     }
 };
@@ -450,6 +453,7 @@ private:
     std::vector<std::shared_ptr<CUFHE2TFHEppBridge>> bridges0_;
     std::vector<std::shared_ptr<TFHEpp2CUFHEBridge>> bridges1_;
     TFHEPacket reqPacket_;
+    TFHEppBKey bkey_;
     int currentCycle_;
     bool cufheInitialized_;
 
@@ -669,7 +673,7 @@ private:
         assert(!cufheInitialized_);
         cufhe::SetGPUNum(pr_.numGPU);
         cufhe::SetSeed();
-        cufhe::Initialize(*tfhepp2cufhe(*reqPacket_.gk));
+        cufhe::Initialize(*tfhepp2cufhe(*bkey_.gk));
         cufheInitialized_ = true;
     }
 
@@ -682,6 +686,7 @@ public:
         : pr_(opt), currentCycle_(0), cufheInitialized_(false)
     {
         reqPacket_ = readFromArchive<TFHEPacket>(pr_.inputFile);
+        bkey_ = readFromArchive<TFHEppBKey>(pr_.bkeyFile);
 
         // Prepare cuFHE
         initializeCUFHE();
@@ -695,7 +700,6 @@ public:
 
         // [[builtin]] type = ram | type = mux-ram
         for (const auto& ram : bp.builtinRAMs()) {
-            assert(reqPacket_.ck);
             assert(ram.inAddrWidth == 8 && ram.inWdataWidth == 8 &&
                    ram.outRdataWidth == 8);
 
@@ -723,8 +727,6 @@ public:
             using ROM_TYPE = blueprint::BuiltinROM::TYPE;
             switch (bprom.type) {
             case ROM_TYPE::CMUX_MEMORY: {
-                assert(reqPacket_.ck);
-
                 if (!utility::isPowerOfTwo(bprom.outRdataWidth))
                     error::die("Invalid out_rdata_width of ROM \"", bprom.name,
                                "\": ", "must be a power of 2.");
@@ -846,11 +848,14 @@ public:
     {
         pr_.print();
 
+        // Check bkey is correct.
+        if (!bkey_.gk || (pr_.blueprint.needsCircuitKey() && !bkey_.ck))
+            error::die("Invalid bootstrapping key");
+
         // Make runner
         CUFHENetworkRunner runner{
             pr_.numGPUWorkers, pr_.numCPUWorkers,
-            TFHEppWorkerInfo{TFHEpp::lweParams{}, reqPacket_.gk,
-                             reqPacket_.ck}};
+            TFHEppWorkerInfo{TFHEpp::lweParams{}, bkey_.gk, bkey_.ck}};
         for (auto&& p : name2cnet_)
             runner.addNetwork(p.second);
         for (auto&& p : name2tnet_)
@@ -907,6 +912,7 @@ public:
     void load(Archive& ar)
     {
         ar(pr_, reqPacket_);
+        bkey_ = readFromArchive<TFHEppBKey>(pr_.bkeyFile);
         initializeCUFHE();
         ar(name2tnet_, name2cnet_, bridges0_, bridges1_, currentCycle_);
     }

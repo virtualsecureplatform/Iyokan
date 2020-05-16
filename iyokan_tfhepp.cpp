@@ -46,7 +46,7 @@ public:
 struct TFHEppRunParameter {
     NetworkBlueprint blueprint;
     int numCPUWorkers, numCycles;
-    std::string inputFile, outputFile;
+    std::string bkeyFile, inputFile, outputFile;
     bool stdoutCSV;
 
     // nullopt means to disable that option.
@@ -62,6 +62,7 @@ struct TFHEppRunParameter {
         numCPUWorkers =
             opt.numCPUWorkers.value_or(std::thread::hardware_concurrency());
         numCycles = opt.numCycles.value_or(-1);
+        bkeyFile = opt.bkeyFile.value();
         inputFile = opt.inputFile.value();
         outputFile = opt.outputFile.value();
         stdoutCSV = opt.stdoutCSV.value_or(false);
@@ -78,6 +79,7 @@ struct TFHEppRunParameter {
         OVERWRITE(blueprint);
         OVERWRITE(numCPUWorkers);
         OVERWRITE(numCycles);
+        OVERWRITE(bkeyFile);
         OVERWRITE(inputFile);
         OVERWRITE(outputFile);
         OVERWRITE(stdoutCSV);
@@ -93,6 +95,7 @@ struct TFHEppRunParameter {
         spdlog::info("\tBlueprint: {}", blueprint.sourceFile());
         spdlog::info("\t# of CPU workers: {}", numCPUWorkers);
         spdlog::info("\t# of cycles: {}", numCycles);
+        spdlog::info("\tBKey file: {}", bkeyFile);
         spdlog::info("\tInput file (request packet): {}", inputFile);
         spdlog::info("\tOutput file (result packet): {}", outputFile);
         spdlog::info("\t--stdoutCSV: {}", stdoutCSV);
@@ -103,7 +106,7 @@ struct TFHEppRunParameter {
     template <class Archive>
     void serialize(Archive &ar)
     {
-        ar(blueprint, numCPUWorkers, numCycles, inputFile, outputFile,
+        ar(blueprint, numCPUWorkers, numCycles, bkeyFile, inputFile, outputFile,
            stdoutCSV, dumpPrefix, secretKey);
     }
 };
@@ -317,7 +320,6 @@ public:
 
         // [[builtin]] type = ram | type = mux-ram
         for (const auto &ram : bp.builtinRAMs()) {
-            assert(reqPacket_.ck);
             assert(ram.inAddrWidth == 8 && ram.inWdataWidth == 8 &&
                    ram.outRdataWidth == 8);
 
@@ -343,8 +345,6 @@ public:
             using ROM_TYPE = blueprint::BuiltinROM::TYPE;
             switch (bprom.type) {
             case ROM_TYPE::CMUX_MEMORY: {
-                assert(reqPacket_.ck);
-
                 if (!utility::isPowerOfTwo(bprom.outRdataWidth))
                     error::die("Invalid out_rdata_width of ROM \"", bprom.name,
                                "\": ", "must be a power of 2.");
@@ -441,8 +441,15 @@ public:
     {
         pr_.print();
 
+        // Read bkey
+        auto bkey = readFromArchive<TFHEppBKey>(pr_.bkeyFile);
+
+        // Check bkey is correct.
+        if (!bkey.gk || (pr_.blueprint.needsCircuitKey() && !bkey.ck))
+            error::die("Invalid bootstrapping key");
+
         // Make runner
-        TFHEppWorkerInfo wi{TFHEpp::lweParams{}, reqPacket_.gk, reqPacket_.ck};
+        TFHEppWorkerInfo wi{TFHEpp::lweParams{}, bkey.gk, bkey.ck};
         TFHEppNetworkRunner runner{pr_.numCPUWorkers, wi};
         for (auto &&p : name2net_)
             runner.addNetwork(p.second);

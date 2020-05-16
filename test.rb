@@ -126,7 +126,7 @@ def test_iyokan_packet_e2e(in_file)
 
   run_iyokan_packet ["toml2packet", "--in", in_file, "--out", plain_pkt]
   if $SLOW_MODE_ENABLED
-    run_iyokan_packet ["enc", "--key", skey, "--bkey", bkey, "--in", plain_pkt, "--out", pkt]
+    run_iyokan_packet ["enc", "--key", skey, "--in", plain_pkt, "--out", pkt]
     run_iyokan_packet ["dec", "--key", skey, "--in", pkt, "--out", plain_pkt]
   end
   r = run_iyokan_packet ["packet2toml", "--in", plain_pkt]
@@ -152,7 +152,7 @@ def test_in_out(blueprint, in_file, out_file, args0 = [], args1 = [], args2 = []
   req_file = "_test_req_packet"
   res_file = "_test_res_packet"
   secret_key = "_test_sk"
-  bootstrapping_key = "_test_bk"
+  bkey = "_test_bk"
   snapshot0 = "_test_snapshot0"
   snapshot1 = "_test_snapshot1"
   cycles = -1
@@ -193,7 +193,6 @@ def test_in_out(blueprint, in_file, out_file, args0 = [], args1 = [], args2 = []
   if $SLOW_MODE_ENABLED
     run_iyokan_packet ["enc",
                        "--key", secret_key,
-                       "--bkey", bootstrapping_key,
                        "--in", plain_req_file,
                        "--out", req_file]
 
@@ -204,20 +203,24 @@ def test_in_out(blueprint, in_file, out_file, args0 = [], args1 = [], args2 = []
         run_iyokan ["tfhe",
                     "--blueprint", blueprint,
                     "-c", 1,
+                    "--bkey", bkey,
                     "-i", req_file,
                     "-o", res_file,
                     "--snapshot", snapshot0]
         run_iyokan ["tfhe",
                     "--resume", snapshot0,
+                    "--bkey", bkey,
                     "--snapshot", snapshot1]
         run_iyokan ["tfhe",
                     "--resume", snapshot1,
+                    "--bkey", bkey,
                     "-c", cycles - 2]
       else
         ## Don't use snapshot in complex situations
         run_iyokan ["tfhe",
                     "--blueprint", blueprint,
                     "-c", cycles,
+                    "--bkey", bkey,
                     "-i", req_file,
                     "-o", res_file] + args1
       end
@@ -241,14 +244,17 @@ def test_in_out(blueprint, in_file, out_file, args0 = [], args1 = [], args2 = []
                       "--enable-gpu",
                       "--blueprint", blueprint,
                       "-c", 1,
+                      "--bkey", bkey,
                       "-i", req_file,
                       "-o", res_file,
                       "--snapshot", snapshot0]
           run_iyokan ["tfhe",
                       "--resume", snapshot0,
+                      "--bkey", bkey,
                       "--snapshot", snapshot1]
           run_iyokan ["tfhe",
                       "--resume", snapshot1,
+                      "--bkey", bkey,
                       "-c", cycles - 2]
         else
           ## Dont use snapshot in complex situations.
@@ -256,6 +262,7 @@ def test_in_out(blueprint, in_file, out_file, args0 = [], args1 = [], args2 = []
                       "--enable-gpu",
                       "--blueprint", blueprint,
                       "-c", cycles,
+                      "--bkey", bkey,
                       "-i", req_file,
                       "-o", res_file] + args2
         end
