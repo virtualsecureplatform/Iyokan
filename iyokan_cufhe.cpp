@@ -247,7 +247,7 @@ void makeTFHEppRAMNetworkForCUFHEImpl(
 
                +-------+   +--------+    B          +-----------+   B
         B-> ---+ CMUXs |   | TFHEpp |    r          | Gate      |   r
-               |  [0]  +---|   2    | -- i -- SEI --| Boot-     |-- i -- Setter
+               |  [1]  +---|   2    | -- i -- SEI --| Boot-     |-- i -- Setter
         A-> ---+       |   | cuFHE  |    d          | strapping |   d
                +-------+   +--------+    g          +-----------+   g
                                          e                          e
