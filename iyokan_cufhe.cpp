@@ -206,7 +206,8 @@ void makeTFHEppRAMNetworkForCUFHEImpl(
     std::vector<
         std::shared_ptr<BridgeDepNode<TFHEppWorkerInfo, CUFHEWorkerInfo>>>&
         bridge1,
-    const std::string& ramPortName, int indexByte)
+    const std::string& ramPortName,
+    const std::vector<std::shared_ptr<TaskTFHEppCBWithInv>>& cbs, int indexByte)
 {
     /*
                    +------+
@@ -255,16 +256,6 @@ void makeTFHEppRAMNetworkForCUFHEImpl(
                   ...
 
     */
-
-    // Create inputs and CBs.
-    std::vector<std::shared_ptr<TaskTFHEppCBWithInv>> cbs;
-    for (size_t i = 0; i < TaskCUFHERAMUX::ADDRESS_BIT; i++) {
-        auto taskINPUT = bt.getTask<TaskTFHEppGateWIRE>("input", "addr", i);
-        auto taskCB = std::make_shared<TaskTFHEppCBWithInv>();
-        bt.addTask(NodeLabel{"CBWithInv", utility::fok("[", i, "]")}, taskCB);
-        connectTasks(taskINPUT, taskCB);
-        cbs.push_back(taskCB);
-    }
 
     // Create RAMUX.
     auto taskRAMUX = bt.emplaceTask<TaskCUFHERAMUX>(NodeLabel{"RAMUX", ""});
@@ -328,8 +319,14 @@ CUFHENetworkWithTFHEpp makeTFHEppRAMNetworkForCUFHE(
     std::vector<std::shared_ptr<TFHEpp2CUFHEBridge>> bridge1;
 
     // Inputs for address.
-    for (size_t i = 0; i < TaskCUFHERAMUX::ADDRESS_BIT; i++)
-        bt.addINPUT<TaskTFHEppGateWIRE>("addr", i, false);
+    std::vector<std::shared_ptr<TaskTFHEppCBWithInv>> cbs;
+    for (size_t i = 0; i < TaskCUFHERAMUX::ADDRESS_BIT; i++) {
+        auto taskINPUT = bt.addINPUT<TaskTFHEppGateWIRE>("addr", i, false);
+        auto taskCB = std::make_shared<TaskTFHEppCBWithInv>();
+        bt.addTask(NodeLabel{"CBWithInv", utility::fok("[", i, "]")}, taskCB);
+        connectTasks(taskINPUT, taskCB);
+        cbs.push_back(taskCB);
+    }
 
     // Input for write-in flag.
     bt.addINPUT<TaskTFHEppGateWIRE>("wren", 0, false);
@@ -341,7 +338,7 @@ CUFHENetworkWithTFHEpp makeTFHEppRAMNetworkForCUFHE(
         bt.addOUTPUT<TaskTFHEppGateWIRE>("rdata", indexByte, true);
 
         makeTFHEppRAMNetworkForCUFHEImpl(bc, bt, bridge0, bridge1, ramPortName,
-                                         indexByte);
+                                         cbs, indexByte);
     }
 
     auto ret = CUFHENetworkWithTFHEpp{
