@@ -741,7 +741,7 @@ public:
         }
     }
 
-    void dumpCSV(std::ostream &os) const
+    void dumpTimeCSV(std::ostream &os) const
     {
         using namespace std::chrono;
 
@@ -1864,6 +1864,7 @@ struct Options {
     std::optional<int> numCPUWorkers, numGPUWorkers, numGPU, numCycles;
     std::optional<std::string> bkeyFile, inputFile, outputFile, secretKey,
         dumpPrefix, snapshotFile, resumeFile;
+    std::optional<std::string> dumpTimeCSVPrefix;
     std::optional<bool> stdoutCSV;
 };
 

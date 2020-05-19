@@ -15,7 +15,7 @@ private:
 public:
     PlainNetworkRunner(int numCPUWorkers,
                        std::shared_ptr<ProgressGraphMaker> graph = nullptr)
-        : graph_(graph)
+        : graph_(std::move(graph))
     {
         for (int i = 0; i < numCPUWorkers; i++)
             plain_.addWorker(graph_);
@@ -51,7 +51,7 @@ struct PlainRunParameter {
     bool stdoutCSV;
 
     // nullopt means to disable that option.
-    std::optional<std::string> dumpPrefix;
+    std::optional<std::string> dumpPrefix, dumpTimeCSVPrefix;
 
     PlainRunParameter()
     {
@@ -68,6 +68,7 @@ struct PlainRunParameter {
         stdoutCSV = opt.stdoutCSV.value_or(false);
 
         dumpPrefix = opt.dumpPrefix;
+        dumpTimeCSVPrefix = opt.dumpTimeCSVPrefix;
     }
 
     void overwrite(const Options &opt)
@@ -82,6 +83,7 @@ struct PlainRunParameter {
         OVERWRITE(outputFile);
         OVERWRITE(stdoutCSV);
         OVERWRITE(dumpPrefix);
+        OVERWRITE(dumpTimeCSVPrefix);
 #undef OVERWRITE
     }
 
@@ -96,13 +98,15 @@ struct PlainRunParameter {
         spdlog::info("\tOutput file (result packet): {}", outputFile);
         spdlog::info("\t--stdoutCSV: {}", stdoutCSV);
         spdlog::info("\t--dump-prefix: {}", dumpPrefix.value_or("(none)"));
+        spdlog::info("\t--dump-time-csv-prefix: {}",
+                     dumpTimeCSVPrefix.value_or("(none)"));
     }
 
     template <class Archive>
     void serialize(Archive &ar)
     {
         ar(blueprint, numCPUWorkers, numCycles, inputFile, outputFile,
-           stdoutCSV, dumpPrefix);
+           stdoutCSV, dumpPrefix, dumpTimeCSVPrefix);
     }
 };
 
@@ -402,15 +406,33 @@ public:
         pr_.print();
 
         // Make runner
-        PlainNetworkRunner runner{pr_.numCPUWorkers};
+        auto graph = pr_.dumpTimeCSVPrefix
+                         ? std::make_shared<ProgressGraphMaker>()
+                         : nullptr;
+        PlainNetworkRunner runner{pr_.numCPUWorkers, graph};
         for (auto &&p : name2net_)
             runner.addNetwork(p.second);
+        auto doRun = [&] {
+            if (pr_.dumpTimeCSVPrefix) {
+                graph->reset();
+                runner.run();
+                const std::string filename = fmt::format(
+                    "{}-{}.csv", *pr_.dumpTimeCSVPrefix, currentCycle_);
+                std::ofstream ofs{filename};
+                if (!ofs)
+                    error::die("Can't open file: ", filename);
+                graph->dumpTimeCSV(ofs);
+            }
+            else {
+                runner.run();
+            }
+        };
 
         // Reset
         if (currentCycle_ == 0) {
             if (auto reset = maybeGetAt("input", "reset"); reset) {
                 reset->set(1_b);
-                runner.run();
+                doRun();
                 reset->set(0_b);
             }
         }
@@ -442,7 +464,7 @@ public:
                     if (currentCycle_ == 0)
                         setInitialRAM();
                     setCircularInputs(currentCycle_);
-                    runner.run();
+                    doRun();
                 });
                 spdlog::info("\tdone. ({} us)", duration.count());
                 if (pr_.stdoutCSV)
