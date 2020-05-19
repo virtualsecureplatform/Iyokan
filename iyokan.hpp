@@ -669,9 +669,9 @@ private:
     struct Node {
         NodeLabel label;
         int index;
-        std::optional<std::chrono::high_resolution_clock::time_point>
-            start = std::nullopt,
-            end = std::nullopt;
+        std::optional<std::chrono::system_clock::time_point> start =
+                                                                 std::nullopt,
+                                                             end = std::nullopt;
     };
 
     struct Edge {
@@ -746,16 +746,9 @@ public:
         using namespace std::chrono;
 
         for (auto &&[id, node] : nodes_) {
-            os << "\""
-               << duration_cast<nanoseconds>(
-                      node.start.value().time_since_epoch())
-                      .count()
-               << "\"";
-            os << ",\""
-               << duration_cast<nanoseconds>(
-                      node.end.value().time_since_epoch())
-                      .count()
-               << "\"";
+            using namespace utility;
+            os << "\"" << node.start.value() << "\"";
+            os << ",\"" << node.end.value() << "\"";
             os << ",\"" << node.index << "\"";
             os << ",\"" << node.label.id << "\"";
             os << ",\"" << node.label.kind << "\"";
