@@ -18,7 +18,7 @@ int main(int argc, char **argv)
 
     enum class TYPE { PLAIN, TFHE } type;
     Options opt;
-    bool enableGPU = false;
+    bool enableGPU = false, verbose = false, quiet = false;
 
     {
         CLI::App *plain = app.add_subcommand("plain", "");
@@ -33,10 +33,8 @@ int main(int argc, char **argv)
             [&](int64_t count) { opt.stdoutCSV = count > 0 ? true : false; },
             "");
         plain->add_option("--snapshot", opt.snapshotFile, "");
-        plain->add_flag_callback(
-            "--quiet", [] { spdlog::set_level(spdlog::level::err); }, "");
-        plain->add_flag_callback(
-            "--verbose", [] { spdlog::set_level(spdlog::level::debug); }, "");
+        plain->add_flag("--quiet", quiet, "");
+        plain->add_flag("--verbose", verbose, "");
 
         auto ogroups = plain->add_option_group("run in plaintext",
                                                "Run in plaintext mode");
@@ -74,10 +72,8 @@ int main(int argc, char **argv)
             [&](int64_t count) { opt.stdoutCSV = count > 0 ? true : false; },
             "");
         tfhe->add_option("--snapshot", opt.snapshotFile, "");
-        tfhe->add_flag_callback(
-            "--quiet", [] { spdlog::set_level(spdlog::level::err); }, "");
-        tfhe->add_flag_callback(
-            "--verbose", [] { spdlog::set_level(spdlog::level::debug); }, "");
+        tfhe->add_flag("--quiet", quiet, "");
+        tfhe->add_flag("--verbose", verbose, "");
 
         tfhe->add_option("--secret-key", opt.secretKey, "")
             ->check(CLI::ExistingFile);
@@ -147,6 +143,14 @@ int main(int argc, char **argv)
         spdlog::info("\t--resume: {}", *opt.resumeFile);
     if (opt.stdoutCSV)
         spdlog::info("\t--stdoutCSV: {}", *opt.stdoutCSV);
+    spdlog::info("\t--verbose: {}", verbose);
+    spdlog::info("\t--quiet: {}", quiet);
+
+    // Process depending on the options chosen.
+    if (quiet)
+        spdlog::set_level(spdlog::level::err);
+    if (verbose)
+        spdlog::set_level(spdlog::level::debug);
 
     if (opt.resumeFile) {
         switch (type) {
