@@ -952,8 +952,6 @@ void processAllGates(CUFHENetwork& net, int numWorkers,
 
 void doCUFHE(const Options& opt)
 {
-    opt.print();
-
     std::optional<CUFHEFrontend> frontend;
     if (opt.resumeFile) {
         frontend.emplace();

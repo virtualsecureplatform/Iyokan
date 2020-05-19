@@ -499,8 +499,6 @@ void processAllGates(PlainNetwork &net, int numWorkers,
 
 void doPlain(const Options &opt)
 {
-    opt.print();
-
     std::optional<PlainFrontend> frontend;
     if (opt.resumeFile) {
         frontend.emplace();

@@ -119,6 +119,35 @@ int main(int argc, char **argv)
 
     CLI11_PARSE(app, argc, argv);
 
+    // Print what options are selected.
+    spdlog::info("Options");
+    if (opt.blueprint)
+        spdlog::info("\tBlueprint: {}", opt.blueprint->sourceFile());
+    if (opt.numCPUWorkers)
+        spdlog::info("\t# of CPU workers: {}", *opt.numCPUWorkers);
+    if (opt.numGPUWorkers)
+        spdlog::info("\t# of GPU workers: {}", *opt.numGPUWorkers);
+    if (opt.numGPU)
+        spdlog::info("\t# of GPUs: {}", *opt.numGPU);
+    if (opt.numCycles)
+        spdlog::info("\t# of cycles: {}", *opt.numCycles);
+    if (opt.bkeyFile)
+        spdlog::info("\tBKey file: {}", *opt.bkeyFile);
+    if (opt.inputFile)
+        spdlog::info("\tInput file (request packet): {}", *opt.inputFile);
+    if (opt.outputFile)
+        spdlog::info("\tOutput file (result packet): {}", *opt.outputFile);
+    if (opt.secretKey)
+        spdlog::info("\t--secret-key: {}", *opt.secretKey);
+    if (opt.dumpPrefix)
+        spdlog::info("\t--dump-prefix: {}", *opt.dumpPrefix);
+    if (opt.snapshotFile)
+        spdlog::info("\t--snapshot: {}", *opt.snapshotFile);
+    if (opt.resumeFile)
+        spdlog::info("\t--resume: {}", *opt.resumeFile);
+    if (opt.stdoutCSV)
+        spdlog::info("\t--stdoutCSV: {}", *opt.stdoutCSV);
+
     if (opt.resumeFile) {
         switch (type) {
         case TYPE::PLAIN:

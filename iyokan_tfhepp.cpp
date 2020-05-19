@@ -533,8 +533,6 @@ void processAllGates(TFHEppNetwork &net, int numWorkers, TFHEppWorkerInfo wi,
 
 void doTFHE(const Options &opt)
 {
-    opt.print();
-
     std::optional<TFHEppFrontend> frontend;
     if (opt.resumeFile) {
         frontend.emplace();
