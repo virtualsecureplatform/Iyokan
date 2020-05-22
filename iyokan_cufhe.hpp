@@ -341,13 +341,12 @@ CEREAL_REGISTER_TYPE(TaskTFHEpp2CUFHE);
 
 class TaskTFHEppRAMCMUXsForCUFHE : public TaskBase<TFHEppWorkerInfo> {
 private:
-    size_t numReadyInputs_;
+    size_t numReadyInputs_, memIndex_;
     std::shared_ptr<cufhe::cuFHETRLWElvl1> output_;
     std::vector<std::weak_ptr<const TRGSWFFTlvl1Pair>> inputAddrs_;
     std::weak_ptr<const TFHEpp::TRLWElvl1> inputWritten_;
 
     std::weak_ptr<cufhe::cuFHETRLWElvl1> mem_;
-    std::bitset<TaskTFHEppRAMUX::ADDRESS_BIT> addrBitset_;
 
     AsyncThread thr_;
 
@@ -356,13 +355,14 @@ public:
     {
     }
 
-    TaskTFHEppRAMCMUXsForCUFHE(std::weak_ptr<cufhe::cuFHETRLWElvl1> mem,
+    TaskTFHEppRAMCMUXsForCUFHE(size_t addressWidth,
+                               std::weak_ptr<cufhe::cuFHETRLWElvl1> mem,
                                size_t memIndex)
         : numReadyInputs_(0),
+          memIndex_(memIndex),
           output_(std::make_shared<cufhe::cuFHETRLWElvl1>()),
-          inputAddrs_(TaskTFHEppRAMUX::ADDRESS_BIT),
-          mem_(std::move(mem)),
-          addrBitset_(memIndex)
+          inputAddrs_(addressWidth),
+          mem_(std::move(mem))
     {
     }
 
@@ -370,9 +370,14 @@ public:
     {
     }
 
+    size_t getAddressWidth() const
+    {
+        return inputAddrs_.size();
+    }
+
     size_t getInputSize() const override
     {
-        return TaskTFHEppRAMUX::ADDRESS_BIT + 1;
+        return getAddressWidth() + 1;
     }
 
     void checkValid(error::Stack& err) override
@@ -394,12 +399,12 @@ public:
     void notifyOneInputReady() override
     {
         numReadyInputs_++;
-        assert(numReadyInputs_ <= TaskTFHEppRAMUX::ADDRESS_BIT + 1);
+        assert(numReadyInputs_ <= getAddressWidth() + 1);
     }
 
     bool areInputsReady() const override
     {
-        return numReadyInputs_ == TaskTFHEppRAMUX::ADDRESS_BIT + 1;
+        return numReadyInputs_ == getAddressWidth() + 1;
     }
 
     bool hasFinished() const override
@@ -430,10 +435,10 @@ public:
     {
         thr_ = [this] {
             output_->trlwehost = *inputWritten_.lock();
-            for (size_t j = 0; j < TaskTFHEppRAMUX::ADDRESS_BIT; j++) {
+            for (size_t j = 0; j < getAddressWidth(); j++) {
                 const TFHEpp::TRGSWFFTlvl1& in =
-                    addrBitset_[j] != 0 ? inputAddrs_[j].lock()->normal
-                                        : inputAddrs_[j].lock()->inverted;
+                    (memIndex_ >> j) & 1u ? inputAddrs_[j].lock()->normal
+                                          : inputAddrs_[j].lock()->inverted;
                 TFHEpp::CMUXFFTlvl1(output_->trlwehost, in, output_->trlwehost,
                                     mem_.lock()->trlwehost);
             }
@@ -444,8 +449,8 @@ public:
     void serialize(Archive& ar)
     {
         ar(cereal::base_class<TaskBase<TFHEppWorkerInfo>>(this),
-           numReadyInputs_, output_, inputAddrs_, inputWritten_, mem_,
-           addrBitset_);
+           numReadyInputs_, memIndex_, output_, inputAddrs_, inputWritten_,
+           mem_);
     }
 };
 CEREAL_REGISTER_TYPE(TaskTFHEppRAMCMUXsForCUFHE);
@@ -478,40 +483,39 @@ CEREAL_REGISTER_TYPE(TaskTFHEpp2CUFHETRLWElvl1);
 
 class TaskCUFHERAMUX
     : public TaskAsync<TRGSWFFTlvl1Pair, TFHEpp::TRLWElvl1, TFHEppWorkerInfo> {
-public:
-    const static size_t ADDRESS_BIT = 8;
-
 private:
     std::vector<std::shared_ptr<cufhe::cuFHETRLWElvl1>> data_;
+    std::vector<TFHEpp::TRLWElvl1> temp_;  // temporary workspace for RAMUX()
 
 private:
     void RAMUX()
     {
-        const uint32_t num_trlwe = 1 << ADDRESS_BIT;
-        std::array<TFHEpp::TRLWElvl1, num_trlwe / 2> temp;
+        const size_t addrWidth = getAddressWidth();
+        const uint32_t num_trlwe = 1 << addrWidth;
+        temp_.resize(num_trlwe / 2);
         auto addr = [this](size_t i) -> const TFHEpp::TRGSWFFTlvl1& {
             return input(i).inverted;
         };
 
         for (uint32_t index = 0; index < num_trlwe / 2; index++) {
-            TFHEpp::CMUXFFTlvl1(temp[index], addr(0),
+            TFHEpp::CMUXFFTlvl1(temp_[index], addr(0),
                                 data_[2 * index]->trlwehost,
                                 data_[2 * index + 1]->trlwehost);
         }
 
-        for (uint32_t bit = 0; bit < (ADDRESS_BIT - 2); bit++) {
+        for (uint32_t bit = 0; bit < (addrWidth - 2); bit++) {
             const uint32_t stride = 1 << bit;
             for (uint32_t index = 0; index < (num_trlwe >> (bit + 2));
                  index++) {
-                TFHEpp::CMUXFFTlvl1(temp[(2 * index) * stride], addr(bit + 1),
-                                    temp[(2 * index) * stride],
-                                    temp[(2 * index + 1) * stride]);
+                TFHEpp::CMUXFFTlvl1(temp_[(2 * index) * stride], addr(bit + 1),
+                                    temp_[(2 * index) * stride],
+                                    temp_[(2 * index + 1) * stride]);
             }
         }
 
-        const uint32_t stride = 1 << (ADDRESS_BIT - 2);
-        TFHEpp::CMUXFFTlvl1(output(), addr(ADDRESS_BIT - 1), temp[0],
-                            temp[stride]);
+        const uint32_t stride = 1 << (addrWidth - 2);
+        TFHEpp::CMUXFFTlvl1(output(), addr(addrWidth - 1), temp_[0],
+                            temp_[stride]);
     }
 
     void startSync(TFHEppWorkerInfo) override
@@ -521,17 +525,26 @@ private:
 
 public:
     TaskCUFHERAMUX()
+    {
+    }
+
+    TaskCUFHERAMUX(size_t addressWidth)
         : TaskAsync<TRGSWFFTlvl1Pair, TFHEpp::TRLWElvl1, TFHEppWorkerInfo>(
-              ADDRESS_BIT),
-          data_(1 << ADDRESS_BIT)
+              addressWidth),
+          data_(1 << addressWidth)
     {
         for (auto&& p : data_)
             p = std::make_shared<cufhe::cuFHETRLWElvl1>();
     }
 
+    size_t getAddressWidth() const
+    {
+        return getInputSize();
+    }
+
     size_t size() const
     {
-        return 1 << ADDRESS_BIT;
+        return 1 << getAddressWidth();
     }
 
     std::shared_ptr<const cufhe::cuFHETRLWElvl1> get(size_t addr) const

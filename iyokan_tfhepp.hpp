@@ -406,9 +406,6 @@ CEREAL_REGISTER_TYPE(TaskTFHEppCBWithInv);
 
 class TaskTFHEppRAMUX
     : public TaskAsync<TRGSWFFTlvl1Pair, TFHEpp::TRLWElvl1, TFHEppWorkerInfo> {
-public:
-    const static size_t ADDRESS_BIT = 8;
-
 private:
     std::vector<std::shared_ptr<TFHEpp::TRLWElvl1>> data_;
     std::vector<TFHEpp::TRLWElvl1> temp_;  // temporary workspace for RAMUX()
