@@ -334,7 +334,6 @@ CEREAL_REGISTER_TYPE(TaskTFHEppROMUX);
 class TaskTFHEppSEI
     : public TaskAsync<TFHEpp::TRLWElvl1, TFHEpp::TLWElvl0, TFHEppWorkerInfo> {
 private:
-    const static size_t ADDRESS_BIT = 7, WIDTH_BIT = 5;
     size_t index_;
 
 private:
@@ -412,34 +411,36 @@ public:
 
 private:
     std::vector<std::shared_ptr<TFHEpp::TRLWElvl1>> data_;
+    std::vector<TFHEpp::TRLWElvl1> temp_;  // temporary workspace for RAMUX()
 
 private:
     void RAMUX()
     {
-        const uint32_t num_trlwe = 1 << ADDRESS_BIT;
-        std::array<TFHEpp::TRLWElvl1, num_trlwe / 2> temp;
+        const size_t addrWidth = getAddressWidth();
+        const uint32_t num_trlwe = 1 << addrWidth;
+        temp_.resize(num_trlwe / 2);
         auto addr = [this](size_t i) -> const TFHEpp::TRGSWFFTlvl1 & {
             return input(i).inverted;
         };
 
         for (uint32_t index = 0; index < num_trlwe / 2; index++) {
-            TFHEpp::CMUXFFTlvl1(temp[index], addr(0), *data_[2 * index],
+            TFHEpp::CMUXFFTlvl1(temp_[index], addr(0), *data_[2 * index],
                                 *data_[2 * index + 1]);
         }
 
-        for (uint32_t bit = 0; bit < (ADDRESS_BIT - 2); bit++) {
+        for (uint32_t bit = 0; bit < (addrWidth - 2); bit++) {
             const uint32_t stride = 1 << bit;
             for (uint32_t index = 0; index < (num_trlwe >> (bit + 2));
                  index++) {
-                TFHEpp::CMUXFFTlvl1(temp[(2 * index) * stride], addr(bit + 1),
-                                    temp[(2 * index) * stride],
-                                    temp[(2 * index + 1) * stride]);
+                TFHEpp::CMUXFFTlvl1(temp_[(2 * index) * stride], addr(bit + 1),
+                                    temp_[(2 * index) * stride],
+                                    temp_[(2 * index + 1) * stride]);
             }
         }
 
-        const uint32_t stride = 1 << (ADDRESS_BIT - 2);
-        TFHEpp::CMUXFFTlvl1(output(), addr(ADDRESS_BIT - 1), temp[0],
-                            temp[stride]);
+        const uint32_t stride = 1 << (addrWidth - 2);
+        TFHEpp::CMUXFFTlvl1(output(), addr(addrWidth - 1), temp_[0],
+                            temp_[stride]);
     }
 
     void startSync(TFHEppWorkerInfo) override
@@ -449,17 +450,26 @@ private:
 
 public:
     TaskTFHEppRAMUX()
+    {
+    }
+
+    TaskTFHEppRAMUX(size_t addressWidth)
         : TaskAsync<TRGSWFFTlvl1Pair, TFHEpp::TRLWElvl1, TFHEppWorkerInfo>(
-              ADDRESS_BIT),
-          data_(1 << ADDRESS_BIT)
+              addressWidth),
+          data_(1 << addressWidth)
     {
         for (auto &p : data_)
             p = std::make_shared<TFHEpp::TRLWElvl1>();
     }
 
+    size_t getAddressWidth() const
+    {
+        return getInputSize();
+    }
+
     size_t size() const
     {
-        return 1 << ADDRESS_BIT;
+        return 1 << getAddressWidth();
     }
 
     std::shared_ptr<const TFHEpp::TRLWElvl1> get(size_t addr) const
@@ -514,13 +524,12 @@ CEREAL_REGISTER_TYPE(TaskTFHEppGateMUXWoSE);
 
 class TaskTFHEppRAMCMUXs : public TaskBase<TFHEppWorkerInfo> {
 private:
-    size_t numReadyInputs_;
+    size_t numReadyInputs_, memIndex_;
     std::shared_ptr<TFHEpp::TRLWElvl1> output_;
     std::vector<std::weak_ptr<const TRGSWFFTlvl1Pair>> inputAddrs_;
     std::weak_ptr<const TFHEpp::TRLWElvl1> inputWritten_;
 
     std::weak_ptr<const TFHEpp::TRLWElvl1> mem_;
-    std::bitset<TaskTFHEppRAMUX::ADDRESS_BIT> addrBitset_;
 
     AsyncThread thr_;
 
@@ -529,13 +538,14 @@ public:
     {
     }
 
-    TaskTFHEppRAMCMUXs(std::weak_ptr<const TFHEpp::TRLWElvl1> mem,
+    TaskTFHEppRAMCMUXs(size_t addressWidth,
+                       std::weak_ptr<const TFHEpp::TRLWElvl1> mem,
                        size_t memIndex)
         : numReadyInputs_(0),
+          memIndex_(memIndex),
           output_(std::make_shared<TFHEpp::TRLWElvl1>()),
-          inputAddrs_(TaskTFHEppRAMUX::ADDRESS_BIT),
-          mem_(std::move(mem)),
-          addrBitset_(memIndex)
+          inputAddrs_(addressWidth),
+          mem_(std::move(mem))
     {
     }
 
@@ -543,9 +553,14 @@ public:
     {
     }
 
+    size_t getAddressWidth() const
+    {
+        return inputAddrs_.size();
+    }
+
     size_t getInputSize() const override
     {
-        return TaskTFHEppRAMUX::ADDRESS_BIT + 1;
+        return getAddressWidth() + 1;
     }
 
     void checkValid(error::Stack &err) override
@@ -567,12 +582,12 @@ public:
     void notifyOneInputReady() override
     {
         numReadyInputs_++;
-        assert(numReadyInputs_ <= TaskTFHEppRAMUX::ADDRESS_BIT + 1);
+        assert(numReadyInputs_ <= getAddressWidth() + 1);
     }
 
     bool areInputsReady() const override
     {
-        return numReadyInputs_ == TaskTFHEppRAMUX::ADDRESS_BIT + 1;
+        return numReadyInputs_ == getAddressWidth() + 1;
     }
 
     bool hasFinished() const override
@@ -603,10 +618,10 @@ public:
     {
         thr_ = [this] {
             *output_ = *inputWritten_.lock();
-            for (size_t j = 0; j < TaskTFHEppRAMUX::ADDRESS_BIT; j++) {
+            for (size_t j = 0; j < getAddressWidth(); j++) {
                 const TFHEpp::TRGSWFFTlvl1 &in =
-                    addrBitset_[j] != 0 ? inputAddrs_[j].lock()->normal
-                                        : inputAddrs_[j].lock()->inverted;
+                    (memIndex_ >> j) & 1u ? inputAddrs_[j].lock()->normal
+                                          : inputAddrs_[j].lock()->inverted;
                 TFHEpp::CMUXFFTlvl1(*output_, in, *output_, *mem_.lock());
             }
         };
@@ -616,8 +631,8 @@ public:
     void serialize(Archive &ar)
     {
         ar(cereal::base_class<TaskBase<TFHEppWorkerInfo>>(this),
-           numReadyInputs_, output_, inputAddrs_, inputWritten_, mem_,
-           addrBitset_);
+           numReadyInputs_, memIndex_, output_, inputAddrs_, inputWritten_,
+           mem_);
     }
 };
 CEREAL_REGISTER_TYPE(TaskTFHEppRAMCMUXs);
@@ -657,7 +672,7 @@ public:
 CEREAL_REGISTER_TYPE(TaskTFHEppRAMGateBootstrapping);
 
 inline void makeTFHEppRAMNetworkImpl(
-    NetworkBuilderBase<TFHEppWorkerInfo> &builder,
+    NetworkBuilderBase<TFHEppWorkerInfo> &builder, size_t addressWidth,
     const std::string &ramPortName,
     const std::vector<std::shared_ptr<TaskTFHEppCBWithInv>> &cbs, int indexByte)
 {
@@ -715,7 +730,7 @@ inline void makeTFHEppRAMNetworkImpl(
     */
 
     // Create RAMUX.
-    auto taskRAMUX = std::make_shared<TaskTFHEppRAMUX>();
+    auto taskRAMUX = std::make_shared<TaskTFHEppRAMUX>(addressWidth);
     builder.addTask(NodeLabel{"RAMUX", ""}, taskRAMUX);
     builder.registerTask("ram", ramPortName, indexByte, taskRAMUX);
 
@@ -747,10 +762,10 @@ inline void makeTFHEppRAMNetworkImpl(
     connectTasks(taskInputWriteEnabled, taskMUXWoSE);
 
     // Create links of CMUXs -> SEI -> GateBootstrapping.
-    for (int i = 0; i < (1 << TaskTFHEppRAMUX::ADDRESS_BIT); i++) {
+    for (int i = 0; i < (1 << addressWidth); i++) {
         // Create components...
-        auto taskCMUXs =
-            std::make_shared<TaskTFHEppRAMCMUXs>(taskRAMUX->get(i), i);
+        auto taskCMUXs = std::make_shared<TaskTFHEppRAMCMUXs>(
+            addressWidth, taskRAMUX->get(i), i);
         builder.addTask(NodeLabel{"CMUXs", utility::fok("[", i, "]")},
                         taskCMUXs);
 
@@ -771,13 +786,13 @@ inline void makeTFHEppRAMNetworkImpl(
 }
 
 inline TaskNetwork<TFHEppWorkerInfo> makeTFHEppRAMNetwork(
-    const std::string &ramPortName)
+    size_t addressWidth, const std::string &ramPortName)
 {
     NetworkBuilderBase<TFHEppWorkerInfo> builder;
 
     // Inputs for address.
     std::vector<std::shared_ptr<TaskTFHEppCBWithInv>> cbs;
-    for (size_t i = 0; i < TaskTFHEppRAMUX::ADDRESS_BIT; i++) {
+    for (size_t i = 0; i < addressWidth; i++) {
         auto taskINPUT = builder.addINPUT<TaskTFHEppGateWIRE>("addr", i, false);
         auto taskCB = std::make_shared<TaskTFHEppCBWithInv>();
         builder.addTask(NodeLabel{"CBWithInv", utility::fok("[", i, "]")},
@@ -795,7 +810,8 @@ inline TaskNetwork<TFHEppWorkerInfo> makeTFHEppRAMNetwork(
         // Output for data to be read from RAM.
         builder.addOUTPUT<TaskTFHEppGateWIRE>("rdata", indexByte, true);
 
-        makeTFHEppRAMNetworkImpl(builder, ramPortName, cbs, indexByte);
+        makeTFHEppRAMNetworkImpl(builder, addressWidth, ramPortName, cbs,
+                                 indexByte);
     }
 
     return TaskNetwork<TFHEppWorkerInfo>(std::move(builder));

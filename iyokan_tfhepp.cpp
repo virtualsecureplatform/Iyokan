@@ -324,14 +324,13 @@ public:
 
         // [[builtin]] type = ram | type = mux-ram
         for (const auto &ram : bp.builtinRAMs()) {
-            assert(ram.inAddrWidth == 8 && ram.inWdataWidth == 8 &&
-                   ram.outRdataWidth == 8);
+            assert(ram.inWdataWidth == 8 && ram.outRdataWidth == 8);
 
             using RAM_TYPE = blueprint::BuiltinRAM::TYPE;
             switch (ram.type) {
             case RAM_TYPE::CMUX_MEMORY: {
-                auto net =
-                    std::make_shared<TFHEppNetwork>(makeTFHEppRAMNetwork(""));
+                auto net = std::make_shared<TFHEppNetwork>(
+                    makeTFHEppRAMNetwork(ram.inAddrWidth, ""));
                 name2net_.emplace(ram.name, net);
                 break;
             }
