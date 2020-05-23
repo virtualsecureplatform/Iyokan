@@ -1876,7 +1876,7 @@ struct Options {
     std::optional<std::string> bkeyFile, inputFile, outputFile, secretKey,
         dumpPrefix, snapshotFile, resumeFile;
     std::optional<std::string> dumpTimeCSVPrefix;
-    std::optional<bool> stdoutCSV;
+    bool stdoutCSV = false;
 };
 
 template <class Func>

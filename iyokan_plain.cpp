@@ -48,10 +48,6 @@ struct PlainRunParameter {
     NetworkBlueprint blueprint;
     int numCPUWorkers, numCycles;
     std::string inputFile, outputFile;
-    bool stdoutCSV;
-
-    // nullopt means to disable that option.
-    std::optional<std::string> dumpPrefix, dumpTimeCSVPrefix;
 
     PlainRunParameter()
     {
@@ -65,10 +61,6 @@ struct PlainRunParameter {
         numCycles = opt.numCycles.value_or(-1);
         inputFile = opt.inputFile.value();
         outputFile = opt.outputFile.value();
-        stdoutCSV = opt.stdoutCSV.value_or(false);
-
-        dumpPrefix = opt.dumpPrefix;
-        dumpTimeCSVPrefix = opt.dumpTimeCSVPrefix;
     }
 
     void overwrite(const Options &opt)
@@ -81,9 +73,6 @@ struct PlainRunParameter {
         OVERWRITE(numCycles);
         OVERWRITE(inputFile);
         OVERWRITE(outputFile);
-        OVERWRITE(stdoutCSV);
-        OVERWRITE(dumpPrefix);
-        OVERWRITE(dumpTimeCSVPrefix);
 #undef OVERWRITE
     }
 
@@ -96,17 +85,12 @@ struct PlainRunParameter {
         spdlog::info("\t# of cycles: {}", numCycles);
         spdlog::info("\tInput file (request packet): {}", inputFile);
         spdlog::info("\tOutput file (result packet): {}", outputFile);
-        spdlog::info("\t--stdoutCSV: {}", stdoutCSV);
-        spdlog::info("\t--dump-prefix: {}", dumpPrefix.value_or("(none)"));
-        spdlog::info("\t--dump-time-csv-prefix: {}",
-                     dumpTimeCSVPrefix.value_or("(none)"));
     }
 
     template <class Archive>
     void serialize(Archive &ar)
     {
-        ar(blueprint, numCPUWorkers, numCycles, inputFile, outputFile,
-           stdoutCSV, dumpPrefix, dumpTimeCSVPrefix);
+        ar(blueprint, numCPUWorkers, numCycles, inputFile, outputFile);
     }
 };
 
@@ -400,23 +384,23 @@ public:
         pr_.overwrite(rhs);
     }
 
-    void go()
+    void go(const Options &opt)
     {
         pr_.print();
 
         // Make runner
-        auto graph = pr_.dumpTimeCSVPrefix
+        auto graph = opt.dumpTimeCSVPrefix
                          ? std::make_shared<ProgressGraphMaker>()
                          : nullptr;
         PlainNetworkRunner runner{pr_.numCPUWorkers, graph};
         for (auto &&p : name2net_)
             runner.addNetwork(p.second);
         auto doRun = [&] {
-            if (pr_.dumpTimeCSVPrefix) {
+            if (opt.dumpTimeCSVPrefix) {
                 graph->reset();
                 runner.run();
                 const std::string filename = fmt::format(
-                    "{}-{}.csv", *pr_.dumpTimeCSVPrefix, currentCycle_);
+                    "{}-{}.csv", *opt.dumpTimeCSVPrefix, currentCycle_);
                 std::ofstream ofs{filename};
                 if (!ofs)
                     error::die("Can't open file: ", filename);
@@ -449,13 +433,13 @@ public:
                 using namespace utility;
 
                 spdlog::info("#{}", currentCycle_ + 1);
-                if (pr_.stdoutCSV)
+                if (opt.stdoutCSV)
                     std::cout << std::chrono::system_clock::now() << ",start,"
                               << currentCycle_ + 1 << std::endl;
 
-                if (pr_.dumpPrefix)
+                if (opt.dumpPrefix)
                     writeToArchive(
-                        utility::fok(*pr_.dumpPrefix, "-", currentCycle_),
+                        utility::fok(*opt.dumpPrefix, "-", currentCycle_),
                         makeResPacket(currentCycle_));
 
                 auto duration = timeit([&] {
@@ -466,7 +450,7 @@ public:
                     doRun();
                 });
                 spdlog::info("\tdone. ({} us)", duration.count());
-                if (pr_.stdoutCSV)
+                if (opt.stdoutCSV)
                     std::cout << std::chrono::system_clock::now() << ",end,"
                               << currentCycle_ + 1 << std::endl;
 
@@ -529,7 +513,7 @@ void doPlain(const Options &opt)
     else {
         frontend.emplace(opt);
     }
-    frontend->go();
+    frontend->go(opt);
     if (opt.snapshotFile)
         writeToArchive(*opt.snapshotFile, *frontend);
 }

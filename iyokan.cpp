@@ -144,7 +144,7 @@ int main(int argc, char **argv)
     if (opt.resumeFile)
         spdlog::info("\t--resume: {}", *opt.resumeFile);
     if (opt.stdoutCSV)
-        spdlog::info("\t--stdoutCSV: {}", *opt.stdoutCSV);
+        spdlog::info("\t--stdoutCSV: {}", opt.stdoutCSV);
     spdlog::info("\t--verbose: {}", verbose);
     spdlog::info("\t--quiet: {}", quiet);
     if (opt.dumpTimeCSVPrefix)

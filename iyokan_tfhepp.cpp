@@ -49,9 +49,6 @@ struct TFHEppRunParameter {
     std::string bkeyFile, inputFile, outputFile;
     bool stdoutCSV;
 
-    // nullopt means to disable that option.
-    std::optional<std::string> secretKey, dumpPrefix, dumpTimeCSVPrefix;
-
     TFHEppRunParameter()
     {
     }
@@ -65,11 +62,6 @@ struct TFHEppRunParameter {
         bkeyFile = opt.bkeyFile.value();
         inputFile = opt.inputFile.value();
         outputFile = opt.outputFile.value();
-        stdoutCSV = opt.stdoutCSV.value_or(false);
-
-        dumpPrefix = opt.dumpPrefix;
-        secretKey = opt.secretKey;
-        dumpTimeCSVPrefix = opt.dumpTimeCSVPrefix;
     }
 
     void overwrite(const Options &opt)
@@ -83,10 +75,6 @@ struct TFHEppRunParameter {
         OVERWRITE(bkeyFile);
         OVERWRITE(inputFile);
         OVERWRITE(outputFile);
-        OVERWRITE(stdoutCSV);
-        OVERWRITE(dumpPrefix);
-        OVERWRITE(secretKey);
-        OVERWRITE(dumpTimeCSVPrefix);
 #undef OVERWRITE
     }
 
@@ -101,17 +89,13 @@ struct TFHEppRunParameter {
         spdlog::info("\tInput file (request packet): {}", inputFile);
         spdlog::info("\tOutput file (result packet): {}", outputFile);
         spdlog::info("\t--stdoutCSV: {}", stdoutCSV);
-        spdlog::info("\t--secret-key: {}", secretKey.value_or("(none)"));
-        spdlog::info("\t--dump-prefix: {}", dumpPrefix.value_or("(none)"));
-        spdlog::info("\t--dump-time-csv-prefix: {}",
-                     dumpTimeCSVPrefix.value_or("(none)"));
     }
 
     template <class Archive>
     void serialize(Archive &ar)
     {
         ar(blueprint, numCPUWorkers, numCycles, bkeyFile, inputFile, outputFile,
-           stdoutCSV, dumpPrefix, secretKey, dumpTimeCSVPrefix);
+           stdoutCSV);
     }
 };
 
@@ -294,15 +278,13 @@ private:
         }
     }
 
-    void mayDumpPacket(int currentCycle)
+    void dumpDecryptedPacket(const std::string &dumpPrefix,
+                             const std::string &secretKey, int currentCycle)
     {
-        if (!pr_.dumpPrefix)
-            return;
         auto sk = std::make_shared<TFHEpp::SecretKey>();
-        readFromArchive(*sk, pr_.secretKey.value());
+        readFromArchive(*sk, secretKey);
         PlainPacket packet = makeResPacket(currentCycle).decrypt(*sk);
-        writeToArchive(utility::fok(*pr_.dumpPrefix, "-", currentCycle),
-                       packet);
+        writeToArchive(utility::fok(dumpPrefix, "-", currentCycle), packet);
     }
 
 public:
@@ -440,7 +422,7 @@ public:
         pr_.overwrite(rhs);
     }
 
-    void go()
+    void go(const Options &opt)
     {
         pr_.print();
 
@@ -452,7 +434,7 @@ public:
             error::die("Invalid bootstrapping key");
 
         // Make runner
-        auto graph = pr_.dumpTimeCSVPrefix
+        auto graph = opt.dumpTimeCSVPrefix
                          ? std::make_shared<ProgressGraphMaker>()
                          : nullptr;
         TFHEppWorkerInfo wi{TFHEpp::lweParams{}, bkey.gk, bkey.ck};
@@ -460,11 +442,11 @@ public:
         for (auto &&p : name2net_)
             runner.addNetwork(p.second);
         auto doRun = [&] {
-            if (pr_.dumpTimeCSVPrefix) {
+            if (opt.dumpTimeCSVPrefix) {
                 graph->reset();
                 runner.run();
                 const std::string filename = fmt::format(
-                    "{}-{}.csv", *pr_.dumpTimeCSVPrefix, currentCycle_);
+                    "{}-{}.csv", *opt.dumpTimeCSVPrefix, currentCycle_);
                 std::ofstream ofs{filename};
                 if (!ofs)
                     error::die("Can't open file: ", filename);
@@ -497,7 +479,9 @@ public:
                 std::cout << std::chrono::system_clock::now() << ",start,"
                           << currentCycle_ + 1 << std::endl;
 
-            mayDumpPacket(currentCycle_);
+            if (opt.dumpPrefix && opt.secretKey)
+                dumpDecryptedPacket(*opt.dumpPrefix, *opt.secretKey,
+                                    currentCycle_);
 
             auto duration = timeit([&] {
                 runner.tick();
@@ -563,7 +547,7 @@ void doTFHE(const Options &opt)
     else {
         frontend.emplace(opt);
     }
-    frontend->go();
+    frontend->go(opt);
     if (opt.snapshotFile)
         writeToArchive(*opt.snapshotFile, *frontend);
 }
