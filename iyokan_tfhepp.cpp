@@ -182,15 +182,16 @@ private:
             case RAM_TYPE::CMUX_MEMORY: {
                 std::vector<TFHEpp::TRLWElvl1> &dst = resPacket.ram[bp.name];
                 assert(dst.size() == 0);
-                for (int bit = 0; bit < 8; bit++) {
+                const size_t dataWidth = bp.inWdataWidth;
+                for (int bit = 0; bit < dataWidth; bit++) {
                     auto &ram =
                         *get<TaskTFHEppRAMUX>({bp.name, {"ram", "", bit}});
                     if (dst.size() == 0)
-                        dst.resize(ram.size() * 8);
+                        dst.resize(ram.size() * dataWidth);
                     else
-                        assert(ram.size() == dst.size() / 8);
+                        assert(ram.size() == dst.size() / dataWidth);
                     for (size_t addr = 0; addr < ram.size(); addr++)
-                        dst.at(addr * 8 + bit) = *ram.get(addr);
+                        dst.at(addr * dataWidth + bit) = *ram.get(addr);
                 }
                 break;
             }
@@ -221,14 +222,15 @@ private:
                 auto it = reqPacket_.ram.find(bpram.name);
                 if (it != reqPacket_.ram.end()) {
                     const auto &init = it->second;
-                    for (int bit = 0; bit < 8; bit++) {
+                    const size_t dataWidth = bpram.inWdataWidth;
+                    for (int bit = 0; bit < dataWidth; bit++) {
                         auto &ram = *get<TaskTFHEppRAMUX>(
                             {bpram.name, {"ram", "", bit}});
-                        if (ram.size() != init.size() / 8)
+                        if (ram.size() != init.size() / dataWidth)
                             error::die(
                                 "Invalid request packet: wrong length of RAM");
                         for (size_t addr = 0; addr < ram.size(); addr++)
-                            ram.set(addr, init.at(addr * 8 + bit));
+                            ram.set(addr, init.at(addr * dataWidth + bit));
                     }
                 }
                 break;
@@ -306,13 +308,17 @@ public:
 
         // [[builtin]] type = ram | type = mux-ram
         for (const auto &ram : bp.builtinRAMs()) {
-            assert(ram.inWdataWidth == 8 && ram.outRdataWidth == 8);
+            // FIXME: relax this constraint
+            if (ram.inWdataWidth != ram.outRdataWidth)
+                error::die(
+                    "Invalid RAM size; RAM that has different sizes of "
+                    "wdata and rdata is not implemented.");
 
             using RAM_TYPE = blueprint::BuiltinRAM::TYPE;
             switch (ram.type) {
             case RAM_TYPE::CMUX_MEMORY: {
-                auto net = std::make_shared<TFHEppNetwork>(
-                    makeTFHEppRAMNetwork(ram.inAddrWidth, ""));
+                auto net = std::make_shared<TFHEppNetwork>(makeTFHEppRAMNetwork(
+                    ram.inAddrWidth, ram.inWdataWidth, ""));
                 name2net_.emplace(ram.name, net);
                 break;
             }

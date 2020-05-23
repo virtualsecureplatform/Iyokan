@@ -671,7 +671,7 @@ CEREAL_REGISTER_TYPE(TaskTFHEppRAMGateBootstrapping);
 inline void makeTFHEppRAMNetworkImpl(
     NetworkBuilderBase<TFHEppWorkerInfo> &builder, size_t addressWidth,
     const std::string &ramPortName,
-    const std::vector<std::shared_ptr<TaskTFHEppCBWithInv>> &cbs, int indexByte)
+    const std::vector<std::shared_ptr<TaskTFHEppCBWithInv>> &cbs, int indexBit)
 {
     /*
         // Address CB
@@ -729,7 +729,7 @@ inline void makeTFHEppRAMNetworkImpl(
     // Create RAMUX.
     auto taskRAMUX = std::make_shared<TaskTFHEppRAMUX>(addressWidth);
     builder.addTask(NodeLabel{"RAMUX", ""}, taskRAMUX);
-    builder.registerTask("ram", ramPortName, indexByte, taskRAMUX);
+    builder.registerTask("ram", ramPortName, indexBit, taskRAMUX);
 
     // Connect CBs and RAMUX.
     for (auto &&cb : cbs)
@@ -742,12 +742,12 @@ inline void makeTFHEppRAMNetworkImpl(
 
     // Create output for read-out data and connect.
     auto taskOutputReadData =
-        builder.getTask<TaskTFHEppGateWIRE>("output", "rdata", indexByte);
+        builder.getTask<TaskTFHEppGateWIRE>("output", "rdata", indexBit);
     connectTasks(taskSEI0, taskOutputReadData);
 
     // Create input for write-in data.
     auto taskInputWriteData =
-        builder.getTask<TaskTFHEppGateWIRE>("input", "wdata", indexByte);
+        builder.getTask<TaskTFHEppGateWIRE>("input", "wdata", indexBit);
     auto taskInputWriteEnabled =
         builder.getTask<TaskTFHEppGateWIRE>("input", "wren", 0);
 
@@ -783,7 +783,7 @@ inline void makeTFHEppRAMNetworkImpl(
 }
 
 inline TaskNetwork<TFHEppWorkerInfo> makeTFHEppRAMNetwork(
-    size_t addressWidth, const std::string &ramPortName)
+    size_t addressWidth, size_t dataWidth, const std::string &ramPortName)
 {
     NetworkBuilderBase<TFHEppWorkerInfo> builder;
 
@@ -801,14 +801,14 @@ inline TaskNetwork<TFHEppWorkerInfo> makeTFHEppRAMNetwork(
     // Input for write-in flag.
     builder.addINPUT<TaskTFHEppGateWIRE>("wren", 0, false);
 
-    for (int indexByte = 0; indexByte < 8; indexByte++) {
+    for (int indexBit = 0; indexBit < dataWidth; indexBit++) {
         // Input for data to write into RAM.
-        builder.addINPUT<TaskTFHEppGateWIRE>("wdata", indexByte, false);
+        builder.addINPUT<TaskTFHEppGateWIRE>("wdata", indexBit, false);
         // Output for data to be read from RAM.
-        builder.addOUTPUT<TaskTFHEppGateWIRE>("rdata", indexByte, true);
+        builder.addOUTPUT<TaskTFHEppGateWIRE>("rdata", indexBit, true);
 
         makeTFHEppRAMNetworkImpl(builder, addressWidth, ramPortName, cbs,
-                                 indexByte);
+                                 indexBit);
     }
 
     return TaskNetwork<TFHEppWorkerInfo>(std::move(builder));
