@@ -295,6 +295,10 @@ test_in_out "test/test-addr-4bit.toml", "test/test04.in", "test/test04.out",
             ["-c", 1] # "-c 1" will be automatically set for args1 and args2
 test_in_out "test/test-div-8bit.toml", "test/test05.in", "test/test05.out",
             ["-c", 1] # "-c 1" will be automatically set for args1 and args2
+test_in_out "test/test-ram-addr8bit.toml", "test/test06.in", "test/test06.out",
+            ["-c", 16] # "-c 16" will be automatically set for args1 and args2
+test_in_out "test/test-ram-addr9bit.toml", "test/test07.in", "test/test07.out",
+            ["-c", 16] # "-c 16" will be automatically set for args1 and args2
 
 test_in_out "test/cahp-diamond.toml", "test/test00.in", "test/test00-diamond.out",
             ["--dump-prefix", "_test_dump"],
