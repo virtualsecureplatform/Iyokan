@@ -24,19 +24,24 @@ template <class... Args>
     using namespace backward;
 
     // Print error message
-    std::stringstream ss;
-    (ss << ... << args);
+    {
+        std::stringstream ss;
+        (ss << ... << args);
+        spdlog::error(ss.str());
+    }
 
 #ifndef NDEBUG
-    // Print backtrace
-    StackTrace st;
-    st.load_here(32);
-    Printer p;
-    p.print(st, ss);
+    {
+        // Print backtrace
+        spdlog::error("Preparing backtrace...");
+        std::stringstream ss;
+        StackTrace st;
+        st.load_here(32);
+        Printer p;
+        p.print(st, ss);
+        spdlog::error(ss.str());
+    }
 #endif
-
-    // Emit
-    spdlog::error(ss.str());
 
     // Abort
     std::exit(EXIT_FAILURE);
