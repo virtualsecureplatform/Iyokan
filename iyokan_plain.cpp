@@ -395,27 +395,12 @@ public:
         PlainNetworkRunner runner{pr_.numCPUWorkers, graph};
         for (auto &&p : name2net_)
             runner.addNetwork(p.second);
-        auto doRun = [&] {
-            if (opt.dumpTimeCSVPrefix) {
-                graph->reset();
-                runner.run();
-                const std::string filename = fmt::format(
-                    "{}-{}.csv", *opt.dumpTimeCSVPrefix, currentCycle_);
-                std::ofstream ofs{filename};
-                if (!ofs)
-                    error::die("Can't open file: ", filename);
-                graph->dumpTimeCSV(ofs);
-            }
-            else {
-                runner.run();
-            }
-        };
 
         // Reset
         if (currentCycle_ == 0) {
             if (auto reset = maybeGetAt("input", "reset"); reset) {
                 reset->set(1_b);
-                doRun();
+                runner.run();
                 reset->set(0_b);
             }
         }
@@ -436,19 +421,31 @@ public:
                 if (opt.stdoutCSV)
                     std::cout << std::chrono::system_clock::now() << ",start,"
                               << currentCycle_ + 1 << std::endl;
-
                 if (opt.dumpPrefix)
                     writeToArchive(
                         utility::fok(*opt.dumpPrefix, "-", currentCycle_),
                         makeResPacket(currentCycle_));
 
                 auto duration = timeit([&] {
+                    // Tick
                     runner.tick();
+
+                    // Set values to RAM and input ports if necessary
                     if (currentCycle_ == 0)
                         setInitialRAM();
                     setCircularInputs(currentCycle_);
-                    doRun();
+
+                    // Run
+                    runner.run();
+
+                    if (opt.dumpTimeCSVPrefix) {
+                        assert(graph);
+                        const std::string filename = fmt::format(
+                            "{}-{}.csv", *opt.dumpTimeCSVPrefix, currentCycle_);
+                        graph->dumpTimeCSV(*utility::openOfstream(filename));
+                    }
                 });
+
                 spdlog::info("\tdone. ({} us)", duration.count());
                 if (opt.stdoutCSV)
                     std::cout << std::chrono::system_clock::now() << ",end,"

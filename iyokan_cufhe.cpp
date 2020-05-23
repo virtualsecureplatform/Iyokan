@@ -848,21 +848,6 @@ public:
             runner.addBridge(bridge0);
         for (auto&& bridge1 : bridges1_)
             runner.addBridge(bridge1);
-        auto doRun = [&] {
-            if (opt.dumpTimeCSVPrefix) {
-                graph->reset();
-                runner.run();
-                const std::string filename = fmt::format(
-                    "{}-{}.csv", *opt.dumpTimeCSVPrefix, currentCycle_);
-                std::ofstream ofs{filename};
-                if (!ofs)
-                    error::die("Can't open file: ", filename);
-                graph->dumpTimeCSV(ofs);
-            }
-            else {
-                runner.run();
-            }
-        };
 
         // Reset
         if (currentCycle_ == 0) {
@@ -873,7 +858,7 @@ public:
                 cufhe::Synchronize();
 
                 reset->set(one);
-                doRun();
+                runner.run();
                 reset->set(zero);
             }
         }
@@ -886,18 +871,30 @@ public:
             if (opt.stdoutCSV)
                 std::cout << std::chrono::system_clock::now() << ",start,"
                           << currentCycle_ + 1 << std::endl;
-
             if (opt.dumpPrefix && opt.secretKey)
                 dumpDecryptedPacket(*opt.dumpPrefix, *opt.secretKey,
                                     currentCycle_);
 
             auto duration = timeit([&] {
+                // Tick
                 runner.tick();
+
+                // Set values to RAM and input ports if necessary
                 if (currentCycle_ == 0)
                     setInitialRAM();
                 setCircularInputs(currentCycle_);
-                doRun();
+
+                // Run
+                runner.run();
+
+                if (opt.dumpTimeCSVPrefix) {
+                    assert(graph);
+                    const std::string filename = fmt::format(
+                        "{}-{}.csv", *opt.dumpTimeCSVPrefix, currentCycle_);
+                    graph->dumpTimeCSV(*utility::openOfstream(filename));
+                }
             });
+
             spdlog::info("\tdone. ({} us)", duration.count());
             if (opt.stdoutCSV)
                 std::cout << std::chrono::system_clock::now() << ",end,"

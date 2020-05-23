@@ -4,6 +4,7 @@
 #include <cassert>
 #include <chrono>
 #include <cmath>
+#include <fstream>
 #include <iostream>
 #include <regex>
 #include <vector>
@@ -72,6 +73,14 @@ inline int ctz(unsigned long n)
 inline int ctz(unsigned long long n)
 {
     return __builtin_ctzll(n);
+}
+
+inline std::unique_ptr<std::ofstream> openOfstream(const std::string& filepath)
+{
+    auto ofs = std::make_unique<std::ofstream>(filepath, std::ios::binary);
+    if (!*ofs)
+        error::die("Can't open the file to write in: ", filepath);
+    return ofs;
 }
 
 }  // namespace utility
