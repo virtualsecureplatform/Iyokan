@@ -231,39 +231,46 @@ CEREAL_REGISTER_TYPE(TaskPlainSplitter);
 
 class TaskPlainRAM
     : public Task<Bit, uint32_t /* only 8 Bit used */, PlainWorkerInfo> {
-public:
-    const static size_t ADDRESS_BIT = 8;
-
 private:
     std::vector<uint8_t> data_;
 
 private:
     void startAsyncImpl(PlainWorkerInfo) override
     {
+        const size_t addrWidth = getAddressWidth();
         size_t addr = 0;
-        for (size_t i = 0; i < ADDRESS_BIT; i++)
+        for (size_t i = 0; i < addrWidth; i++)
             addr |= static_cast<size_t>(input(i)) << i;
         output() = data_.at(addr);
 
-        if (input(ADDRESS_BIT) == 1_b) {
+        if (input(addrWidth) == 1_b) {
             uint8_t val = 0;
             for (int i = 0; i < 8; i++)
-                val |= static_cast<uint8_t>(input(ADDRESS_BIT + 1 + i)) << i;
+                val |= static_cast<uint8_t>(input(addrWidth + 1 + i)) << i;
             data_.at(addr) = val;
         }
     }
 
 public:
     TaskPlainRAM()
-        : Task<Bit, uint32_t, PlainWorkerInfo>(ADDRESS_BIT /* addr */ +
-                                               1 /* wren */ + 8 /* wdata */),
-          data_(1 << ADDRESS_BIT)
     {
+    }
+
+    TaskPlainRAM(size_t addressWidth)
+        : Task<Bit, uint32_t, PlainWorkerInfo>(addressWidth /* addr */ +
+                                               1 /* wren */ + 8 /* wdata */),
+          data_(1 << addressWidth)
+    {
+    }
+
+    size_t getAddressWidth() const
+    {
+        return utility::ctz(data_.size());
     }
 
     size_t size() const
     {
-        return (1 << ADDRESS_BIT);
+        return (1 << getAddressWidth());
     }
 
     void set(size_t addr, uint8_t val)
@@ -291,17 +298,17 @@ public:
 CEREAL_REGISTER_TYPE(TaskPlainRAM);
 
 inline TaskNetwork<PlainWorkerInfo> makePlainRAMNetwork(
-    const std::string &ramPortName)
+    size_t addressWidth, const std::string &ramPortName)
 {
     NetworkBuilderBase<PlainWorkerInfo> builder;
 
     // Create RAM
-    auto taskRAM = std::make_shared<TaskPlainRAM>();
+    auto taskRAM = std::make_shared<TaskPlainRAM>(addressWidth);
     builder.addTask(NodeLabel{"RAM", "body"}, taskRAM);
     builder.registerTask("ram", ramPortName, 0, taskRAM);
 
     // Create inputs and outputs, and connect to RAM
-    for (size_t i = 0; i < TaskPlainRAM::ADDRESS_BIT; i++) {
+    for (size_t i = 0; i < addressWidth; i++) {
         auto taskINPUT = builder.addINPUT<TaskPlainGateWIRE>("addr", i, false);
         connectTasks(taskINPUT, taskRAM);
     }

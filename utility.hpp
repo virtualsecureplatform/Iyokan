@@ -59,6 +59,21 @@ inline std::ostream& operator<<(std::ostream& os,
     return os;
 }
 
+inline int ctz(unsigned int n)
+{
+    return __builtin_ctz(n);
+}
+
+inline int ctz(unsigned long n)
+{
+    return __builtin_ctzl(n);
+}
+
+inline int ctz(unsigned long long n)
+{
+    return __builtin_ctzll(n);
+}
+
 }  // namespace utility
 
 #endif

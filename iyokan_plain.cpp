@@ -286,10 +286,9 @@ public:
             switch (ram.type) {
             case RAM_TYPE::CMUX_MEMORY: {
                 // FIXME: relax this constraint
-                assert(ram.inAddrWidth == 8 && ram.inWdataWidth == 8 &&
-                       ram.outRdataWidth == 8);
-                auto net =
-                    std::make_shared<PlainNetwork>(makePlainRAMNetwork(""));
+                assert(ram.inWdataWidth == 8 && ram.outRdataWidth == 8);
+                auto net = std::make_shared<PlainNetwork>(
+                    makePlainRAMNetwork(ram.inAddrWidth, ""));
                 name2net_.emplace(ram.name, net);
                 break;
             }
