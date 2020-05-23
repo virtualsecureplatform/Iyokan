@@ -229,10 +229,9 @@ public:
 };
 CEREAL_REGISTER_TYPE(TaskPlainSplitter);
 
-class TaskPlainRAM
-    : public Task<Bit, uint32_t /* only 8 Bit used */, PlainWorkerInfo> {
+class TaskPlainRAM : public Task<Bit, uint32_t, PlainWorkerInfo> {
 private:
-    std::vector<uint8_t> data_;
+    std::vector<uint32_t> data_;
 
 private:
     void startAsyncImpl(PlainWorkerInfo) override
@@ -244,9 +243,10 @@ private:
         output() = data_.at(addr);
 
         if (input(addrWidth) == 1_b) {
-            uint8_t val = 0;
-            for (int i = 0; i < 8; i++)
-                val |= static_cast<uint8_t>(input(addrWidth + 1 + i)) << i;
+            const size_t dataWidth = getDataWidth();
+            uint32_t val = 0;
+            for (int i = 0; i < dataWidth; i++)
+                val |= static_cast<uint32_t>(input(addrWidth + 1 + i)) << i;
             data_.at(addr) = val;
         }
     }
@@ -256,11 +256,14 @@ public:
     {
     }
 
-    TaskPlainRAM(size_t addressWidth)
-        : Task<Bit, uint32_t, PlainWorkerInfo>(addressWidth /* addr */ +
-                                               1 /* wren */ + 8 /* wdata */),
+    TaskPlainRAM(size_t addressWidth, size_t dataWidth)
+        : Task<Bit, uint32_t, PlainWorkerInfo>(/* addr */ addressWidth +
+                                               /* wren */ 1 +
+                                               /* wdata */ dataWidth),
           data_(1 << addressWidth)
     {
+        // FIXME: relax this limitation.
+        assert(dataWidth < sizeof(uint32_t) * 8);
     }
 
     size_t getAddressWidth() const
@@ -268,17 +271,22 @@ public:
         return utility::ctz(data_.size());
     }
 
+    size_t getDataWidth() const
+    {
+        return getInputSize() - getAddressWidth() - 1;
+    }
+
     size_t size() const
     {
         return (1 << getAddressWidth());
     }
 
-    void set(size_t addr, uint8_t val)
+    void set(size_t addr, uint32_t val)
     {
         data_.at(addr) = val;
     }
 
-    uint8_t get(size_t addr)
+    uint32_t get(size_t addr)
     {
         return data_.at(addr);
     }
@@ -298,12 +306,12 @@ public:
 CEREAL_REGISTER_TYPE(TaskPlainRAM);
 
 inline TaskNetwork<PlainWorkerInfo> makePlainRAMNetwork(
-    size_t addressWidth, const std::string &ramPortName)
+    size_t addressWidth, size_t dataWidth, const std::string &ramPortName)
 {
     NetworkBuilderBase<PlainWorkerInfo> builder;
 
     // Create RAM
-    auto taskRAM = std::make_shared<TaskPlainRAM>(addressWidth);
+    auto taskRAM = std::make_shared<TaskPlainRAM>(addressWidth, dataWidth);
     builder.addTask(NodeLabel{"RAM", "body"}, taskRAM);
     builder.registerTask("ram", ramPortName, 0, taskRAM);
 
@@ -315,11 +323,11 @@ inline TaskNetwork<PlainWorkerInfo> makePlainRAMNetwork(
     auto taskWriteEnabled =
         builder.addINPUT<TaskPlainGateWIRE>("wren", 0, false);
     connectTasks(taskWriteEnabled, taskRAM);
-    for (size_t i = 0; i < 8; i++) {
+    for (size_t i = 0; i < dataWidth; i++) {
         auto taskINPUT = builder.addINPUT<TaskPlainGateWIRE>("wdata", i, false);
         connectTasks(taskINPUT, taskRAM);
     }
-    for (size_t i = 0; i < 8; i++) {
+    for (size_t i = 0; i < dataWidth; i++) {
         auto taskSplitter = std::make_shared<TaskPlainSplitter>(i);
         builder.addTask(NodeLabel{"SPLITTER", utility::fok("RAM[", i, "]")},
                         taskSplitter);

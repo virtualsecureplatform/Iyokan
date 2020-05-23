@@ -1,0 +1,19 @@
+[[bits]]
+name = "wren"
+size = 8
+bytes = [0b01110010]
+
+[[bits]]
+name = "addr"
+size = 64 # 8 * 8
+bytes = [0, 128, 31, 237, 92, 124, 91, 128]
+
+[[bits]]
+name = "wdata"
+size = 128   # 16 * 8
+bytes = [0, 29, 245, 2, 110, 124, 166, 49, 230, 51, 163, 16, 165, 218, 59, 255]
+
+[[ram]]
+name = "target"
+size = 4096 # 256 * 16
+bytes = []

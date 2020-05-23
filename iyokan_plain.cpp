@@ -177,8 +177,8 @@ private:
                 std::vector<Bit> &dst = resPacket.ram[bp.name];
                 assert(dst.size() == 0);
                 for (size_t addr = 0; addr < ram.size(); addr++) {
-                    uint8_t val = ram.get(addr);
-                    for (int i = 0; i < 8; i++)
+                    uint32_t val = ram.get(addr);
+                    for (int i = 0; i < ram.getDataWidth(); i++)
                         dst.push_back(((val >> i) & 1u) != 0 ? 1_b : 0_b);
                 }
                 break;
@@ -206,12 +206,14 @@ private:
             if (auto ramPtr = maybeGet<TaskPlainRAM>({name, {"ram", "", 0}});
                 ramPtr) {  // CMUX Memory
                 auto &ram = *ramPtr;
-                if (ram.size() * 8 != init.size())
+                if (ram.size() * ram.getDataWidth() != init.size())
                     error::die("Invalid request packet: wrong length of RAM");
                 for (size_t addr = 0; addr < ram.size(); addr++) {
-                    uint8_t val = 0;
-                    for (int i = 0; i < 8; i++)
-                        val |= static_cast<uint8_t>(init[addr * 8 + i]) << i;
+                    const size_t width = ram.getDataWidth();
+                    uint32_t val = 0;
+                    for (int i = 0; i < width; i++)
+                        val |= static_cast<uint32_t>(init[addr * width + i])
+                               << i;
                     ram.set(addr, val);
                 }
             }
@@ -270,9 +272,12 @@ public:
             switch (ram.type) {
             case RAM_TYPE::CMUX_MEMORY: {
                 // FIXME: relax this constraint
-                assert(ram.inWdataWidth == 8 && ram.outRdataWidth == 8);
+                if (ram.inWdataWidth != ram.outRdataWidth)
+                    error::die(
+                        "Invalid RAM size; RAM that has different sizes of "
+                        "wdata and rdata is not implemented.");
                 auto net = std::make_shared<PlainNetwork>(
-                    makePlainRAMNetwork(ram.inAddrWidth, ""));
+                    makePlainRAMNetwork(ram.inAddrWidth, ram.inWdataWidth, ""));
                 name2net_.emplace(ram.name, net);
                 break;
             }
