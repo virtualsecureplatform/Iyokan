@@ -1740,6 +1740,24 @@ public:
             const auto srcConnect =
                 toml::find_or<toml::table>(src, "connect", {});
             for (const auto &[srcKey, srcValue] : srcConnect) {
+                if (srcKey == "TOGND") {  // TOGND = [@...[n:m], @...[n:m], ...]
+                    auto ary = toml::get<std::vector<std::string>>(srcValue);
+                    for (const auto &portStr : ary) {  // @...[n:m]
+                        if (portStr.empty() || portStr.at(0) != '@')
+                            error::die("Invalid port name for TOGND: ",
+                                       portStr);
+                        auto ports = parsePortString(portStr, "output");
+                        for (auto &&port : ports) {  // @...[n]
+                            const std::string &name = port.portLabel.portName;
+                            int bit = port.portLabel.portBit;
+                            auto [it, inserted] =
+                                atPortWidths_.emplace(name, 0);
+                            it->second = std::max(it->second, bit + 1);
+                        }
+                    }
+                    continue;
+                }
+
                 std::string srcTo = srcKey,
                             srcFrom = toml::get<std::string>(srcValue),
                             errMsg = utility::fok("Invalid connect: ", srcTo,
