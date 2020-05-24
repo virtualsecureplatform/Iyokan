@@ -388,6 +388,19 @@ inline std::unordered_map<int, int> doTopologicalSort(
                 que.push(child);
         }
     }
+
+    if (id2node.size() > node2index.size()) {
+        spdlog::debug("id2node {} != node2index {}", id2node.size(),
+                      node2index.size());
+        for (auto &&[id, node] : id2node) {
+            auto it = node2index.find(node);
+            if (it == node2index.end()) {
+                spdlog::debug("\t{} {} {}", node->label.id, node->label.kind,
+                              node->label.desc);
+            }
+        }
+        error::die("Invalid network; some nodes will not be executed.");
+    }
     assert(id2node.size() == node2index.size());
 
     std::unordered_map<int, int> id2index;
