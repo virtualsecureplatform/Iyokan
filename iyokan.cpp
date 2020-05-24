@@ -36,6 +36,8 @@ int main(int argc, char **argv)
         plain->add_flag("--quiet", quiet, "");
         plain->add_flag("--verbose", verbose, "");
         plain->add_option("--dump-time-csv-prefix", opt.dumpTimeCSVPrefix, "");
+        plain->add_option("--dump-graph-json-prefix", opt.dumpGraphJSONPrefix,
+                          "");
 
         auto ogroups = plain->add_option_group("run in plaintext",
                                                "Run in plaintext mode");
@@ -76,6 +78,8 @@ int main(int argc, char **argv)
         tfhe->add_flag("--quiet", quiet, "");
         tfhe->add_flag("--verbose", verbose, "");
         tfhe->add_option("--dump-time-csv-prefix", opt.dumpTimeCSVPrefix, "");
+        tfhe->add_option("--dump-graph-json-prefix", opt.dumpGraphJSONPrefix,
+                         "");
 
         tfhe->add_option("--secret-key", opt.secretKey, "")
             ->check(CLI::ExistingFile);
@@ -149,6 +153,9 @@ int main(int argc, char **argv)
     spdlog::info("\t--quiet: {}", quiet);
     if (opt.dumpTimeCSVPrefix)
         spdlog::info("\t--dump-time-csv-prefix: {}", *opt.dumpTimeCSVPrefix);
+    if (opt.dumpGraphJSONPrefix)
+        spdlog::info("\t--dump-graph-json-prefix: {}",
+                     *opt.dumpGraphJSONPrefix);
 
     // Process depending on the options chosen.
     if (quiet)

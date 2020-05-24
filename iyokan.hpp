@@ -770,6 +770,39 @@ public:
         }
     }
 
+    void dumpJSON(std::ostream &os) const
+    {
+        picojson::object nodes;
+        for (auto &&[id, node] : nodes_) {
+            picojson::object json;
+            if (node.start)
+                json.emplace("start", utility::fok(*node.start));
+            if (node.end)
+                json.emplace("end", utility::fok(*node.end));
+            json.emplace("index", static_cast<double>(node.index));
+            json.emplace("id", static_cast<double>(node.label.id));
+            json.emplace("kind", node.label.kind);
+            json.emplace("desc", node.label.desc);
+
+            nodes.emplace(utility::fok(id), json);
+        }
+
+        picojson::array edges;
+        for (auto &&edge : edges_) {
+            picojson::object json;
+            json.emplace("index", static_cast<double>(edge.index));
+            json.emplace("from", static_cast<double>(edge.from));
+            json.emplace("to", static_cast<double>(edge.to));
+
+            edges.emplace_back(json);
+        }
+
+        picojson::object root;
+        root.emplace("nodes", nodes);
+        root.emplace("edges", edges);
+        os << picojson::value(root);
+    }
+
     void dumpDOT(std::ostream &os) const
     {
         os << "digraph progress_graph_maker {" << std::endl;
@@ -1888,7 +1921,7 @@ struct Options {
     std::optional<int> numCPUWorkers, numGPUWorkers, numGPU, numCycles;
     std::optional<std::string> bkeyFile, inputFile, outputFile, secretKey,
         dumpPrefix, snapshotFile, resumeFile;
-    std::optional<std::string> dumpTimeCSVPrefix;
+    std::optional<std::string> dumpTimeCSVPrefix, dumpGraphJSONPrefix;
     bool stdoutCSV = false;
 };
 

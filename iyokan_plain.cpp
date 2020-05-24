@@ -416,7 +416,7 @@ public:
         pr_.print();
 
         // Make runner
-        auto graph = opt.dumpTimeCSVPrefix
+        auto graph = opt.dumpTimeCSVPrefix || opt.dumpGraphJSONPrefix
                          ? std::make_shared<ProgressGraphMaker>()
                          : nullptr;
         PlainNetworkRunner runner{pr_.numCPUWorkers, graph};
@@ -470,6 +470,13 @@ public:
                         const std::string filename = fmt::format(
                             "{}-{}.csv", *opt.dumpTimeCSVPrefix, currentCycle_);
                         graph->dumpTimeCSV(*utility::openOfstream(filename));
+                    }
+                    if (opt.dumpGraphJSONPrefix) {
+                        assert(graph);
+                        const std::string filename =
+                            fmt::format("{}-{}.json", *opt.dumpGraphJSONPrefix,
+                                        currentCycle_);
+                        graph->dumpJSON(*utility::openOfstream(filename));
                     }
                 });
 
