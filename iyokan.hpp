@@ -618,8 +618,8 @@ public:
     }
 
     virtual void propagate(ReadyQueue<WorkerInfo> &readyQueue);
-    void propagate(ReadyQueue<WorkerInfo> &readyQueue,
-                   ProgressGraphMaker &graph);
+    virtual void propagate(ReadyQueue<WorkerInfo> &readyQueue,
+                           ProgressGraphMaker &graph);
 
     void tick()
     {
@@ -1563,6 +1563,16 @@ public:
             assert(que);
             que->push(src_);
         }
+    }
+
+    void propagate(ReadyQueue<InWorkerInfo> &readyQueue,
+                   ProgressGraphMaker &graph) override
+    {
+        graph.finishNode(this->label());
+
+        propagate(readyQueue);
+
+        graph.notify(this->label(), src_->label());
     }
 
     void visit(GraphVisitor &visitor) override
