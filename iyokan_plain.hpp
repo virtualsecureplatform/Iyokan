@@ -195,43 +195,16 @@ public:
 };
 CEREAL_REGISTER_TYPE(TaskPlainROMUX);
 
-class TaskPlainSplitter : public Task<uint32_t, Bit, PlainWorkerInfo> {
+class TaskPlainRAMReader : public Task<Bit, Bit, PlainWorkerInfo> {
 private:
-    size_t index_;
-
-private:
-    void startAsyncImpl(PlainWorkerInfo) override
-    {
-        output() = Bit((input(0) >> index_) & 1u);
-    }
+    std::shared_ptr<std::vector<Bit>> data_;
 
 public:
-    TaskPlainSplitter()
-    {
-    }
-
-    TaskPlainSplitter(size_t index)
-        : Task<uint32_t, Bit, PlainWorkerInfo>(1), index_(index)
-    {
-    }
-
-    bool hasFinished() const override
-    {
-        return true;
-    }
-
     template <class Archive>
     void serialize(Archive &ar)
     {
-        ar(cereal::base_class<Task<uint32_t, Bit, PlainWorkerInfo>>(this),
-           index_);
+        ar(cereal::base_class<Task<Bit, Bit, PlainWorkerInfo>>(this), data_);
     }
-};
-CEREAL_REGISTER_TYPE(TaskPlainSplitter);
-
-class TaskPlainRAM : public Task<Bit, uint32_t, PlainWorkerInfo> {
-private:
-    std::vector<uint32_t> data_;
 
 private:
     void startAsyncImpl(PlainWorkerInfo) override
@@ -240,40 +213,23 @@ private:
         size_t addr = 0;
         for (size_t i = 0; i < addrWidth; i++)
             addr |= static_cast<size_t>(input(i)) << i;
-        output() = data_.at(addr);
-
-        if (input(addrWidth) == 1_b) {
-            const size_t dataWidth = getDataWidth();
-            uint32_t val = 0;
-            for (int i = 0; i < dataWidth; i++)
-                val |= static_cast<uint32_t>(input(addrWidth + 1 + i)) << i;
-            data_.at(addr) = val;
-        }
+        output() = data_->at(addr);
     }
 
 public:
-    TaskPlainRAM()
+    TaskPlainRAMReader()
     {
     }
 
-    TaskPlainRAM(size_t addressWidth, size_t dataWidth)
-        : Task<Bit, uint32_t, PlainWorkerInfo>(/* addr */ addressWidth +
-                                               /* wren */ 1 +
-                                               /* wdata */ dataWidth),
-          data_(1 << addressWidth)
+    TaskPlainRAMReader(size_t addressWidth)
+        : Task<Bit, Bit, PlainWorkerInfo>(addressWidth)
     {
-        // FIXME: relax this limitation.
-        assert(dataWidth < sizeof(uint32_t) * 8);
+        data_ = std::make_shared<std::vector<Bit>>(1 << addressWidth);
     }
 
     size_t getAddressWidth() const
     {
-        return utility::ctz(data_.size());
-    }
-
-    size_t getDataWidth() const
-    {
-        return getInputSize() - getAddressWidth() - 1;
+        return utility::ctz(data_->size());
     }
 
     size_t size() const
@@ -281,61 +237,139 @@ public:
         return (1 << getAddressWidth());
     }
 
-    void set(size_t addr, uint32_t val)
+    void set(size_t addr, Bit val)
     {
-        data_.at(addr) = val;
+        data_->at(addr) = val;
     }
 
-    uint32_t get(size_t addr)
+    Bit get(size_t addr)
     {
-        return data_.at(addr);
+        return data_->at(addr);
+    }
+
+    const std::shared_ptr<std::vector<Bit>> &data()
+    {
+        return data_;
     }
 
     bool hasFinished() const override
     {
         return true;
     }
+};
+CEREAL_REGISTER_TYPE(TaskPlainRAMReader);
 
+class TaskPlainRAMWriter
+    : public Task<Bit, uint8_t /* dummy */, PlainWorkerInfo> {
+private:
+    std::weak_ptr<std::vector<Bit>> data_;
+
+public:
     template <class Archive>
     void serialize(Archive &ar)
     {
-        ar(cereal::base_class<Task<Bit, uint32_t, PlainWorkerInfo>>(this),
+        ar(cereal::base_class<Task<Bit, uint8_t, PlainWorkerInfo>>(this),
            data_);
     }
+
+private:
+    void startAsyncImpl(PlainWorkerInfo) override
+    {
+        std::shared_ptr<std::vector<Bit>> data = data_.lock();
+        assert(data);
+        const size_t addrWidth = getAddressWidth();
+        if (input(addrWidth) == 1_b) {  // wren is asserted
+            // Make address
+            size_t addr = 0;
+            for (size_t i = 0; i < addrWidth; i++)
+                addr |= static_cast<size_t>(input(i)) << i;
+            // Write in the data
+            data->at(addr) = input(addrWidth + 1);
+        }
+
+        // NOTE: input(addrWidth + 1 + 1) (that is rdata) is not used at all
+        // here, but it is used to make dependence relationship between
+        // TaskPlainRAMReader and TaskPlainRAMWriter. TaskPlainRAMWriter MUST be
+        // started AFTER TaskPlainRAMReader has finished so that the value from
+        // the RAM will not be corrupted.
+    }
+
+public:
+    TaskPlainRAMWriter()
+    {
+    }
+
+    TaskPlainRAMWriter(size_t addressWidth,
+                       const std::shared_ptr<std::vector<Bit>> &data)
+        : Task<Bit, uint8_t, PlainWorkerInfo>(/* addr */ addressWidth +
+                                              /* wren */ 1 +
+                                              /* wdata */ 1 +
+                                              /* rdata */ 1),
+          data_(data)
+    {
+    }
+
+    size_t getAddressWidth() const
+    {
+        std::shared_ptr<std::vector<Bit>> data = data_.lock();
+        assert(data);
+        return utility::ctz(data->size());
+    }
+
+    bool hasFinished() const override
+    {
+        return true;
+    }
 };
-CEREAL_REGISTER_TYPE(TaskPlainRAM);
+CEREAL_REGISTER_TYPE(TaskPlainRAMWriter);
 
 inline TaskNetwork<PlainWorkerInfo> makePlainRAMNetwork(
     size_t addressWidth, size_t dataWidth, const std::string &ramPortName)
 {
     NetworkBuilderBase<PlainWorkerInfo> builder;
 
-    // Create RAM
-    auto taskRAM = std::make_shared<TaskPlainRAM>(addressWidth, dataWidth);
-    builder.addTask(NodeLabel{"RAM", "body"}, taskRAM);
-    builder.registerTask("ram", ramPortName, 0, taskRAM);
-
-    // Create inputs and outputs, and connect to RAM
+    // Create inputs
+    std::vector<std::shared_ptr<TaskPlainGateWIRE>> inputsAddr, inputsWdata;
     for (size_t i = 0; i < addressWidth; i++) {
         auto taskINPUT = builder.addINPUT<TaskPlainGateWIRE>("addr", i, false);
-        connectTasks(taskINPUT, taskRAM);
+        inputsAddr.push_back(taskINPUT);
     }
     auto taskWriteEnabled =
         builder.addINPUT<TaskPlainGateWIRE>("wren", 0, false);
-    connectTasks(taskWriteEnabled, taskRAM);
     for (size_t i = 0; i < dataWidth; i++) {
         auto taskINPUT = builder.addINPUT<TaskPlainGateWIRE>("wdata", i, false);
-        connectTasks(taskINPUT, taskRAM);
+        inputsWdata.push_back(taskINPUT);
     }
-    for (size_t i = 0; i < dataWidth; i++) {
-        auto taskSplitter = std::make_shared<TaskPlainSplitter>(i);
-        builder.addTask(NodeLabel{"SPLITTER", utility::fok("RAM[", i, "]")},
-                        taskSplitter);
-        connectTasks(taskRAM, taskSplitter);
 
+    // Create outputs
+    std::vector<std::shared_ptr<TaskPlainGateWIRE>> outputsRdata;
+    for (size_t i = 0; i < dataWidth; i++) {
         auto taskOUTPUT =
             builder.addOUTPUT<TaskPlainGateWIRE>("rdata", i, true);
-        connectTasks(taskSplitter, taskOUTPUT);
+        outputsRdata.push_back(taskOUTPUT);
+    }
+
+    // Create and connect components for each data bit
+    for (size_t i = 0; i < dataWidth; i++) {
+        // Create RAMReader and RAMWriter
+        auto taskRAMReader = builder.emplaceTask<TaskPlainRAMReader>(
+            NodeLabel{"RAMReader", fmt::format("[{}]", i)}, addressWidth);
+        builder.registerTask("ram", ramPortName, i, taskRAMReader);
+        auto taskRAMWriter = builder.emplaceTask<TaskPlainRAMWriter>(
+            NodeLabel{"RAMWriter", fmt::format("[{}]", i)}, addressWidth,
+            taskRAMReader->data());
+
+        // Connect addr to RAMReader and RAMWriter
+        for (size_t i = 0; i < addressWidth; i++) {
+            connectTasks(inputsAddr.at(i), taskRAMReader);
+            connectTasks(inputsAddr.at(i), taskRAMWriter);
+        }
+        // Connect RAMReader to rdata
+        connectTasks(taskRAMReader, outputsRdata.at(i));
+        // Connect wren, wdata and rdata to RAMWriter
+        connectTasks(taskWriteEnabled, taskRAMWriter);
+        connectTasks(inputsWdata.at(i), taskRAMWriter);
+        connectTasks(outputsRdata.at(i), taskRAMWriter);
     }
 
     return TaskNetwork<PlainWorkerInfo>(std::move(builder));

@@ -173,13 +173,18 @@ private:
             using RAM_TYPE = blueprint::BuiltinRAM::TYPE;
             switch (bp.type) {
             case RAM_TYPE::CMUX_MEMORY: {
-                auto &ram = *get<TaskPlainRAM>({bp.name, {"ram", "", 0}});
                 std::vector<Bit> &dst = resPacket.ram[bp.name];
                 assert(dst.size() == 0);
-                for (size_t addr = 0; addr < ram.size(); addr++) {
-                    uint32_t val = ram.get(addr);
-                    for (int i = 0; i < ram.getDataWidth(); i++)
-                        dst.push_back(((val >> i) & 1u) != 0 ? 1_b : 0_b);
+                const size_t dataWidth = bp.inWdataWidth;
+                for (int bit = 0; bit < dataWidth; bit++) {
+                    auto &ram =
+                        *get<TaskPlainRAMReader>({bp.name, {"ram", "", bit}});
+                    if (dst.size() == 0)
+                        dst.resize(ram.size() * dataWidth);
+                    else
+                        assert(ram.size() == dst.size() / dataWidth);
+                    for (size_t addr = 0; addr < ram.size(); addr++)
+                        dst.at(addr * dataWidth + bit) = ram.get(addr);
                 }
                 break;
             }
@@ -202,27 +207,44 @@ private:
 
     void setInitialRAM()
     {
-        for (auto &&[name, init] : reqPacket_.ram) {
-            if (auto ramPtr = maybeGet<TaskPlainRAM>({name, {"ram", "", 0}});
-                ramPtr) {  // CMUX Memory
-                auto &ram = *ramPtr;
-                if (ram.size() * ram.getDataWidth() != init.size())
-                    error::die("Invalid request packet: wrong length of RAM");
-                for (size_t addr = 0; addr < ram.size(); addr++) {
-                    const size_t width = ram.getDataWidth();
-                    uint32_t val = 0;
-                    for (int i = 0; i < width; i++)
-                        val |= static_cast<uint32_t>(init[addr * width + i])
-                               << i;
-                    ram.set(addr, val);
+        for (const auto &bpram : pr_.blueprint.builtinRAMs()) {
+            using RAM_TYPE = blueprint::BuiltinRAM::TYPE;
+            switch (bpram.type) {
+            case RAM_TYPE::CMUX_MEMORY: {
+                auto it = reqPacket_.ram.find(bpram.name);
+                if (it != reqPacket_.ram.end()) {
+                    const auto &init = it->second;
+                    const size_t dataWidth = bpram.inWdataWidth;
+                    for (int bit = 0; bit < dataWidth; bit++) {
+                        auto &ram = *get<TaskPlainRAMReader>(
+                            {bpram.name, {"ram", "", bit}});
+                        if (ram.size() != init.size() / dataWidth)
+                            error::die(
+                                "Invalid request packet: wrong length of RAM");
+                        for (size_t addr = 0; addr < ram.size(); addr++)
+                            ram.set(addr, init.at(addr * dataWidth + bit));
+                    }
                 }
+                break;
             }
-            else {  // MUX
-                for (size_t i = 0; i < init.size(); i++) {
-                    auto &ram = *get<TaskPlainGateMem>(
-                        {name, {"ram", "ramdata", static_cast<int>(i)}});
-                    ram.set(init.at(i));
+
+            case RAM_TYPE::MUX: {
+                auto it = reqPacket_.ram.find(bpram.name);
+                if (it != reqPacket_.ram.end()) {
+                    const auto &init = it->second;
+                    if (init.size() !=
+                        (1 << bpram.inAddrWidth) * bpram.outRdataWidth)
+                        error::die(
+                            "Invalid request packet: wrong length of RAM");
+                    for (size_t i = 0; i < init.size(); i++) {
+                        auto &ram = *get<TaskPlainGateMem>(
+                            {bpram.name,
+                             {"ram", "ramdata", static_cast<int>(i)}});
+                        ram.set(init.at(i));
+                    }
                 }
+                break;
+            }
             }
         }
     }
