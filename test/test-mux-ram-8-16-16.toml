@@ -1,0 +1,12 @@
+[[builtin]]
+type = "mux-ram"
+name = "target"
+in_addr_width = 8
+in_wdata_width = 16
+out_rdata_width = 16
+
+[connect]
+"target/wren" = "@wren"
+"target/addr[0:7]" = "@addr[0:7]"
+"target/wdata[0:15]" = "@wdata[0:15]"
+"@rdata[0:15]" = "target/rdata[0:15]"

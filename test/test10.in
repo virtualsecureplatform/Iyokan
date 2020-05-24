@@ -1,0 +1,46 @@
+[[rom]]
+name = "rom"
+size = 4096                 # 512 * 8
+bytes = [
+# 00000000 _start:
+       0x75, 0x01, 0xfe,    # li	sp, 510
+       0x1e, 0x06,          # jsal	48
+       0x0e, 0x00,          # js	0
+       0x00,
+
+# 00000008 fib:
+       0xc2, 0xa1,          # addi2	sp, -6
+       0x1c, 0x20,          # swsp	ra, 4(sp)
+       0x1c, 0x13,          # swsp	s0, 2(sp)
+       0x1c, 0x04,          # swsp	s1, 0(sp)
+       0xc0, 0x83,          # mov	s0, a0
+       0x34, 0x28,          # lsi	a0, 2
+       0x3f, 0x83, 0x07,    # ble	a0, s0, 7
+       0xc0, 0x38,          # mov	a0, s0
+       0x0e, 0x02,          # js	16
+       0xc3, 0x38, 0xff,    # addi	a0, s0, -1
+       0x5e, 0xfd,          # jsal	-22
+       0xc0, 0x84,          # mov	s1, a0
+       0xc3, 0x38, 0xfe,    # addi	a0, s0, -2
+       0x7e, 0xfc,          # jsal	-29
+       0x80, 0x48,          # add2	a0, s1
+       0x14, 0x04,          # lwsp	s1, 0(sp)
+       0x14, 0x13,          # lwsp	s0, 2(sp)
+       0x14, 0x20,          # lwsp	ra, 4(sp)
+       0x02, 0x61,          # addi2	sp, 6
+       0x06, 0x00,          # jr	ra
+
+# 00000033 main:
+       0xc2, 0xe1,          # addi2	sp, -2
+       0x1c, 0x00,          # swsp	ra, 0(sp)
+       0x34, 0x58,          # lsi	a0, 5
+       0xfe, 0xf9,          # jsal	-49
+       0x14, 0x00,          # lwsp	ra, 0(sp)
+       0x02, 0x21,          # addi2	sp, 2
+       0x06, 0x00,          # jr	ra
+]
+
+[[ram]]
+name = "ram"
+size = 4096 # 512 * 8
+bytes = []
