@@ -62,6 +62,14 @@ inline TFHEpp::TLWElvl0 cufhe2tfhepp(const cufhe::Ctxt& src)
     return tlwe;
 }
 
+inline void cufhe2tfheppInPlace(TFHEpp::TLWElvl0& dst, const cufhe::Ctxt& src)
+{
+    // FIXME: Check if TFHEpp's parameters are the same as cuFHE's.
+    const int32_t n = cufhe::GetDefaultParam()->lwe_n_;
+    for (int i = 0; i < n + 1; i++)
+        dst[i] = src.lwe_sample_->data()[i];
+}
+
 inline std::shared_ptr<cufhe::Ctxt> tfhepp2cufhe(const TFHEpp::TLWElvl0& src)
 {
     // FIXME: Check if TFHEpp's parameters are the same as cuFHE's.
@@ -72,6 +80,15 @@ inline std::shared_ptr<cufhe::Ctxt> tfhepp2cufhe(const TFHEpp::TLWElvl0& src)
         ctxt->lwe_sample_->data()[i] = src[i];
 
     return ctxt;
+}
+
+inline void tfhepp2cufheInPlace(cufhe::Ctxt& dst, const TFHEpp::TLWElvl0& src)
+{
+    // FIXME: Check if TFHEpp's parameters are the same as cuFHE's.
+    const int32_t n = cufhe::GetDefaultParam()->lwe_n_;
+    int* p = dst.lwe_sample_->data();
+    for (int i = 0; i < n + 1; i++)
+        p[i] = src[i];
 }
 
 namespace cufhe {
@@ -298,7 +315,7 @@ class TaskCUFHE2TFHEpp
 private:
     void startSync(TFHEppWorkerInfo) override
     {
-        output() = cufhe2tfhepp(input(0));
+        cufhe2tfheppInPlace(output(), input(0));
     }
 
 public:
@@ -321,7 +338,7 @@ class TaskTFHEpp2CUFHE
 private:
     void startSync(TFHEppWorkerInfo) override
     {
-        copyCtxt(output(), *tfhepp2cufhe(input(0)));
+        tfhepp2cufheInPlace(output(), input(0));
     }
 
 public:
