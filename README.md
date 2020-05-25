@@ -133,14 +133,14 @@ Next, encrypt the packet:
 
 ```
 $ iyokan-packet genbkey --in secret.key --out bootstrapping.key
-$ iyokan-packet enc --key secret.key --bkey bootstrapping.key --in request.plain.packet --out request.enc.packet
+$ iyokan-packet enc --key secret.key --in request.plain.packet --out request.enc.packet
 ```
 
 Finally, run Iyokan with it:
 
 ```
 # Use option `--enable-gpu` if your machine has a NVIDIA GPU such as V100.
-$ iyokan tfhe --blueprint test/test-div-8bit.toml \
+$ iyokan tfhe --blueprint test/test-div-8bit.toml --bkey bootstrapping.key \
               -i request.enc.packet -o result.enc.packet -c 1
 ```
 
