@@ -2254,25 +2254,33 @@ void make1bitROMWithMUX(NetworkBuilder &b, const std::vector<int> &addrInputs,
 extern char _binary_mux_ram_8_8_8_min_json_start[];
 extern char _binary_mux_ram_8_8_8_min_json_end[];
 extern char _binary_mux_ram_8_8_8_min_json_size[];
+extern char _binary_mux_ram_8_16_16_min_json_start[];
+extern char _binary_mux_ram_8_16_16_min_json_end[];
+extern char _binary_mux_ram_8_16_16_min_json_size[];
 template <class NetworkBuilder>
 std::shared_ptr<typename NetworkBuilder::NetworkType> makeRAMWithMUX(
     int inAddrWidth, int dataWidth)
 {
     RAMNetworkBuilder<NetworkBuilder> b{dataWidth};
 
-    if (inAddrWidth == 8 && dataWidth == 8) {
-        std::stringstream ss{std::string{_binary_mux_ram_8_8_8_min_json_start,
-                                         _binary_mux_ram_8_8_8_min_json_end}};
-        readNetworkFromJSONImpl(b, ss);
-        auto net = std::make_shared<typename NetworkBuilder::NetworkType>(
-            std::move(b));
-
-        error::Stack err;
-        net->checkValid(err);
-        assert(err.empty());
-
-        return net;
+#define USE_PRECOMPILED_BINARY(addrW, dataW)                               \
+    if (inAddrWidth == addrW && dataWidth == dataW) {                      \
+        std::stringstream ss{std::string{                                  \
+            _binary_mux_ram_##addrW##_##dataW##_##dataW##_min_json_start,  \
+            _binary_mux_ram_##addrW##_##dataW##_##dataW##_min_json_end}};  \
+        readNetworkFromJSONImpl(b, ss);                                    \
+        auto net = std::make_shared<typename NetworkBuilder::NetworkType>( \
+            std::move(b));                                                 \
+                                                                           \
+        error::Stack err;                                                  \
+        net->checkValid(err);                                              \
+        assert(err.empty());                                               \
+                                                                           \
+        return net;                                                        \
     }
+    USE_PRECOMPILED_BINARY(8, 8);
+    USE_PRECOMPILED_BINARY(8, 16);
+#undef USE_PRECOMPILED_BINARY
 
     // Create inputs
     std::vector<int> addrInputs;
