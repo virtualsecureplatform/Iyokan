@@ -53,9 +53,8 @@ inline void copyCtxt(cufhe::Ctxt& dst, const cufhe::Ctxt& src,
 inline TFHEpp::TLWElvl0 cufhe2tfhepp(const cufhe::Ctxt& src)
 {
     // FIXME: Check if TFHEpp's parameters are the same as cuFHE's.
-    const int32_t n = cufhe::GetDefaultParam()->lwe_n_;
-
     TFHEpp::TLWElvl0 tlwe;
+    constexpr size_t n = tlwe.size();
     for (int i = 0; i < n + 1; i++)
         tlwe[i] = src.lwe_sample_->data()[i];
 
@@ -65,7 +64,9 @@ inline TFHEpp::TLWElvl0 cufhe2tfhepp(const cufhe::Ctxt& src)
 inline void cufhe2tfheppInPlace(TFHEpp::TLWElvl0& dst, const cufhe::Ctxt& src)
 {
     // FIXME: Check if TFHEpp's parameters are the same as cuFHE's.
-    const int32_t n = cufhe::GetDefaultParam()->lwe_n_;
+    // NOTE: dst.size() is not compile-time constant expression, though I don't
+    // know why.
+    constexpr size_t n = TFHEpp::TLWElvl0{}.size();
     for (int i = 0; i < n + 1; i++)
         dst[i] = src.lwe_sample_->data()[i];
 }
