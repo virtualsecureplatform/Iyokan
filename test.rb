@@ -285,10 +285,12 @@ end
 test_in_out "test/cahp-diamond.toml", "test/test00.in", "test/test00-diamond.out"
 test_in_out "test/cahp-emerald.toml", "test/test00.in", "test/test00-emerald.out"
 test_in_out "test/cahp-ruby.toml", "test/test09.in", "test/test09-ruby.out"
+test_in_out "test/cahp-pearl.toml", "test/test09.in", "test/test09-pearl.out"
 
 test_in_out "test/cahp-diamond-mux.toml", "test/test00.in", "test/test00-diamond.out"
 test_in_out "test/cahp-emerald-mux.toml", "test/test00.in", "test/test00-emerald.out"
 test_in_out "test/cahp-ruby-mux.toml", "test/test09.in", "test/test09-ruby.out"
+test_in_out "test/cahp-pearl-mux.toml", "test/test09.in", "test/test09-pearl.out"
 
 test_in_out "test/cahp-diamond.toml", "test/test01.in", "test/test01-diamond.out",
             [], nil, [] # Won't do test for TFHEpp
@@ -296,12 +298,16 @@ test_in_out "test/cahp-emerald.toml", "test/test01.in", "test/test01-emerald.out
             [], nil, [] # Won't do test for TFHEpp
 test_in_out "test/cahp-ruby.toml", "test/test10.in", "test/test10-ruby.out",
             [], nil, [] # Won't do test for TFHEpp
+test_in_out "test/cahp-pearl.toml", "test/test10.in", "test/test10-pearl.out",
+            [], nil, [] # Won't do test for TFHEpp
 
 test_in_out "test/cahp-diamond-mux.toml", "test/test01.in", "test/test01-diamond.out",
             [], nil, [] # Won't do test for TFHEpp
 test_in_out "test/cahp-emerald-mux.toml", "test/test01.in", "test/test01-emerald.out",
             [], nil, [] # Won't do test for TFHEpp
 test_in_out "test/cahp-ruby-mux.toml", "test/test10.in", "test/test10-ruby.out",
+            [], nil, [] # Won't do test for TFHEpp
+test_in_out "test/cahp-pearl-mux.toml", "test/test10.in", "test/test10-pearl.out",
             [], nil, [] # Won't do test for TFHEpp
 
 test_in_out "test/test-addr-4bit.toml", "test/test04.in", "test/test04.out",
