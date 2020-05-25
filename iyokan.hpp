@@ -2251,18 +2251,18 @@ void make1bitROMWithMUX(NetworkBuilder &b, const std::vector<int> &addrInputs,
     b.connect(workingIds.at(0), id);
 }
 
-extern char _binary_mux_ram_256_8_min_json_start[];
-extern char _binary_mux_ram_256_8_min_json_end[];
-extern char _binary_mux_ram_256_8_min_json_size[];
+extern char _binary_mux_ram_8_8_8_min_json_start[];
+extern char _binary_mux_ram_8_8_8_min_json_end[];
+extern char _binary_mux_ram_8_8_8_min_json_size[];
 template <class NetworkBuilder>
 std::shared_ptr<typename NetworkBuilder::NetworkType> makeRAMWithMUX(
-    int inAddrWidth, int outRdataWidth)
+    int inAddrWidth, int dataWidth)
 {
-    RAMNetworkBuilder<NetworkBuilder> b{outRdataWidth};
+    RAMNetworkBuilder<NetworkBuilder> b{dataWidth};
 
-    if (inAddrWidth == 8 && outRdataWidth == 8) {
-        std::stringstream ss{std::string{_binary_mux_ram_256_8_min_json_start,
-                                         _binary_mux_ram_256_8_min_json_end}};
+    if (inAddrWidth == 8 && dataWidth == 8) {
+        std::stringstream ss{std::string{_binary_mux_ram_8_8_8_min_json_start,
+                                         _binary_mux_ram_8_8_8_min_json_end}};
         readNetworkFromJSONImpl(b, ss);
         auto net = std::make_shared<typename NetworkBuilder::NetworkType>(
             std::move(b));
@@ -2283,7 +2283,7 @@ std::shared_ptr<typename NetworkBuilder::NetworkType> makeRAMWithMUX(
     int wrenInput = b.INPUT("wren", 0);
 
     // Create 1bitRAMs
-    for (int i = 0; i < outRdataWidth; i++) {
+    for (int i = 0; i < dataWidth; i++) {
         make1bitRAMWithMUX(b, addrInputs, wrenInput, i);
     }
 

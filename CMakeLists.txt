@@ -60,15 +60,15 @@ set(CMAKE_CXX_FLAGS "")
 set(CMAKE_CXX_FLAGS_DEBUG "")
 set(CMAKE_CXX_FLAGS_RELEASE "")
 
-add_custom_command(OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/mux-ram-256-8.o
+add_custom_command(OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/mux-ram-8-8-8.o
                    COMMAND ${CMAKE_OBJCOPY}
-                   ARGS -I binary -O elf64-x86-64 -B i386 mux-ram-256-8.min.json ${CMAKE_CURRENT_BINARY_DIR}/mux-ram-256-8.o
+                   ARGS -I binary -O elf64-x86-64 -B i386 mux-ram-8-8-8.min.json ${CMAKE_CURRENT_BINARY_DIR}/mux-ram-8-8-8.o
                    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
 
 ##### iyokan
 add_executable(iyokan
     iyokan.cpp iyokan_plain.cpp iyokan_tfhepp.cpp
-    ${CMAKE_CURRENT_BINARY_DIR}/mux-ram-256-8.o
+    ${CMAKE_CURRENT_BINARY_DIR}/mux-ram-8-8-8.o
     ${BACKWARD_ENABLE})
 add_sanitizers(iyokan)
 add_backward(iyokan)
@@ -85,7 +85,7 @@ endif(IYOKAN_ENABLE_CUDA)
 ##### test0
 add_executable(test0
     test0.cpp iyokan_plain.cpp iyokan_tfhepp.cpp
-    ${CMAKE_CURRENT_BINARY_DIR}/mux-ram-256-8.o
+    ${CMAKE_CURRENT_BINARY_DIR}/mux-ram-8-8-8.o
     ${BACKWARD_ENABLE})
 add_sanitizers(test0)
 add_backward(test0)
