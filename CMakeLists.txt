@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.5)
 
 set(CMAKE_MODULE_PATH
     ${CMAKE_SOURCE_DIR}
-    "${CMAKE_SOURCE_DIR}/sanitizers-cmake/cmake"
+    "${CMAKE_SOURCE_DIR}/thirdparty/sanitizers-cmake/cmake"
     ${CMAKE_MODULE_PATH}
 )
 
@@ -24,26 +24,26 @@ find_package(OpenMP REQUIRED)
 find_package(Sanitizers)
 find_package(TcMalloc)
 
-add_subdirectory(TFHEpp)
+add_subdirectory(thirdparty/TFHEpp)
 if (IYOKAN_ENABLE_CUDA)
     enable_language(CUDA)
-    add_subdirectory(cuFHE/cufhe)
+    add_subdirectory(thirdparty/cuFHE/cufhe)
 endif(IYOKAN_ENABLE_CUDA)
-add_subdirectory(${CMAKE_SOURCE_DIR}/backward-cpp)
-add_subdirectory(spdlog)
+add_subdirectory(${CMAKE_SOURCE_DIR}/thirdparty/backward-cpp)
+add_subdirectory(thirdparty/spdlog)
 
 set(IYOKAN_CXXFLAGS -Wall -Wextra -pedantic -Wno-sign-compare -g3)
 set(IYOKAN_CXXFLAGS_DEBUG   ${IYOKAN_CXXFLAGS} -O0)
 set(IYOKAN_CXXFLAGS_RELEASE ${IYOKAN_CXXFLAGS} -O3 -march=native -DNDEBUG)
 set(IYOKAN_INCLUDE_DIRS
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/picojson>
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/ThreadPool>
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/CLI11/include>
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/cereal/include>
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/ELFIO>
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/toml11>
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/spdlog/include>
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/fmt/include>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/thirdparty//picojson>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/thirdparty//ThreadPool>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/thirdparty//CLI11/include>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/thirdparty//cereal/include>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/thirdparty//ELFIO>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/thirdparty//toml11>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/thirdparty//spdlog/include>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/thirdparty//fmt/include>
 )
 if (IYOKAN_ENABLE_CUDA)
     list(APPEND IYOKAN_INCLUDE_DIRS ${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES})

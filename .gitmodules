@@ -1,33 +1,33 @@
 [submodule "picojson"]
-	path = picojson
+	path = thirdparty/picojson
 	url = https://github.com/kazuho/picojson.git
 [submodule "TFHEpp"]
-	path = TFHEpp
+	path = thirdparty/TFHEpp
 	url = https://github.com/virtualsecureplatform/TFHEpp.git
 [submodule "ThreadPool"]
-	path = ThreadPool
+	path = thirdparty/ThreadPool
 	url = https://github.com/progschj/ThreadPool.git
 [submodule "cereal"]
-	path = cereal
+	path = thirdparty/cereal
 	url = https://github.com/USCiLab/cereal.git
 [submodule "CLI11"]
-	path = CLI11
+	path = thirdparty/CLI11
 	url = https://github.com/CLIUtils/CLI11.git
 [submodule "sanitizers-cmake"]
-	path = sanitizers-cmake
+	path = thirdparty/sanitizers-cmake
 	url = https://github.com/arsenm/sanitizers-cmake.git
 [submodule "cuFHE"]
-	path = cuFHE
+	path = thirdparty/cuFHE
 	url = https://github.com/virtualsecureplatform/cuFHE.git
 [submodule "backward-cpp"]
-	path = backward-cpp
+	path = thirdparty/backward-cpp
 	url = https://github.com/bombela/backward-cpp.git
 [submodule "toml11"]
-	path = toml11
+	path = thirdparty/toml11
 	url = https://github.com/ToruNiina/toml11.git
 [submodule "spdlog"]
-	path = spdlog
+	path = thirdparty/spdlog
 	url = https://github.com/gabime/spdlog.git
 [submodule "fmt"]
-	path = fmt
+	path = thirdparty/fmt
 	url = https://github.com/fmtlib/fmt.git
