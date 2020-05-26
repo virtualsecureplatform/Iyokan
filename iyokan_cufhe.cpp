@@ -239,19 +239,19 @@ void makeTFHEppRAMNetworkForCUFHEImpl(
 
         ===========================================================================
 
-               +-------+   +--------+    B          +-----------+   B
-        B-> ---+ CMUXs |   | TFHEpp |    r          | Gate      |   r
-               |  [0]  +---|   2    | -- i -- SEI --| Boot-     |-- i -- Setter
-        A-> ---+       |   | cuFHE  |    d          | strapping |   d
-               +-------+   +--------+    g          +-----------+   g
-                                         e                          e
+               +-------+   B          +-----------+
+        B-> ---+ CMUXs |   r          | Gate      |
+               |  [0]  +-- i -- SEI --| Boot-     |
+        A-> ---+       |   d          | strapping |
+               +-------+   g          +-----------+
+                           e
 
-               +-------+   +--------+    B          +-----------+   B
-        B-> ---+ CMUXs |   | TFHEpp |    r          | Gate      |   r
-               |  [1]  +---|   2    | -- i -- SEI --| Boot-     |-- i -- Setter
-        A-> ---+       |   | cuFHE  |    d          | strapping |   d
-               +-------+   +--------+    g          +-----------+   g
-                                         e                          e
+               +-------+   B          +-----------+
+        B-> ---+ CMUXs |   r          | Gate      |
+               |  [1]  +-- i -- SEI --| Boot-     |
+        A-> ---+       |   d          | strapping |
+               +-------+   g          +-----------+
+                           e
 
                   ...
 
