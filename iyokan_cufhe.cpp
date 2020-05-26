@@ -290,24 +290,38 @@ void makeTFHEppRAMNetworkForCUFHEImpl(
     connectTasks(taskInputWriteEnabled, taskMUXWoSE);
 
     // Create links of CMUXs -> SEI -> GateBootstrapping.
-    for (int i = 0; i < (1 << addressWidth); i++) {
-        // Create components...
+    const size_t blockWidth = addressWidth < 8 ? 8 : addressWidth,
+                 blockSize = 1 << blockWidth;
+    for (int i = 0; i < (1 << (addressWidth - blockWidth)); i++) {
+        // Prepare mems
+        const int memFirstIndex = i << blockWidth;
+        std::vector<std::weak_ptr<cufhe::cuFHETRLWElvl1>> mem;
+        for (int j = 0; j < blockSize; j++)
+            mem.push_back(taskRAMUX->get(memFirstIndex + j));
+
+        // Create CMUXs and connect inputs to them.
+        const std::string strIndexRange =
+            fmt::format("[{}-{}][{}]", memFirstIndex,
+                        memFirstIndex + blockSize - 1, indexBit);
         auto taskCMUXs = bt.emplaceTask<TaskTFHEppRAMCMUXsForCUFHE>(
-            NodeLabel{"CMUXs", utility::fok("[", i, "]")}, addressWidth,
-            taskRAMUX->get(i), i);
-
-        auto taskSEIAndKS = bc.emplaceTask<TaskCUFHERAMSEIAndKS>(
-            NodeLabel{"SEI&KS", utility::fok("[", i, "]")});
-
-        auto taskGB = bc.emplaceTask<TaskCUFHERAMGateBootstrapping>(
-            NodeLabel{"GB", utility::fok("[", i, "]")}, taskRAMUX->get(i));
-
-        // ... and connect them.
+            NodeLabel{"CMUXs", strIndexRange}, addressWidth, std::move(mem),
+            memFirstIndex, blockSize);
         connectTasks(taskMUXWoSE, taskCMUXs);
         for (auto&& cb : cbs)
             connectTasks(cb, taskCMUXs);
-        bridge1.push_back(connectWithBridge(taskCMUXs, taskSEIAndKS));
-        connectTasks(taskSEIAndKS, taskGB);
+
+        // Create SEI&KS and GB, and connect them.
+        for (int j = 0; j < blockSize; j++) {
+            const int index = i * blockSize + j;
+            auto taskSEIAndKS = bc.emplaceTask<TaskCUFHERAMSEIAndKS>(
+                NodeLabel{"SEI&KS", fmt::format("[{}][{}]", index, indexBit)},
+                j);
+            auto taskGB = bc.emplaceTask<TaskCUFHERAMGateBootstrapping>(
+                NodeLabel{"GB", fmt::format("[{}][{}]", index, indexBit)},
+                taskRAMUX->get(index));
+            bridge1.push_back(connectWithBridge(taskCMUXs, taskSEIAndKS));
+            connectTasks(taskSEIAndKS, taskGB);
+        }
     }
 }
 
