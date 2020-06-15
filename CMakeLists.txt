@@ -5,6 +5,7 @@ set(CMAKE_MODULE_PATH
     "${CMAKE_SOURCE_DIR}/thirdparty/sanitizers-cmake/cmake"
     ${CMAKE_MODULE_PATH}
 )
+set(Backward_DIR "${CMAKE_SOURCE_DIR}/thirdparty/backward-cpp")
 
 # Defaults to CMAKE_BUILD_TYPE=Debug
 if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
@@ -22,32 +23,32 @@ project(iyokan LANGUAGES CXX)
 find_package(Threads REQUIRED)
 find_package(OpenMP REQUIRED)
 find_package(Sanitizers)
+find_package(Backward)
 
 add_subdirectory(thirdparty/TFHEpp)
 if (IYOKAN_ENABLE_CUDA)
     enable_language(CUDA)
     add_subdirectory(thirdparty/cuFHE/cufhe)
 endif(IYOKAN_ENABLE_CUDA)
-add_subdirectory(${CMAKE_SOURCE_DIR}/thirdparty/backward-cpp)
 add_subdirectory(thirdparty/spdlog)
 
-set(IYOKAN_CXXFLAGS -Wall -Wextra -pedantic -Wno-sign-compare -g3)
-set(IYOKAN_CXXFLAGS_DEBUG   ${IYOKAN_CXXFLAGS} -O0)
+set(IYOKAN_CXXFLAGS -Wall -Wextra -pedantic -Wno-sign-compare)
+set(IYOKAN_CXXFLAGS_DEBUG   ${IYOKAN_CXXFLAGS} -O0 -g3)
 set(IYOKAN_CXXFLAGS_RELEASE ${IYOKAN_CXXFLAGS} -O3 -march=native -DNDEBUG)
 set(IYOKAN_INCLUDE_DIRS
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/thirdparty//picojson>
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/thirdparty//ThreadPool>
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/thirdparty//CLI11/include>
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/thirdparty//cereal/include>
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/thirdparty//ELFIO>
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/thirdparty//toml11>
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/thirdparty//spdlog/include>
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/thirdparty//fmt/include>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/picojson>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/ThreadPool>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/CLI11/include>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/cereal/include>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/ELFIO>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/toml11>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/spdlog/include>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/fmt/include>
 )
 if (IYOKAN_ENABLE_CUDA)
     list(APPEND IYOKAN_INCLUDE_DIRS ${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES})
 endif(IYOKAN_ENABLE_CUDA)
-set(IYOKAN_LIBS tfhe++ Threads::Threads OpenMP::OpenMP_CXX stdc++fs)
+set(IYOKAN_LIBS tfhe++ Threads::Threads OpenMP::OpenMP_CXX Backward::Backward stdc++fs)
 
 set(CMAKE_C_FLAGS "")
 set(CMAKE_C_FLAGS_DEBUG "")
@@ -67,12 +68,10 @@ add_custom_command(OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/mux-ram-8-16-16.o
 
 ##### iyokan
 add_executable(iyokan
-    iyokan.cpp iyokan_plain.cpp iyokan_tfhepp.cpp
+    iyokan.cpp iyokan_plain.cpp iyokan_tfhepp.cpp error.cpp
     ${CMAKE_CURRENT_BINARY_DIR}/mux-ram-8-8-8.o
-    ${CMAKE_CURRENT_BINARY_DIR}/mux-ram-8-16-16.o
-    ${BACKWARD_ENABLE})
+    ${CMAKE_CURRENT_BINARY_DIR}/mux-ram-8-16-16.o)
 add_sanitizers(iyokan)
-add_backward(iyokan)
 target_compile_options(iyokan PUBLIC "$<$<CONFIG:DEBUG>:${IYOKAN_CXXFLAGS_DEBUG}>")
 target_compile_options(iyokan PUBLIC "$<$<CONFIG:RELEASE>:${IYOKAN_CXXFLAGS_RELEASE}>")
 target_link_libraries(iyokan ${IYOKAN_LIBS})
@@ -85,12 +84,10 @@ endif(IYOKAN_ENABLE_CUDA)
 
 ##### test0
 add_executable(test0
-    test0.cpp iyokan_plain.cpp iyokan_tfhepp.cpp
+    test0.cpp iyokan_plain.cpp iyokan_tfhepp.cpp error.cpp
     ${CMAKE_CURRENT_BINARY_DIR}/mux-ram-8-8-8.o
-    ${CMAKE_CURRENT_BINARY_DIR}/mux-ram-8-16-16.o
-    ${BACKWARD_ENABLE})
+    ${CMAKE_CURRENT_BINARY_DIR}/mux-ram-8-16-16.o)
 add_sanitizers(test0)
-add_backward(test0)
 target_compile_options(test0 PUBLIC "$<$<CONFIG:DEBUG>:${IYOKAN_CXXFLAGS_DEBUG}>")
 target_compile_options(test0 PUBLIC "$<$<CONFIG:RELEASE>:${IYOKAN_CXXFLAGS_RELEASE}>")
 target_link_libraries(test0 ${IYOKAN_LIBS})
@@ -102,9 +99,8 @@ if (IYOKAN_ENABLE_CUDA)
 endif(IYOKAN_ENABLE_CUDA)
 
 ##### iyokan-packet
-add_executable(iyokan-packet iyokan-packet.cpp ${BACKWARD_ENABLE})
+add_executable(iyokan-packet iyokan-packet.cpp error.cpp)
 add_sanitizers(iyokan-packet)
-add_backward(iyokan-packet)
 target_compile_options(iyokan-packet PUBLIC "$<$<CONFIG:DEBUG>:${IYOKAN_CXXFLAGS_DEBUG}>")
 target_compile_options(iyokan-packet PUBLIC "$<$<CONFIG:RELEASE>:${IYOKAN_CXXFLAGS_RELEASE}>")
 target_link_libraries(iyokan-packet ${IYOKAN_LIBS})
@@ -114,3 +110,4 @@ set_target_properties(iyokan test0 iyokan-packet
     PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin"
 )
+install(TARGETS iyokan iyokan-packet DESTINATION bin)
