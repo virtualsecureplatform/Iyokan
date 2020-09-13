@@ -47,7 +47,6 @@ struct TFHEppRunParameter {
     NetworkBlueprint blueprint;
     int numCPUWorkers, numCycles;
     std::string bkeyFile, inputFile, outputFile;
-    bool stdoutCSV;
 
     TFHEppRunParameter()
     {
@@ -88,14 +87,13 @@ struct TFHEppRunParameter {
         spdlog::info("\tBKey file: {}", bkeyFile);
         spdlog::info("\tInput file (request packet): {}", inputFile);
         spdlog::info("\tOutput file (result packet): {}", outputFile);
-        spdlog::info("\t--stdoutCSV: {}", stdoutCSV);
     }
 
     template <class Archive>
     void serialize(Archive &ar)
     {
-        ar(blueprint, numCPUWorkers, numCycles, bkeyFile, inputFile, outputFile,
-           stdoutCSV);
+        ar(blueprint, numCPUWorkers, numCycles, bkeyFile, inputFile,
+           outputFile);
     }
 };
 
@@ -466,7 +464,7 @@ public:
             using namespace utility;
 
             spdlog::info("#{}", currentCycle_ + 1);
-            if (pr_.stdoutCSV)
+            if (opt.stdoutCSV)
                 std::cout << std::chrono::system_clock::now() << ",start,"
                           << currentCycle_ + 1 << std::endl;
             if (opt.dumpPrefix && opt.secretKey)
@@ -500,7 +498,7 @@ public:
             });
 
             spdlog::info("\tdone. ({} us)", duration.count());
-            if (pr_.stdoutCSV)
+            if (opt.stdoutCSV)
                 std::cout << std::chrono::system_clock::now() << ",end,"
                           << currentCycle_ + 1 << std::endl;
         }
