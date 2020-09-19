@@ -25,6 +25,7 @@ find_package(OpenMP REQUIRED)
 find_package(Sanitizers)
 find_package(Backward)
 
+set(USE_80BIT_SECURITY ON CACHE BOOL "")
 add_subdirectory(thirdparty/TFHEpp)
 if (IYOKAN_ENABLE_CUDA)
     enable_language(CUDA)
@@ -49,6 +50,9 @@ if (IYOKAN_ENABLE_CUDA)
     list(APPEND IYOKAN_INCLUDE_DIRS ${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES})
 endif(IYOKAN_ENABLE_CUDA)
 set(IYOKAN_LIBS tfhe++ Threads::Threads OpenMP::OpenMP_CXX Backward::Backward stdc++fs)
+set(IYOKAN_COMPILE_DEFINITIONS
+    USE_80BIT_SECURITY # For TFHEpp headers
+)
 
 set(CMAKE_C_FLAGS "")
 set(CMAKE_C_FLAGS_DEBUG "")
@@ -76,6 +80,7 @@ target_compile_options(iyokan PUBLIC "$<$<CONFIG:DEBUG>:${IYOKAN_CXXFLAGS_DEBUG}
 target_compile_options(iyokan PUBLIC "$<$<CONFIG:RELEASE>:${IYOKAN_CXXFLAGS_RELEASE}>")
 target_link_libraries(iyokan ${IYOKAN_LIBS})
 target_include_directories(iyokan PRIVATE ${IYOKAN_INCLUDE_DIRS})
+target_compile_definitions(iyokan PRIVATE ${IYOKAN_COMPILE_DEFINITIONS})
 if (IYOKAN_ENABLE_CUDA)
     target_sources(iyokan PRIVATE iyokan_cufhe.cpp)
     target_link_libraries(iyokan cufhe_gpu ${CUDA_LIBRARIES})
@@ -92,6 +97,7 @@ target_compile_options(test0 PUBLIC "$<$<CONFIG:DEBUG>:${IYOKAN_CXXFLAGS_DEBUG}>
 target_compile_options(test0 PUBLIC "$<$<CONFIG:RELEASE>:${IYOKAN_CXXFLAGS_RELEASE}>")
 target_link_libraries(test0 ${IYOKAN_LIBS})
 target_include_directories(test0 PRIVATE ${IYOKAN_INCLUDE_DIRS})
+target_compile_definitions(test0 PRIVATE ${IYOKAN_COMPILE_DEFINITIONS})
 if (IYOKAN_ENABLE_CUDA)
     target_sources(test0 PRIVATE iyokan_cufhe.cpp)
     target_link_libraries(test0 cufhe_gpu ${CUDA_LIBRARIES})
@@ -105,6 +111,7 @@ target_compile_options(iyokan-packet PUBLIC "$<$<CONFIG:DEBUG>:${IYOKAN_CXXFLAGS
 target_compile_options(iyokan-packet PUBLIC "$<$<CONFIG:RELEASE>:${IYOKAN_CXXFLAGS_RELEASE}>")
 target_link_libraries(iyokan-packet ${IYOKAN_LIBS})
 target_include_directories(iyokan-packet PRIVATE ${IYOKAN_INCLUDE_DIRS})
+target_compile_definitions(iyokan-packet PRIVATE ${IYOKAN_COMPILE_DEFINITIONS})
 
 set_target_properties(iyokan test0 iyokan-packet
     PROPERTIES
