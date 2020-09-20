@@ -327,6 +327,8 @@ test_in_out "test/test-ram-8-16-16.toml", "test/test08.in", "test/test08.out",
 test_in_out "test/test-mux-ram-8-16-16.toml", "test/test08.in", "test/test08.out",
             ["-c", 8] # "-c 8" will be automatically set for args1 and args2
 
+test_in_out "test/cahp-ruby-mux-1KiB.toml", "test/test11.in", "test/test11.out"
+
 test_in_out "test/cahp-diamond.toml", "test/test00.in", "test/test00-diamond.out",
             ["--dump-prefix", "_test_dump"],
             ["--dump-prefix", "_test_dump", "--secret-key", "_test_sk"],
