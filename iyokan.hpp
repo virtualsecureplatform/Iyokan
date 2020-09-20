@@ -2257,6 +2257,9 @@ extern char _binary_mux_ram_8_8_8_min_json_size[];
 extern char _binary_mux_ram_8_16_16_min_json_start[];
 extern char _binary_mux_ram_8_16_16_min_json_end[];
 extern char _binary_mux_ram_8_16_16_min_json_size[];
+extern char _binary_mux_ram_9_16_16_min_json_start[];
+extern char _binary_mux_ram_9_16_16_min_json_end[];
+extern char _binary_mux_ram_9_16_16_min_json_size[];
 template <class NetworkBuilder>
 std::shared_ptr<typename NetworkBuilder::NetworkType> makeRAMWithMUX(
     int inAddrWidth, int dataWidth)
@@ -2280,6 +2283,7 @@ std::shared_ptr<typename NetworkBuilder::NetworkType> makeRAMWithMUX(
     }
     USE_PRECOMPILED_BINARY(8, 8);
     USE_PRECOMPILED_BINARY(8, 16);
+    USE_PRECOMPILED_BINARY(9, 16);
 #undef USE_PRECOMPILED_BINARY
 
     // Create inputs
