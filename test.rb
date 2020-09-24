@@ -5,8 +5,23 @@ require "open3"
 require "pathname"
 require "json"
 require "toml-rb"
+require "logger"
 
+def print_usage_and_exit(ret = 1)
+  puts "Usage: #{$0} PATH [fast|plain|tfhe|cufhe]"
+  exit ret
+end
+
+##### Globals
+$logger = Logger.new $stderr, level: :info
+$req_file = "_test_req_packet"
+$res_file = "_test_res_packet"
+$skey = "_test_sk"
+$bkey = "_test_bk"
 $has_any_error = false
+
+print_usage_and_exit unless ARGV.size >= 2
+$path = ARGV.shift
 
 ##### utility #####
 
@@ -56,6 +71,8 @@ def assert_equal_packet(got, expected)
   assert_equal toml2packet(got), toml2packet(expected)
 end
 
+#### Run
+
 def run_command(command, args = [])
   path = Pathname.new($path) / command
   cmd = "#{Shellwords.join([path.to_s] + args)}"
@@ -72,31 +89,18 @@ def run_iyokan_packet(args)
   run_command "./iyokan-packet", args
 end
 
-def print_error(fh, command, args, ex)
-  $has_any_error = true
-  fh.puts "\e[31m[ERROR] #{command.inspect} [#{args.map { |s| s.inspect }.join(", ")}]\e[m"
-  fh.puts ex.full_message
-  fh.puts
-end
-
-raise "ruby test.rb PATH [slow]" unless ARGV.size >= 1
-
-$path = ARGV.shift
-$path ||= ""
-
-$SLOW_MODE_ENABLED = ARGV.include?("slow")
-$CUDA_MODE_ENABLED = ARGV.include?("cuda")
-
 ##### test0 #####
 
+$logger.info "test0 running..."
 run_command "./test0"
+$logger.info "test0 done."
 
 ##### prepare #####
 
-run_iyokan_packet ["genkey", "--type", "tfhepp", "--out", "_test_sk"]
-if $SLOW_MODE_ENABLED
-  run_iyokan_packet ["genbkey", "--in", "_test_sk", "--out", "_test_bk"]
-end
+$logger.info "Preparing skey and bkey..."
+run_iyokan_packet ["genkey", "--type", "tfhepp", "--out", $skey] unless File.exist? $skey
+run_iyokan_packet ["genbkey", "--in", $skey, "--out", $bkey] unless File.exist? $bkey
+$logger.info "Preparing skey and bkey done."
 
 ##### method toml2packet #####
 
@@ -106,6 +110,7 @@ def test_method_toml2packet(in_file, expected)
   assert_equal got, expected
 end
 
+$logger.info "Testing toml2packet..."
 test_method_toml2packet "test/test03.in", {
   cycles: -1,
   ram: {},
@@ -115,229 +120,257 @@ test_method_toml2packet "test/test03.in", {
     "piyo" => { size: 3, bytes: [0] },
   },
 }
+$logger.info "Testing toml2packet done."
 
 ##### iyokan-packet #####
 
 def test_iyokan_packet_e2e(in_file)
-  plain_pkt = "_test_plain_packet"
-  pkt = "_test_packet"
-  skey = "_test_sk"
-  bkey = "_test_bk"
+  pkt = $req_file
 
-  run_iyokan_packet ["toml2packet", "--in", in_file, "--out", plain_pkt]
-  if $SLOW_MODE_ENABLED
-    run_iyokan_packet ["enc", "--key", skey, "--in", plain_pkt, "--out", pkt]
-    run_iyokan_packet ["dec", "--key", skey, "--in", pkt, "--out", plain_pkt]
-  end
-  r = run_iyokan_packet ["packet2toml", "--in", plain_pkt]
+  run_iyokan_packet ["toml2packet", "--in", in_file, "--out", pkt]
+  run_iyokan_packet ["enc", "--key", $skey, "--in", pkt, "--out", pkt]
+  run_iyokan_packet ["dec", "--key", $skey, "--in", pkt, "--out", pkt]
+  r = run_iyokan_packet ["packet2toml", "--in", pkt]
 
   got = TomlRB.parse(r)
   expected = TomlRB.load_file(in_file)
   assert_equal_packet got, expected
 end
 
+$logger.info "Testing toml2packet running..."
 test_iyokan_packet_e2e "test/test00.in"
 test_iyokan_packet_e2e "test/test00-diamond.out"
 test_iyokan_packet_e2e "test/test03.in"
+$logger.info "Testing toml2packet done."
 
 ##### iyokan #####
 
-## args1 == nil means tests for TFHEpp won't run. args2 == nil for cuFHE.
-## args0 must not be nil. Tests for plain must run.
-def test_in_out(blueprint, in_file, out_file, args0 = [], args1 = [], args2 = [])
-  raise "args0 must not be nil" if args0.nil?
-
-  plain_req_file = "_test_plain_req_packet"
-  plain_res_file = "_test_plain_res_packet"
-  req_file = "_test_req_packet"
-  res_file = "_test_res_packet"
-  secret_key = "_test_sk"
-  bkey = "_test_bk"
-  snapshot0 = "_test_snapshot0"
-  snapshot1 = "_test_snapshot1"
-  cycles = -1
-
-  run_iyokan_packet ["toml2packet",
-                     "--in", in_file,
-                     "--out", plain_req_file]
-
-  ## Check plain mode
-  if args0.empty? and not block_given?
-    ## Use snapshot
-    run_iyokan ["plain",
-                "--blueprint", blueprint,
-                "-i", plain_req_file,
-                "-o", plain_res_file,
-                "-c", 1,
-                "--snapshot", snapshot0]
-    run_iyokan ["plain",
-                "--resume", snapshot0,
-                "--snapshot", snapshot1]
-    run_iyokan ["plain",
-                "-c", -1,
-                "--resume", snapshot1]
-  else
-    ## Don't use snapshot in complex situations
-    run_iyokan ["plain",
-                "--blueprint", blueprint,
-                "-i", plain_req_file,
-                "-o", plain_res_file] + args0
+class TestRunner
+  def initialize(tests)
+    @tests = tests
   end
-  r = run_iyokan_packet ["packet2toml", "--in", plain_res_file]
-  got = TomlRB.parse(r)
-  expected = TomlRB.load_file(out_file)
-  assert_equal_packet got, expected
-  yield 0 if block_given?
-  cycles = got["cycles"]  # Get # of cycles for the rest
 
-  if $SLOW_MODE_ENABLED
-    run_iyokan_packet ["enc",
-                       "--key", secret_key,
-                       "--in", plain_req_file,
-                       "--out", req_file]
-
-    unless args1.nil?
-      ## Check TFHE mode
-      if args1.empty? and not block_given? and cycles > 2
-        ## Use snapshot
-        run_iyokan ["tfhe",
-                    "--blueprint", blueprint,
-                    "-c", 1,
-                    "--bkey", bkey,
-                    "-i", req_file,
-                    "-o", res_file,
-                    "--snapshot", snapshot0]
-        run_iyokan ["tfhe",
-                    "--resume", snapshot0,
-                    "--bkey", bkey,
-                    "--snapshot", snapshot1]
-        run_iyokan ["tfhe",
-                    "--resume", snapshot1,
-                    "--bkey", bkey,
-                    "-c", cycles - 2]
-      else
-        ## Don't use snapshot in complex situations
-        run_iyokan ["tfhe",
-                    "--blueprint", blueprint,
-                    "-c", cycles,
-                    "--bkey", bkey,
-                    "-i", req_file,
-                    "-o", res_file] + args1
-      end
-      run_iyokan_packet ["dec",
-                         "--key", secret_key,
-                         "--in", res_file,
-                         "--out", plain_res_file]
-      r = run_iyokan_packet ["packet2toml", "--in", plain_res_file]
-      got = TomlRB.parse(r)
-      expected = TomlRB.load_file(out_file)
-      assert_equal_packet got, expected
-      yield 1 if block_given?
-    end
-
-    if $CUDA_MODE_ENABLED
-      unless args2.nil?
-        ## Check cuFHE mode
-        if args2.empty? and not block_given? and cycles > 2
-          ## Use snapshot
-          run_iyokan ["tfhe",
-                      "--enable-gpu",
-                      "--blueprint", blueprint,
-                      "-c", 1,
-                      "--bkey", bkey,
-                      "-i", req_file,
-                      "-o", res_file,
-                      "--snapshot", snapshot0]
-          run_iyokan ["tfhe",
-                      "--resume", snapshot0,
-                      "--bkey", bkey,
-                      "--snapshot", snapshot1]
-          run_iyokan ["tfhe",
-                      "--resume", snapshot1,
-                      "--bkey", bkey,
-                      "-c", cycles - 2]
-        else
-          ## Dont use snapshot in complex situations.
-          run_iyokan ["tfhe",
-                      "--enable-gpu",
-                      "--blueprint", blueprint,
-                      "-c", cycles,
-                      "--bkey", bkey,
-                      "-i", req_file,
-                      "-o", res_file] + args2
-        end
-        run_iyokan_packet ["dec",
-                           "--key", secret_key,
-                           "--in", res_file,
-                           "--out", plain_res_file]
-        r = run_iyokan_packet ["packet2toml", "--in", plain_res_file]
-        got = TomlRB.parse(r)
-        expected = TomlRB.load_file(out_file)
-        assert_equal_packet got, expected
-        yield 2 if block_given?
-      end
+  def run
+    @tests.each do |test|
+      $logger.info "Test #{test[:name]} running..."
+      start = Time.now
+      test[:body].call
+      $logger.info "Test #{test[:name]} done. (#{Time.now - start} sec.)"
+    rescue
+      $logger.fatal "Test #{test[:name]} failed!"
+      raise $!  # re-throw the exception
     end
   end
-rescue => ex
-  print_error $stderr, "test_in_out", [blueprint, in_file, out_file], ex
 end
 
-test_in_out "test/cahp-diamond.toml", "test/test00.in", "test/test00-diamond.out"
-test_in_out "test/cahp-emerald.toml", "test/test00.in", "test/test00-emerald.out"
-test_in_out "test/cahp-ruby.toml", "test/test09.in", "test/test09-ruby.out"
-test_in_out "test/cahp-pearl.toml", "test/test09.in", "test/test09-pearl.out"
+class TestRegisterer
+  def initialize
+    @tests = {}
+  end
 
-test_in_out "test/cahp-diamond-mux.toml", "test/test00.in", "test/test00-diamond.out"
-test_in_out "test/cahp-emerald-mux.toml", "test/test00.in", "test/test00-emerald.out"
-test_in_out "test/cahp-ruby-mux.toml", "test/test09.in", "test/test09-ruby.out"
-test_in_out "test/cahp-pearl-mux.toml", "test/test09.in", "test/test09-pearl.out"
+  def add(name, tags, &body)
+    tags = (tags + [name.to_sym]).uniq
+    @tests[name] = {
+      name: name,
+      tags: tags,
+      body: body,
+    }
+    $logger.info "Test #{name} (#{tags}) added."
+  end
 
-test_in_out "test/cahp-diamond.toml", "test/test01.in", "test/test01-diamond.out",
-            [], nil, [] # Won't do test for TFHEpp
-test_in_out "test/cahp-emerald.toml", "test/test01.in", "test/test01-emerald.out",
-            [], nil, [] # Won't do test for TFHEpp
-test_in_out "test/cahp-ruby.toml", "test/test10.in", "test/test10-ruby.out",
-            [], nil, [] # Won't do test for TFHEpp
-test_in_out "test/cahp-pearl.toml", "test/test10.in", "test/test10-pearl.out",
-            [], nil, [] # Won't do test for TFHEpp
+  def add_plain(name, blueprint, in_file, out_file,
+                tags: [], ncycles: -1, iyokan_args: [], after_assert: nil)
+    name = "plain-" + name
+    add(name, tags + [:plain, :fast]) do
+      run_iyokan_packet ["toml2packet",
+                         "--in", in_file,
+                         "--out", $req_file]
+      run_iyokan (["plain",
+                   "--blueprint", blueprint,
+                   "-i", $req_file,
+                   "-o", $res_file,
+                   "-c", ncycles] + iyokan_args)
+      r = run_iyokan_packet ["packet2toml", "--in", $res_file]
 
-#test_in_out "test/cahp-diamond-mux.toml", "test/test01.in", "test/test01-diamond.out",
-#            [], nil, [] # Won't do test for TFHEpp
-#test_in_out "test/cahp-emerald-mux.toml", "test/test01.in", "test/test01-emerald.out",
-#            [], nil, [] # Won't do test for TFHEpp
-#test_in_out "test/cahp-ruby-mux.toml", "test/test10.in", "test/test10-ruby.out",
-#            [], nil, [] # Won't do test for TFHEpp
-#test_in_out "test/cahp-pearl-mux.toml", "test/test10.in", "test/test10-pearl.out",
-#            [], nil, [] # Won't do test for TFHEpp
+      got = TomlRB.parse r
+      expected = TomlRB.load_file out_file
+      assert_equal_packet got, expected
 
-test_in_out "test/test-addr-4bit.toml", "test/test04.in", "test/test04.out",
-            ["-c", 1] # "-c 1" will be automatically set for args1 and args2
-test_in_out "test/test-div-8bit.toml", "test/test05.in", "test/test05.out",
-            ["-c", 1] # "-c 1" will be automatically set for args1 and args2
-test_in_out "test/test-ram-addr8bit.toml", "test/test06.in", "test/test06.out",
-            ["-c", 16] # "-c 16" will be automatically set for args1 and args2
-test_in_out "test/test-ram-addr9bit.toml", "test/test07.in", "test/test07.out",
-            ["-c", 16] # "-c 16" will be automatically set for args1 and args2
-test_in_out "test/test-mux-ram-addr8bit.toml", "test/test06.in", "test/test06.out",
-            ["-c", 16] # "-c 16" will be automatically set for args1 and args2
-test_in_out "test/test-mux-ram-addr9bit.toml", "test/test07.in", "test/test07.out",
-            ["-c", 16] # "-c 16" will be automatically set for args1 and args2
-test_in_out "test/test-ram-8-16-16.toml", "test/test08.in", "test/test08.out",
-            ["-c", 8] # "-c 8" will be automatically set for args1 and args2
-test_in_out "test/test-mux-ram-8-16-16.toml", "test/test08.in", "test/test08.out",
-            ["-c", 8] # "-c 8" will be automatically set for args1 and args2
+      after_assert.call unless after_assert.nil?
+    end
+  end
 
-test_in_out "test/cahp-ruby-mux-1KiB.toml", "test/test11.in", "test/test11.out"
+  def add_tfhe(name, blueprint, in_file, out_file,
+               tags: [], ncycles:, iyokan_args: [], after_assert: nil)
+    add("tfhe-" + name, tags + [:tfhe]) do
+      run_iyokan_packet ["toml2packet",
+                         "--in", in_file,
+                         "--out", $req_file]
+      run_iyokan_packet ["enc",
+                         "--key", $skey,
+                         "--in", $req_file,
+                         "--out", $req_file]
+      run_iyokan (["tfhe",
+                   "--blueprint", blueprint,
+                   "--bkey", $bkey,
+                   "-i", $req_file,
+                   "-o", $res_file,
+                   "-c", ncycles] + iyokan_args)
+      run_iyokan_packet ["dec",
+                         "--key", $skey,
+                         "--in", $res_file,
+                         "--out", $res_file]
+      r = run_iyokan_packet ["packet2toml", "--in", $res_file]
 
-test_in_out "test/cahp-diamond.toml", "test/test00.in", "test/test00-diamond.out",
-            ["--dump-prefix", "_test_dump"],
-            ["--dump-prefix", "_test_dump", "--secret-key", "_test_sk"],
-            ["--dump-prefix", "_test_dump", "--secret-key", "_test_sk"] do |_|
+      got = TomlRB.parse r
+      expected = TomlRB.load_file out_file
+      assert_equal_packet got, expected
+
+      after_assert.call unless after_assert.nil?
+    end
+  end
+
+  def add_cufhe(name, blueprint, in_file, out_file,
+                tags: [], ncycles:, iyokan_args: [], after_assert: nil)
+    add("cufhe-" + name, tags + [:cufhe]) do
+      run_iyokan_packet ["toml2packet",
+                         "--in", in_file,
+                         "--out", $req_file]
+      run_iyokan_packet ["enc",
+                         "--key", $skey,
+                         "--in", $req_file,
+                         "--out", $req_file]
+      run_iyokan (["tfhe",
+                   "--enable-gpu",
+                   "--blueprint", blueprint,
+                   "--bkey", $bkey,
+                   "-i", $req_file,
+                   "-o", $res_file,
+                   "-c", ncycles] + iyokan_args)
+      run_iyokan_packet ["dec",
+                         "--key", $skey,
+                         "--in", $res_file,
+                         "--out", $res_file]
+      r = run_iyokan_packet ["packet2toml", "--in", $res_file]
+
+      got = TomlRB.parse r
+      expected = TomlRB.load_file out_file
+      assert_equal_packet got, expected
+
+      after_assert.call unless after_assert.nil?
+    end
+  end
+
+  def add_in_out(name, blueprint, in_file, out_file,
+                 ncycles:, set_plain_ncycles: false,
+                 plain_tags: [], tfhe_tags: [], cufhe_tags: [],
+                 plain_iyokan_args: [], tfhe_iyokan_args: [], cufhe_iyokan_args: [],
+                 &after_assert)
+    unless plain_tags.nil?
+      add_plain name, blueprint, in_file, out_file,
+                tags: plain_tags,
+                ncycles: (set_plain_ncycles ? ncycles : -1),
+                iyokan_args: plain_iyokan_args,
+                after_assert: after_assert
+    end
+    unless tfhe_tags.nil?
+      add_tfhe name, blueprint, in_file, out_file,
+               tags: tfhe_tags,
+               ncycles: ncycles,
+               iyokan_args: tfhe_iyokan_args,
+               after_assert: after_assert
+    end
+    unless cufhe_tags.nil?
+      add_cufhe name, blueprint, in_file, out_file,
+                tags: cufhe_tags,
+                ncycles: ncycles,
+                iyokan_args: cufhe_iyokan_args,
+                after_assert: after_assert
+    end
+  end
+
+  def get_runner(tags: [])
+    tests = @tests.select { |name, test|
+      tags.all? { |tag| test[:tags].include? tag }
+    }.values.shuffle
+    $logger.info "[#{tests.size} TESTS SELECTED (#{tags})] #{tests.map { |t| t[:name] }.join(", ")}"
+    TestRunner.new tests
+  end
+end
+
+reg = TestRegisterer.new
+
+reg.add_in_out "cahp-diamond-00", "test/cahp-diamond.toml",
+               "test/test00.in", "test/test00-diamond.out", ncycles: 8, cufhe_tags: [:fast]
+reg.add_in_out "cahp-emerald-00", "test/cahp-emerald.toml",
+               "test/test00.in", "test/test00-emerald.out", ncycles: 6
+reg.add_in_out "cahp-ruby-09", "test/cahp-ruby.toml",
+               "test/test09.in", "test/test09-ruby.out", ncycles: 7
+reg.add_in_out "cahp-pearl-09", "test/cahp-pearl.toml",
+               "test/test09.in", "test/test09-pearl.out", ncycles: 3
+
+reg.add_in_out "cahp-diamond-mux-00", "test/cahp-diamond-mux.toml",
+               "test/test00.in", "test/test00-diamond.out", ncycles: 8
+reg.add_in_out "cahp-emerald-mux-00", "test/cahp-emerald-mux.toml",
+               "test/test00.in", "test/test00-emerald.out", ncycles: 6
+reg.add_in_out "cahp-ruby-mux-09", "test/cahp-ruby-mux.toml",
+               "test/test09.in", "test/test09-ruby.out", ncycles: 7
+reg.add_in_out "cahp-pearl-mux-09", "test/cahp-pearl-mux.toml",
+               "test/test09.in", "test/test09-pearl.out", ncycles: 3
+
+reg.add_in_out "cahp-diamond-01", "test/cahp-diamond.toml",
+               "test/test01.in", "test/test01-diamond.out", ncycles: 346, tfhe_tags: nil
+reg.add_in_out "cahp-emerald-01", "test/cahp-emerald.toml",
+               "test/test01.in", "test/test01-emerald.out", ncycles: 261, tfhe_tags: nil
+reg.add_in_out "cahp-ruby-10", "test/cahp-ruby.toml",
+               "test/test10.in", "test/test10-ruby.out", ncycles: 362, tfhe_tags: nil
+reg.add_in_out "cahp-pearl-10", "test/cahp-pearl.toml",
+               "test/test10.in", "test/test10-pearl.out", ncycles: 264, tfhe_tags: nil
+
+reg.add_in_out "cahp-diamond-mux-01", "test/cahp-diamond-mux.toml",
+               "test/test01.in", "test/test01-diamond.out", ncycles: 346, tfhe_tags: nil
+reg.add_in_out "cahp-emerald-mux-01", "test/cahp-emerald-mux.toml",
+               "test/test01.in", "test/test01-emerald.out", ncycles: 261, tfhe_tags: nil
+reg.add_in_out "cahp-ruby-mux-10", "test/cahp-ruby-mux.toml",
+               "test/test10.in", "test/test10-ruby.out", ncycles: 362, tfhe_tags: nil
+reg.add_in_out "cahp-pearl-mux-10", "test/cahp-pearl-mux.toml",
+               "test/test10.in", "test/test10-pearl.out", ncycles: 264, tfhe_tags: nil
+
+reg.add_in_out "cahp-ruby-mux-1KiB-11", "test/cahp-ruby-mux-1KiB.toml",
+               "test/test11.in", "test/test11.out", ncycles: 8
+
+reg.add_in_out "addr-4bit-04", "test/test-addr-4bit.toml",
+               "test/test04.in", "test/test04.out", ncycles: 1, set_plain_ncycles: true
+reg.add_in_out "div-8bit-05", "test/test-div-8bit.toml",
+               "test/test05.in", "test/test05.out", ncycles: 1, set_plain_ncycles: true
+reg.add_in_out "ram-addr8bit-06", "test/test-ram-addr8bit.toml",
+               "test/test06.in", "test/test06.out", ncycles: 16, set_plain_ncycles: true
+reg.add_in_out "ram-addr9bit-07", "test/test-ram-addr9bit.toml",
+               "test/test07.in", "test/test07.out", ncycles: 16, set_plain_ncycles: true
+reg.add_in_out "mux-ram-addr8bit-06", "test/test-mux-ram-addr8bit.toml",
+               "test/test06.in", "test/test06.out", ncycles: 16, set_plain_ncycles: true
+reg.add_in_out "mux-ram-addr9bit-07", "test/test-mux-ram-addr9bit.toml",
+               "test/test07.in", "test/test07.out", ncycles: 16, set_plain_ncycles: true
+reg.add_in_out "ram-8-16-16-08", "test/test-ram-8-16-16.toml",
+               "test/test08.in", "test/test08.out", ncycles: 8, set_plain_ncycles: true
+reg.add_in_out "mux-ram-8-16-16-08", "test/test-mux-ram-8-16-16.toml",
+               "test/test08.in", "test/test08.out", ncycles: 8, set_plain_ncycles: true
+
+reg.add_in_out("cahp-diamond-dump-prefix-00", "test/cahp-diamond.toml",
+               "test/test00.in", "test/test00-diamond.out",
+               ncycles: 8,
+               plain_iyokan_args: ["--dump-prefix", "_test_dump"],
+               tfhe_iyokan_args: ["--dump-prefix", "_test_dump", "--secret-key", "_test_sk"],
+               cufhe_iyokan_args: ["--dump-prefix", "_test_dump", "--secret-key", "_test_sk"]) do
   r = run_iyokan_packet ["packet2toml", "--in", "_test_dump-7"]
   toml = TomlRB.parse(r)
   assert_equal toml["cycles"].to_i, 7
   assert_include toml["bits"], { "bytes" => [0], "size" => 1, "name" => "finflag" }
   assert_include toml["bits"], { "bytes" => [42, 0], "size" => 16, "name" => "reg_x0" }
 end
+
+##### Parse command-line arguments
+runner = reg.get_runner(tags: ARGV.map(&:to_sym))
+runner.run
 
 exit 1 if $has_any_error
