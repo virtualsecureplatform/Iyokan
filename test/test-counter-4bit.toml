@@ -1,0 +1,10 @@
+[[file]]
+type = "iyokanl1-json"
+path = "test-counter-4bit.json"
+name = "counter"
+
+[connect]
+"counter/reset" = "@reset"
+"@out[0:3]" = "counter/io_out[0:3]"
+
+
