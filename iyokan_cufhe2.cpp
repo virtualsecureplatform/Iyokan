@@ -391,14 +391,14 @@ public:
         cudaNodes_.at(id).emplace(node);           \
         break;                                     \
     }
-                CASE_GATE_2IN_1OUT(AND, cufhe::And);
-                CASE_GATE_2IN_1OUT(NAND, cufhe::Nand);
-                CASE_GATE_2IN_1OUT(ANDNOT, cufhe::AndYN);
-                CASE_GATE_2IN_1OUT(OR, cufhe::Or);
-                CASE_GATE_2IN_1OUT(NOR, cufhe::Nor);
-                CASE_GATE_2IN_1OUT(ORNOT, cufhe::OrYN);
-                CASE_GATE_2IN_1OUT(XOR, cufhe::Xor);
-                CASE_GATE_2IN_1OUT(XNOR, cufhe::Xnor);
+                CASE_GATE_2IN_1OUT(AND, cufhe::gAnd);
+                CASE_GATE_2IN_1OUT(NAND, cufhe::gNand);
+                CASE_GATE_2IN_1OUT(ANDNOT, cufhe::gAndYN);
+                CASE_GATE_2IN_1OUT(OR, cufhe::gOr);
+                CASE_GATE_2IN_1OUT(NOR, cufhe::gNor);
+                CASE_GATE_2IN_1OUT(ORNOT, cufhe::gOrYN);
+                CASE_GATE_2IN_1OUT(XOR, cufhe::gXor);
+                CASE_GATE_2IN_1OUT(XNOR, cufhe::gXnor);
 #undef CASE_GATE_2IN_1OUT
 
             case GateInfo::Kind::MUX: {
@@ -408,7 +408,7 @@ public:
                     auto& in1 = *ctxts_.at(gate.in[1]);
                     auto& in2 = *ctxts_.at(gate.in[2]);
                     auto& out = *ctxts_.at(id);
-                    cufhe::Mux(out, in2, in1, in0, s);
+                    cufhe::gMux(out, in2, in1, in0, s);
                 });
                 cudaNodes_.at(id).emplace(node);
                 break;
@@ -419,7 +419,7 @@ public:
                     assert(gate.in.size() == 1);
                     auto& in0 = *ctxts_.at(gate.in[0]);
                     auto& out = *ctxts_.at(id);
-                    cufhe::Not(out, in0, s);
+                    cufhe::gNot(out, in0, s);
                 });
                 cudaNodes_.at(id).emplace(node);
                 break;
@@ -436,7 +436,7 @@ public:
                     auto node = cuda.addKernel([&](auto&& s) {
                         auto& in0 = *ctxts_.at(gate.in[0]);
                         auto& out = *ctxts_.at(id);
-                        cufhe::Copy(out, in0, s);
+                        cufhe::gCopy(out, in0, s);
                     });
                     cudaNodes_.at(id).emplace(node);
                 }
@@ -447,7 +447,7 @@ public:
                     assert(gate.in.size() == 1);
                     auto& in0 = *ctxts_.at(gate.in[0]);
                     auto& out = *ctxts_.at(id);
-                    cufhe::Copy(out, in0, s);
+                    cufhe::gCopy(out, in0, s);
                 });
                 cudaNodes_.at(id).emplace(node);
                 break;
@@ -506,9 +506,21 @@ public:
         }
     }
 
-    void copyCtxt(cufhe::Ctxt& dst, const cufhe::Ctxt& src)
+    // Copy `src` host data to `src` device and `dst` host and device
+    // i.e., dst.host = dst.device = src.device = src.host
+    void copyCtxtH2HD(cufhe::Ctxt& dst, const cufhe::Ctxt& src)
     {
         cufhe::Copy(dst, src, stream_);
+        cufhe::Synchronize();
+    }
+
+    // Copy `src` device data to `dst` host and device
+    // i.e., dst.host = dst.device = src.device
+    void copyCtxtD2HD(cufhe::Ctxt& dst, const cufhe::Ctxt& src)
+    {
+        cufhe::Stream st = stream_;
+        gCopy(dst, src, stream_);
+        CtxtCopyD2H(dst, st);
         cufhe::Synchronize();
     }
 
@@ -518,7 +530,7 @@ public:
         auto name = std::make_tuple(nodeName, "rom", "romdata", bitIndex);
         auto id = name2id_.at(name);
         auto& dst = *ctxts_.at(id);
-        copyCtxt(dst, src);
+        copyCtxtH2HD(dst, src);
     }
 
     void setRAMData(const std::string& nodeName, int bitIndex,
@@ -527,7 +539,7 @@ public:
         auto name = std::make_tuple(nodeName, "ram", "ramdata", bitIndex);
         auto id = name2id_.at(name);
         auto& dst = *ctxts_.at(id);
-        copyCtxt(dst, src);
+        copyCtxtH2HD(dst, src);
     }
 
     void getRAMData(cufhe::Ctxt& dst, const std::string& nodeName, int bitIndex)
@@ -535,7 +547,7 @@ public:
         auto name = std::make_tuple(nodeName, "ram", "ramdata", bitIndex);
         auto id = name2id_.at(name);
         auto& src = *ctxts_.at(id);
-        copyCtxt(dst, src);
+        copyCtxtD2HD(dst, src);
     }
 
     void setInputData(const std::string& nodeName, const std::string& portName,
@@ -544,7 +556,7 @@ public:
         auto name = std::make_tuple(nodeName, "input", portName, portBit);
         auto id = name2id_.at(name);
         auto& dst = *ctxts_.at(id);
-        copyCtxt(dst, src);
+        copyCtxtH2HD(dst, src);
     }
 
     void getOutputData(cufhe::Ctxt& dst, const std::string& nodeName,
@@ -553,7 +565,7 @@ public:
         auto name = std::make_tuple(nodeName, "output", portName, portBit);
         auto id = name2id_.at(name);
         auto& src = *ctxts_.at(id);
-        copyCtxt(dst, src);
+        copyCtxtD2HD(dst, src);
     }
 
     void tick()
@@ -563,7 +575,7 @@ public:
             int dep = gates_.at(id).in[0];
             auto& dst = *ctxts_.at(id);
             auto& src = *ctxts_.at(dep);
-            cufhe::Copy(dst, src, stream_);
+            cufhe::gCopy(dst, src, stream_);
         }
         cufhe::Synchronize();
     }
