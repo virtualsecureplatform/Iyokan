@@ -1,0 +1,9 @@
+[[file]]
+type = "iyokanl1-json"
+path = "test-pass-4bit.json"
+name = "pass"
+
+[connect]
+"pass/io_in[0:3]" = "@A[0:3]"
+"@out[0:3]" = "pass/io_out[0:3]"
+
