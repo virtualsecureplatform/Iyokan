@@ -6,7 +6,7 @@
 #include "iyokan_tfhepp.hpp"
 
 #ifdef IYOKAN_CUDA_ENABLED
-#include "iyokan_cufhe.hpp"
+#include "iyokan_cufhe2.hpp"
 #endif
 
 int main(int argc, char **argv)
@@ -173,11 +173,11 @@ int main(int argc, char **argv)
         case TYPE::TFHE:
             if (!isSerializedTFHEppFrontend(*opt.resumeFile)) {
 #ifdef IYOKAN_CUDA_ENABLED
-                if (isSerializedCUFHEFrontend(*opt.resumeFile))
-                    enableGPU = true;
-                else
+                // if (isSerializedCUFHEFrontend(*opt.resumeFile))
+                //    enableGPU = true;
+                // else
 #endif
-                    error::die("Invalid resume file: ", *opt.resumeFile);
+                error::die("Invalid resume file: ", *opt.resumeFile);
             }
             break;
         }
@@ -192,7 +192,7 @@ int main(int argc, char **argv)
     case TYPE::TFHE:
 #ifdef IYOKAN_CUDA_ENABLED
         if (enableGPU)
-            doCUFHE(opt);
+            doCUFHE2(opt);
         else
 #endif
             doTFHE(opt);
