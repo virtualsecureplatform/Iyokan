@@ -154,11 +154,13 @@ class TestRunner
     @tests.each do |test|
       $logger.info "Test #{test[:name]} running..."
       start = Time.now
-      test[:body].call
-      $logger.info "Test #{test[:name]} done. (#{Time.now - start} sec.)"
-    rescue
-      $logger.fatal "Test #{test[:name]} failed!"
-      raise $!  # re-throw the exception
+      begin
+        test[:body].call
+        $logger.info "Test #{test[:name]} done. (#{Time.now - start} sec.)"
+      rescue
+        $logger.fatal "Test #{test[:name]} failed! (#{Time.now - start} sec.)"
+        raise $!  # re-throw the exception
+      end
     end
   end
 end
