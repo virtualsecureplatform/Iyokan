@@ -31,11 +31,11 @@ std::shared_ptr<cufhe::PubKey> tfhepp2cufhe(const TFHEpp::GateKey& src)
 
     // Read the bootstrapping key.
     for (int p = 0; p < n; p++) {
-        const TFHEpp::TRGSWFFTlvl1& trgswfft = src.bkfftlvl01[p];
+        const TRGSWFFTlvl1& trgswfft = src.bkfftlvl01[p];
         for (int q = 0; q < (k + 1) * l; q++) {
             for (int r = 0; r < (k + 1); r++) {
-                TFHEpp::Polynomiallvl1 poly;
-                TFHEpp::TwistFFTlvl1(poly, trgswfft[q][r]);
+                Polynomiallvl1 poly;
+                TwistFFTlvl1(poly, trgswfft[q][r]);
                 for (int s = 0; s < N; s++) {
                     int index = ((p * ((k + 1) * l) + q) * (k + 1) + r) * N + s;
                     pubkey->bk_->data()[index] = poly[s];
@@ -61,7 +61,7 @@ std::shared_ptr<cufhe::PubKey> tfhepp2cufhe(const TFHEpp::GateKey& src)
                 assert(static_cast<size_t>(q) < src.ksk[p].size());
                 assert(static_cast<size_t>(r - 1) < src.ksk[p][q].size());
 
-                const TFHEpp::TLWElvl0& from = src.ksk[p][q][r - 1];
+                const TLWElvl0& from = src.ksk[p][q][r - 1];
                 cufhe::LWESample to = pubkey->ksk_->ExtractLWESample(
                     pubkey->ksk_->GetLWESampleIndex(p, q, r));
                 for (int s = 0; s < n; s++) {
@@ -557,7 +557,7 @@ private:
             using RAM_TYPE = blueprint::BuiltinRAM::TYPE;
             switch (bp.type) {
             case RAM_TYPE::CMUX_MEMORY: {
-                std::vector<TFHEpp::TRLWElvl1>& dst = resPacket.ram[bp.name];
+                std::vector<TRLWElvl1>& dst = resPacket.ram[bp.name];
                 assert(dst.size() == 0);
                 const size_t dataWidth = bp.inWdataWidth;
                 for (int bit = 0; bit < dataWidth; bit++) {
@@ -575,8 +575,7 @@ private:
             }
 
             case RAM_TYPE::MUX: {
-                std::vector<TFHEpp::TLWElvl0>& dst =
-                    resPacket.ramInTLWE[bp.name];
+                std::vector<TLWElvl0>& dst = resPacket.ramInTLWE[bp.name];
                 for (size_t i = 0; i < (1 << bp.inAddrWidth) * bp.outRdataWidth;
                      i++) {
                     const auto& ram = *get<TaskCUFHEGateMem>(
@@ -744,7 +743,7 @@ public:
                 // Set initial ROM data
                 if (auto it = reqPacket_.rom.find(bprom.name);
                     it != reqPacket_.rom.end()) {
-                    std::vector<TFHEpp::TRLWElvl1>& init = it->second;
+                    std::vector<TRLWElvl1>& init = it->second;
                     auto& rom =
                         *get<TaskTFHEppROMUX>({bprom.name, {"rom", "all", 0}});
 
@@ -767,7 +766,7 @@ public:
                 // Set initial data
                 if (auto it = reqPacket_.romInTLWE.find(bprom.name);
                     it != reqPacket_.romInTLWE.end()) {
-                    std::vector<TFHEpp::TLWElvl0>& init = it->second;
+                    std::vector<TLWElvl0>& init = it->second;
                     if (init.size() !=
                         (1 << bprom.inAddrWidth) * bprom.outRdataWidth)
                         error::die(

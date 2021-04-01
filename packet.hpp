@@ -14,7 +14,7 @@
 #include <cereal/types/unordered_map.hpp>
 #include <cereal/types/vector.hpp>
 
-#include <tfhe++.hpp>
+#include "tfhepp_wrapper.hpp"
 
 #include "error.hpp"
 #include "utility.hpp"
@@ -65,44 +65,9 @@ inline uint64_t bitvec2i(const std::vector<Bit>& src, int start = 0,
     return ret;
 }
 
-namespace TFHEpp {
-template <class Archive>
-void serialize(Archive& ar, lweParams& src)
-{
-    ar(src.n, src.α, src.Nbit, src.N, src.l, src.Bgbit, src.Bg, src.αbk, src.t,
-       src.basebit, src.αks, src.μ, src.nbarbit, src.nbar, src.lbar,
-       src.Bgbitbar, src.Bgbar, src.αbklvl02, src.tbar, src.basebitlvl21,
-       src.αprivks, src.μbar);
-}
-
-template <class Archive>
-void serialize(Archive& ar, lweKey& src)
-{
-    ar(src.lvl0, src.lvl1, src.lvl2);
-}
-
-template <class Archive>
-void serialize(Archive& ar, SecretKey& src)
-{
-    ar(src.key, src.params);
-}
-
-template <class Archive>
-void serialize(Archive& ar, GateKey& src)
-{
-    ar(src.ksk, src.bkfftlvl01);
-}
-
-template <class Archive>
-void serialize(Archive& ar, CircuitKey& src)
-{
-    ar(src.privksk, src.bkfftlvl02);
-}
-}  // namespace TFHEpp
-
 struct TFHEppBKey {
     std::shared_ptr<TFHEpp::GateKey> gk;
-    std::shared_ptr<TFHEpp::CircuitKey> ck;
+    std::shared_ptr<TFHEpp::CircuitKeylvl01> ck;
 
     TFHEppBKey()
     {
@@ -110,7 +75,7 @@ struct TFHEppBKey {
 
     TFHEppBKey(const TFHEpp::SecretKey& sk)
         : gk(std::make_shared<TFHEpp::GateKey>(sk)),
-          ck(std::make_shared<TFHEpp::CircuitKey>(sk))
+          ck(std::make_shared<TFHEpp::CircuitKeylvl01>(sk))
     {
     }
 
@@ -121,8 +86,8 @@ struct TFHEppBKey {
     }
 };
 
-inline std::vector<TFHEpp::TLWElvl0> encryptBits(const TFHEpp::SecretKey& key,
-                                                 const std::vector<Bit>& src)
+inline std::vector<TLWElvl0> encryptBits(const TFHEpp::SecretKey& key,
+                                         const std::vector<Bit>& src)
 {
     std::vector<uint8_t> in;
     in.reserve(src.size());
@@ -131,52 +96,51 @@ inline std::vector<TFHEpp::TLWElvl0> encryptBits(const TFHEpp::SecretKey& key,
     return TFHEpp::bootsSymEncrypt(in, key);
 }
 
-inline std::vector<TFHEpp::TRLWElvl1> encryptROM(const TFHEpp::SecretKey& key,
-                                                 const std::vector<Bit>& src)
+inline std::vector<TRLWElvl1> encryptROM(const TFHEpp::SecretKey& key,
+                                         const std::vector<Bit>& src)
 {
-    const TFHEpp::lweParams& params = key.params;
-    std::vector<TFHEpp::TRLWElvl1> ret;
+    using P = TFHEpp::lvl1param;
+    std::vector<TRLWElvl1> ret;
 
-    TFHEpp::Polynomiallvl1 pmu = {};
+    Polynomiallvl1 pmu = {};
     for (size_t i = 0; i < src.size(); i++) {
-        pmu[i % params.N] = src[i] == 1_b ? params.μ : -params.μ;
-        if (i % params.N == params.N - 1)
-            ret.push_back(
-                TFHEpp::trlweSymEncryptlvl1(pmu, params.αbk, key.key.lvl1));
+        pmu[i % P::n] = src[i] == 1_b ? P::μ : -P::μ;
+        if (i % P::n == P::n - 1)
+            ret.push_back(trlweSymEncryptlvl1(pmu, P::α, key.key.lvl1));
     }
 
     return ret;
 }
 
-inline std::vector<TFHEpp::TLWElvl0> encryptROMInTLWE(
-    const TFHEpp::SecretKey& key, const std::vector<Bit>& src)
+inline std::vector<TLWElvl0> encryptROMInTLWE(const TFHEpp::SecretKey& key,
+                                              const std::vector<Bit>& src)
 {
     return encryptBits(key, src);
 }
 
-inline std::vector<TFHEpp::TRLWElvl1> encryptRAM(const TFHEpp::SecretKey& key,
-                                                 const std::vector<Bit>& src)
+inline std::vector<TRLWElvl1> encryptRAM(const TFHEpp::SecretKey& key,
+                                         const std::vector<Bit>& src)
 {
-    const TFHEpp::lweParams& params = key.params;
-    std::vector<TFHEpp::TRLWElvl1> ret;
+    using P = TFHEpp::lvl1param;
+    std::vector<TRLWElvl1> ret;
 
     for (auto&& bit : src) {
-        TFHEpp::Polynomiallvl1 pmu = {};
-        pmu[0] = bit == 1_b ? params.μ : -params.μ;
-        ret.push_back(TFHEpp::trlweSymEncryptlvl1(pmu, params.α, key.key.lvl1));
+        Polynomiallvl1 pmu = {};
+        pmu[0] = bit == 1_b ? P::μ : -P::μ;
+        ret.push_back(trlweSymEncryptlvl1(pmu, P::α, key.key.lvl1));
     }
 
     return ret;
 }
 
-inline std::vector<TFHEpp::TLWElvl0> encryptRAMInTLWE(
-    const TFHEpp::SecretKey& key, const std::vector<Bit>& src)
+inline std::vector<TLWElvl0> encryptRAMInTLWE(const TFHEpp::SecretKey& key,
+                                              const std::vector<Bit>& src)
 {
     return encryptBits(key, src);
 }
 
 inline std::vector<uint8_t> decrypt(const TFHEpp::SecretKey& key,
-                                    const std::vector<TFHEpp::TLWElvl0>& src)
+                                    const std::vector<TLWElvl0>& src)
 {
     std::vector<uint8_t> ret;
     for (auto it = src.begin(); it != src.end();) {
@@ -192,7 +156,7 @@ inline std::vector<uint8_t> decrypt(const TFHEpp::SecretKey& key,
 }
 
 inline std::vector<Bit> decryptBits(const TFHEpp::SecretKey& key,
-                                    const std::vector<TFHEpp::TLWElvl0>& src)
+                                    const std::vector<TLWElvl0>& src)
 {
     auto bitvals = TFHEpp::bootsSymDecrypt(src, key);
     std::vector<Bit> bits;
@@ -202,30 +166,29 @@ inline std::vector<Bit> decryptBits(const TFHEpp::SecretKey& key,
 }
 
 inline std::vector<Bit> decryptRAM(const TFHEpp::SecretKey& key,
-                                   const std::vector<TFHEpp::TRLWElvl1>& src)
+                                   const std::vector<TRLWElvl1>& src)
 {
     std::vector<Bit> ret;
     for (auto&& encbit : src) {
-        uint8_t bitval =
-            TFHEpp::trlweSymDecryptlvl1(encbit, key.key.lvl1).at(0);
+        uint8_t bitval = trlweSymDecryptlvl1(encbit, key.key.lvl1).at(0);
         ret.push_back(bitval != 0 ? 1_b : 0_b);
     }
 
     return ret;
 }
 
-inline std::vector<Bit> decryptRAMInTLWE(
-    const TFHEpp::SecretKey& key, const std::vector<TFHEpp::TLWElvl0>& src)
+inline std::vector<Bit> decryptRAMInTLWE(const TFHEpp::SecretKey& key,
+                                         const std::vector<TLWElvl0>& src)
 {
     return decryptBits(key, src);
 }
 
 inline std::vector<Bit> decryptROM(const TFHEpp::SecretKey& key,
-                                   const std::vector<TFHEpp::TRLWElvl1>& src)
+                                   const std::vector<TRLWElvl1>& src)
 {
     std::vector<Bit> ret;
     for (auto&& encblk : src) {
-        auto blk = TFHEpp::trlweSymDecryptlvl1(encblk, key.key.lvl1);
+        auto blk = trlweSymDecryptlvl1(encblk, key.key.lvl1);
         for (uint8_t bitval : blk)
             ret.push_back(bitval != 0 ? 1_b : 0_b);
     }
@@ -233,8 +196,8 @@ inline std::vector<Bit> decryptROM(const TFHEpp::SecretKey& key,
     return ret;
 }
 
-inline std::vector<Bit> decryptROMInTLWE(
-    const TFHEpp::SecretKey& key, const std::vector<TFHEpp::TLWElvl0>& src)
+inline std::vector<Bit> decryptROMInTLWE(const TFHEpp::SecretKey& key,
+                                         const std::vector<TLWElvl0>& src)
 {
     return decryptBits(key, src);
 }
@@ -257,11 +220,11 @@ struct PlainPacket {
 };
 
 struct TFHEPacket {
-    std::unordered_map<std::string, std::vector<TFHEpp::TRLWElvl1>> ram;
-    std::unordered_map<std::string, std::vector<TFHEpp::TLWElvl0>> ramInTLWE;
-    std::unordered_map<std::string, std::vector<TFHEpp::TRLWElvl1>> rom;
-    std::unordered_map<std::string, std::vector<TFHEpp::TLWElvl0>> romInTLWE;
-    std::unordered_map<std::string, std::vector<TFHEpp::TLWElvl0>> bits;
+    std::unordered_map<std::string, std::vector<TRLWElvl1>> ram;
+    std::unordered_map<std::string, std::vector<TLWElvl0>> ramInTLWE;
+    std::unordered_map<std::string, std::vector<TRLWElvl1>> rom;
+    std::unordered_map<std::string, std::vector<TLWElvl0>> romInTLWE;
+    std::unordered_map<std::string, std::vector<TLWElvl0>> bits;
     std::optional<int> numCycles;
 
     template <class Archive>
