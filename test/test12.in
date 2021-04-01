@@ -1,0 +1,9 @@
+[[rom]]
+name = "rom"
+size = 4096           # 512 * 8
+bytes = [0, 1, 2, 3, 4, 5, 6, 7]
+
+[[bits]]
+name = "addr"
+size = 7
+bytes = [1]

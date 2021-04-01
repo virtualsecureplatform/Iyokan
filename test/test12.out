@@ -1,0 +1,6 @@
+rom = []
+ram = []
+cycles = 1
+bits = [
+{bytes=[4,5,6,7],size=32,name="rdata"},
+]
