@@ -517,8 +517,8 @@ class TFHEppTestHelper {
 private:
     std::shared_ptr<TFHEpp::SecretKey> sk_;
     std::shared_ptr<TFHEpp::GateKey> gk_;
-    std::shared_ptr<TFHEpp::CircuitKey> ck_;
-    TFHEpp::TLWElvl0 zero_, one_;
+    std::shared_ptr<TFHEpp::CircuitKeylvl01> ck_;
+    TLWElvl0 zero_, one_;
 
 private:
     TFHEppTestHelper()
@@ -538,7 +538,7 @@ public:
 
     void prepareCircuitKey()
     {
-        ck_ = std::make_shared<TFHEpp::CircuitKey>(*sk_);
+        ck_ = std::make_shared<TFHEpp::CircuitKeylvl01>(*sk_);
     }
 
     TFHEppWorkerInfo wi() const
@@ -551,12 +551,12 @@ public:
         return sk_;
     }
 
-    const TFHEpp::TLWElvl0& zero() const
+    const TLWElvl0& zero() const
     {
         return zero_;
     }
 
-    const TFHEpp::TLWElvl0& one() const
+    const TLWElvl0& one() const
     {
         return one_;
     }
@@ -597,7 +597,7 @@ void testTFHEppSerialization()
 
         auto zero = TFHEpp::bootsSymEncrypt({0}, *sk2).at(0);
         auto one = TFHEpp::bootsSymEncrypt({1}, *sk2).at(0);
-        TFHEpp::TLWElvl0 res;
+        TLWElvl0 res;
         TFHEpp::HomANDNY(res, zero, one, *gk);
         assert(TFHEpp::bootsSymDecrypt({res}, *sk2).at(0) == 1);
     }
@@ -614,7 +614,7 @@ void testTFHEppSerialization()
 
         auto zero = TFHEpp::bootsSymEncrypt({0}, *sk).at(0);
         auto one = TFHEpp::bootsSymEncrypt({1}, *sk).at(0);
-        TFHEpp::TLWElvl0 res;
+        TLWElvl0 res;
         TFHEpp::HomANDNY(res, zero, one, *gk2);
         assert(TFHEpp::bootsSymDecrypt({res}, *sk).at(0) == 1);
     }
@@ -632,7 +632,7 @@ void testTFHEppSerialization()
         }
 
         {
-            TFHEpp::TLWElvl0 res, zero, one;
+            TLWElvl0 res, zero, one;
             readFromArchive(zero, ss);
             readFromArchive(one, ss);
             TFHEpp::HomANDNY(res, zero, one, *gk);
