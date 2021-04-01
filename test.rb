@@ -16,6 +16,7 @@ $skey = "_test_sk"
 $bkey = "_test_bk"
 $has_any_error = false
 $IYOKAN_ARGS = []
+$SKIP_PREFACE = false
 
 ##### utility #####
 
@@ -85,6 +86,7 @@ end
 
 ##### Parse command-line arguments
 opt = OptionParser.new
+opt.on("--skip-preface") { |v| $SKIP_PREFACE = true }
 opt.on("--iyokan-arg ARG") { |v| $IYOKAN_ARGS.push v }
 opt.banner += " PATH [fast|plain|tfhe|cufhe|TEST-NAME]"
 opt.parse! ARGV
@@ -98,9 +100,13 @@ $logger.info "$IYOKAN_ARGS == #{$IYOKAN_ARGS}"
 
 ##### test0 #####
 
-$logger.info "test0 running..."
-run_command "./test0"
-$logger.info "test0 done."
+if $SKIP_PREFACE
+  $logger.info "Skip test0."
+else
+  $logger.info "test0 running..."
+  run_command "./test0"
+  $logger.info "test0 done."
+end
 
 ##### prepare #####
 
@@ -117,17 +123,21 @@ def test_method_toml2packet(in_file, expected)
   assert_equal got, expected
 end
 
-$logger.info "Testing toml2packet..."
-test_method_toml2packet "test/test03.in", {
-  cycles: -1,
-  ram: {},
-  rom: {},
-  bits: {
-    "hoge" => { size: 3, bytes: [5] },
-    "piyo" => { size: 3, bytes: [0] },
-  },
-}
-$logger.info "Testing toml2packet done."
+if $SKIP_PREFACE
+  $logger.info "Skip test of method toml2packet."
+else
+  $logger.info "Testing toml2packet..."
+  test_method_toml2packet "test/test03.in", {
+                            cycles: -1,
+                            ram: {},
+                            rom: {},
+                            bits: {
+                              "hoge" => { size: 3, bytes: [5] },
+                              "piyo" => { size: 3, bytes: [0] },
+                            },
+                          }
+  $logger.info "Testing toml2packet done."
+end
 
 ##### iyokan-packet #####
 
@@ -144,11 +154,15 @@ def test_iyokan_packet_e2e(in_file)
   assert_equal_packet got, expected
 end
 
-$logger.info "Testing toml2packet running..."
-test_iyokan_packet_e2e "test/test00.in"
-test_iyokan_packet_e2e "test/test00-diamond.out"
-test_iyokan_packet_e2e "test/test03.in"
-$logger.info "Testing toml2packet done."
+if $SKIP_PREFACE
+  $logger.info "Skip test of iyokan_packet toml2packet."
+else
+  $logger.info "Testing toml2packet running..."
+  test_iyokan_packet_e2e "test/test00.in"
+  test_iyokan_packet_e2e "test/test00-diamond.out"
+  test_iyokan_packet_e2e "test/test03.in"
+  $logger.info "Testing toml2packet done."
+end
 
 ##### iyokan #####
 
