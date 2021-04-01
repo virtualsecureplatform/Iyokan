@@ -155,50 +155,96 @@ public:
     }
 };
 
-class TaskTFHEppCB
-    : public TaskAsync<TLWElvl0, TRGSWFFTlvl1, TFHEppWorkerInfo> {
+class TaskTFHEppCB : public Task<TLWElvl0, TRGSWFFTlvl1, TFHEppWorkerInfo> {
 private:
-    void startSync(TFHEppWorkerInfo wi) override
+    AsyncThread thrs_[TFHEpp::lvl1param::l];
+
+private:
+    void startAsyncImpl(TFHEppWorkerInfo wi) override
     {
-        auto ck = wi.circuitKey;
-        assert(ck);
-        TFHEpp::CircuitBootstrappingFFT(output(), input(0), *ck);
+        for (size_t i = 0; i < TFHEpp::lvl1param::l; i++)
+            thrs_[i] = [i, wi, this] {
+                auto ck = wi.circuitKey;
+                assert(ck);
+
+                TRLWElvl1 trgswupper, trgswlower;
+                TFHEpp::CircuitBootstrappingPartial(trgswupper, trgswlower,
+                                                    input(0), *ck, i);
+                for (size_t j = 0; j < 2; j++) {
+                    TwistIFFTlvl1(output()[i][j], trgswupper[j]);
+                    TwistIFFTlvl1(output()[i + TFHEpp::lvl1param::l][j],
+                                  trgswlower[j]);
+                }
+            };
     }
 
 public:
-    TaskTFHEppCB() : TaskAsync<TLWElvl0, TRGSWFFTlvl1, TFHEppWorkerInfo>(1)
+    TaskTFHEppCB() : Task<TLWElvl0, TRGSWFFTlvl1, TFHEppWorkerInfo>(1)
     {
+    }
+
+    bool hasFinished() const override
+    {
+        for (size_t i = 0; i < TFHEpp::lvl1param::l; i++)
+            if (!thrs_[i].hasFinished())
+                return false;
+        return true;
     }
 
     template <class Archive>
     void serialize(Archive &ar)
     {
-        ar(cereal::base_class<
-            TaskAsync<TLWElvl0, TRGSWFFTlvl1, TFHEppWorkerInfo>>(this));
+        ar(cereal::base_class<Task<TLWElvl0, TRGSWFFTlvl1, TFHEppWorkerInfo>>(
+            this));
     }
 };
 CEREAL_REGISTER_TYPE(TaskTFHEppCB);
 
-class TaskTFHEppCBInv
-    : public TaskAsync<TLWElvl0, TRGSWFFTlvl1, TFHEppWorkerInfo> {
+class TaskTFHEppCBInv : public Task<TLWElvl0, TRGSWFFTlvl1, TFHEppWorkerInfo> {
 private:
-    void startSync(TFHEppWorkerInfo wi) override
+    AsyncThread thrs_[TFHEpp::lvl1param::l];
+    TLWElvl0 invtlwe_;
+
+private:
+    void startAsyncImpl(TFHEppWorkerInfo wi) override
     {
-        auto ck = wi.circuitKey;
-        assert(ck);
-        TFHEpp::CircuitBootstrappingFFTInv(output(), input(0), *ck);
+        for (size_t i = 0; i <= TFHEpp::lvl0param::n; i++)
+            invtlwe_[i] = -input(0)[i];
+
+        for (size_t i = 0; i < TFHEpp::lvl1param::l; i++)
+            thrs_[i] = [i, wi, this] {
+                auto ck = wi.circuitKey;
+                assert(ck);
+
+                TRLWElvl1 trgswupper, trgswlower;
+                TFHEpp::CircuitBootstrappingPartial(trgswupper, trgswlower,
+                                                    invtlwe_, *ck, i);
+                for (size_t j = 0; j < 2; j++) {
+                    TwistIFFTlvl1(output()[i][j], trgswupper[j]);
+                    TwistIFFTlvl1(output()[i + TFHEpp::lvl1param::l][j],
+                                  trgswlower[j]);
+                }
+            };
     }
 
 public:
-    TaskTFHEppCBInv() : TaskAsync<TLWElvl0, TRGSWFFTlvl1, TFHEppWorkerInfo>(1)
+    TaskTFHEppCBInv() : Task<TLWElvl0, TRGSWFFTlvl1, TFHEppWorkerInfo>(1)
     {
+    }
+
+    bool hasFinished() const override
+    {
+        for (size_t i = 0; i < TFHEpp::lvl1param::l; i++)
+            if (!thrs_[i].hasFinished())
+                return false;
+        return true;
     }
 
     template <class Archive>
     void serialize(Archive &ar)
     {
-        ar(cereal::base_class<
-            TaskAsync<TLWElvl0, TRGSWFFTlvl1, TFHEppWorkerInfo>>(this));
+        ar(cereal::base_class<Task<TLWElvl0, TRGSWFFTlvl1, TFHEppWorkerInfo>>(
+            this));
     }
 };
 CEREAL_REGISTER_TYPE(TaskTFHEppCBInv);
@@ -364,27 +410,46 @@ struct TRGSWFFTlvl1Pair {
 };
 
 class TaskTFHEppCBWithInv
-    : public TaskAsync<TLWElvl0, TRGSWFFTlvl1Pair, TFHEppWorkerInfo> {
+    : public Task<TLWElvl0, TRGSWFFTlvl1Pair, TFHEppWorkerInfo> {
 private:
-    void startSync(TFHEppWorkerInfo wi) override
+    AsyncThread thrs_[TFHEpp::lvl1param::l];
+
+private:
+    void startAsyncImpl(TFHEppWorkerInfo wi) override
     {
-        auto ck = wi.circuitKey;
-        assert(ck);
-        TFHEpp::CircuitBootstrappingFFTwithInv(
-            output().normal, output().inverted, input(0), *ck);
+        for (size_t i = 0; i < TFHEpp::lvl1param::l; i++)
+            thrs_[i] = [i, wi, this] {
+                auto ck = wi.circuitKey;
+                assert(ck);
+
+                TFHEpp::CircuitBootstrappingFFTwithInvPartial(
+                    output().normal[i],
+                    output().normal[i + TFHEpp::lvl1param::l],
+                    output().inverted[i],
+                    output().inverted[i + TFHEpp::lvl1param::l], input(0), *ck,
+                    i);
+            };
     }
 
 public:
     TaskTFHEppCBWithInv()
-        : TaskAsync<TLWElvl0, TRGSWFFTlvl1Pair, TFHEppWorkerInfo>(1)
+        : Task<TLWElvl0, TRGSWFFTlvl1Pair, TFHEppWorkerInfo>(1)
     {
+    }
+
+    bool hasFinished() const override
+    {
+        for (size_t i = 0; i < TFHEpp::lvl1param::l; i++)
+            if (!thrs_[i].hasFinished())
+                return false;
+        return true;
     }
 
     template <class Archive>
     void serialize(Archive &ar)
     {
         ar(cereal::base_class<
-            TaskAsync<TLWElvl0, TRGSWFFTlvl1Pair, TFHEppWorkerInfo>>(this));
+            Task<TLWElvl0, TRGSWFFTlvl1Pair, TFHEppWorkerInfo>>(this));
     }
 };
 CEREAL_REGISTER_TYPE(TaskTFHEppCBWithInv);

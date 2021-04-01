@@ -61,4 +61,9 @@ inline void TwistFFTlvl1(Polynomiallvl1& res, const PolynomialInFDlvl1& a)
     TFHEpp::TwistFFT<TFHEpp::lvl1param>(res, a);
 }
 
+inline void TwistIFFTlvl1(PolynomialInFDlvl1& res, const Polynomiallvl1& a)
+{
+    TFHEpp::TwistIFFT<TFHEpp::lvl1param>(res, a);
+}
+
 #endif
