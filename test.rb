@@ -6,11 +6,7 @@ require "pathname"
 require "json"
 require "toml-rb"
 require "logger"
-
-def print_usage_and_exit(ret = 1)
-  puts "Usage: #{$0} PATH [fast|plain|tfhe|cufhe]"
-  exit ret
-end
+require "optparse"
 
 ##### Globals
 $logger = Logger.new $stderr, level: :info
@@ -19,9 +15,7 @@ $res_file = "_test_res_packet"
 $skey = "_test_sk"
 $bkey = "_test_bk"
 $has_any_error = false
-
-print_usage_and_exit unless ARGV.size >= 2
-$path = ARGV.shift
+$IYOKAN_ARGS = []
 
 ##### utility #####
 
@@ -82,12 +76,25 @@ def run_command(command, args = [])
 end
 
 def run_iyokan(args)
-  run_command "./iyokan", args
+  run_command "./iyokan", (args + $IYOKAN_ARGS)
 end
 
 def run_iyokan_packet(args)
   run_command "./iyokan-packet", args
 end
+
+##### Parse command-line arguments
+opt = OptionParser.new
+opt.on("--iyokan-arg ARG") { |v| $IYOKAN_ARGS.push v }
+opt.banner += " PATH [fast|plain|tfhe|cufhe|TEST-NAME]"
+opt.parse! ARGV
+unless ARGV.size >= 2
+  puts opt.to_s
+  exit 1
+end
+$path = ARGV.shift
+$logger.info "$path == #{$path}"
+$logger.info "$IYOKAN_ARGS == #{$IYOKAN_ARGS}"
 
 ##### test0 #####
 
@@ -371,7 +378,7 @@ reg.add_in_out("cahp-diamond-dump-prefix-00", "test/cahp-diamond.toml",
   assert_include toml["bits"], { "bytes" => [42, 0], "size" => 16, "name" => "reg_x0" }
 end
 
-##### Parse command-line arguments
+##### Run
 runner = reg.get_runner(tags: ARGV.map(&:to_sym))
 runner.run
 
