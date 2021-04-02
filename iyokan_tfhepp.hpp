@@ -39,13 +39,20 @@ private:
     AsyncThread thr_;
 
 private:
-    void startAsyncImpl(TFHEppWorkerInfo) override
+    void startAsyncImpl(TFHEppWorkerInfo, ProgressGraphMaker *graph) override
     {
         if (getInputSize() == 0) {
+            if (graph)
+                graph->startNode(this->depnode()->label());
+
             // Nothing to do!
         }
         else if (getInputSize() == 1) {
-            thr_ = [&]() { output() = input(0); };
+            thr_ = [graph, this]() {
+                if (graph)
+                    graph->startNode(this->depnode()->label());
+                output() = input(0);
+            };
         }
         else {
             assert(false);
@@ -160,10 +167,13 @@ private:
     AsyncThread thrs_[TFHEpp::lvl1param::l];
 
 private:
-    void startAsyncImpl(TFHEppWorkerInfo wi) override
+    void startAsyncImpl(TFHEppWorkerInfo wi, ProgressGraphMaker *graph) override
     {
         for (size_t i = 0; i < TFHEpp::lvl1param::l; i++)
-            thrs_[i] = [i, wi, this] {
+            thrs_[i] = [i, wi, this, graph] {
+                if (i == 0 && graph)
+                    graph->startNode(this->depnode()->label());
+
                 auto ck = wi.circuitKey;
                 assert(ck);
 
@@ -206,13 +216,17 @@ private:
     TLWElvl0 invtlwe_;
 
 private:
-    void startAsyncImpl(TFHEppWorkerInfo wi) override
+    void startAsyncImpl(TFHEppWorkerInfo wi, ProgressGraphMaker *graph) override
     {
         for (size_t i = 0; i <= TFHEpp::lvl0param::n; i++)
             invtlwe_[i] = -input(0)[i];
 
         for (size_t i = 0; i < TFHEpp::lvl1param::l; i++)
-            thrs_[i] = [i, wi, this] {
+            thrs_[i] = [i, wi, this, graph] {
+                if (i == 0 && graph) {
+                    graph->startNode(this->depnode()->label());
+                }
+
                 auto ck = wi.circuitKey;
                 assert(ck);
 
@@ -415,10 +429,13 @@ private:
     AsyncThread thrs_[TFHEpp::lvl1param::l];
 
 private:
-    void startAsyncImpl(TFHEppWorkerInfo wi) override
+    void startAsyncImpl(TFHEppWorkerInfo wi, ProgressGraphMaker *graph) override
     {
         for (size_t i = 0; i < TFHEpp::lvl1param::l; i++)
-            thrs_[i] = [i, wi, this] {
+            thrs_[i] = [i, wi, this, graph] {
+                if (i == 0 && graph)
+                    graph->startNode(this->depnode()->label());
+
                 auto ck = wi.circuitKey;
                 assert(ck);
 
@@ -658,9 +675,12 @@ public:
         return output_;
     }
 
-    void startAsync(TFHEppWorkerInfo) override
+    void startAsync(TFHEppWorkerInfo, ProgressGraphMaker *graph) override
     {
-        thr_ = [this] {
+        thr_ = [this, graph] {
+            if (graph)
+                graph->startNode(this->depnode()->label());
+
             *output_ = *inputWritten_.lock();
             for (size_t j = 0; j < getAddressWidth(); j++) {
                 const TRGSWFFTlvl1 &in = (memIndex_ >> j) & 1u

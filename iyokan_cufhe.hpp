@@ -455,9 +455,12 @@ public:
         return outputs_;
     }
 
-    void startAsync(TFHEppWorkerInfo) override
+    void startAsync(TFHEppWorkerInfo, ProgressGraphMaker* graph) override
     {
-        thr_ = [this] {
+        thr_ = [this, graph] {
+            if (graph)
+                graph->startNode(this->depnode()->label());
+
             assert(outputs_);
             for (size_t i = 0; i < outputs_->size(); i++) {
                 auto& output = *(*outputs_)[i];

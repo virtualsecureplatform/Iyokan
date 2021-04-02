@@ -124,6 +124,158 @@ private:
     }
 };
 
+class ProgressGraphMaker {
+private:
+    struct Node {
+        NodeLabel label;
+        int index;
+        std::optional<std::chrono::system_clock::time_point> start =
+                                                                 std::nullopt,
+                                                             end = std::nullopt;
+    };
+
+    struct Edge {
+        int from, to;
+        int index;
+    };
+
+    std::unordered_map<int, Node> nodes_;
+    std::vector<Edge> edges_;
+
+    int numStartedNodes_, numNotifiedEdges_;
+
+    std::mutex mtxWrite_;
+
+private:
+    Node &node(const NodeLabel &label)
+    {
+        auto [it, emplaced] = nodes_.try_emplace(label.id, Node{label, -1});
+        return it->second;
+    }
+
+public:
+    ProgressGraphMaker() : numStartedNodes_(0), numNotifiedEdges_(0)
+    {
+    }
+
+    void reset()
+    {
+        nodes_.clear();
+        edges_.clear();
+        numStartedNodes_ = 0;
+        numNotifiedEdges_ = 0;
+    }
+
+    void startNode(const NodeLabel &label)
+    {
+        std::lock_guard<std::mutex> lock(mtxWrite_);
+
+        auto &n = node(label);
+        n.index = numStartedNodes_++;
+        assert(!n.start && !n.end);
+        n.start = std::chrono::high_resolution_clock::now();
+    }
+
+    void finishNode(const NodeLabel &label)
+    {
+        std::lock_guard<std::mutex> lock(mtxWrite_);
+
+        auto &n = node(label);
+        assert(n.start && !n.end);
+        n.end = std::chrono::high_resolution_clock::now();
+    }
+
+    void notify(const NodeLabel &from, const NodeLabel &to)
+    {
+        edges_.push_back(Edge{from.id, to.id, numNotifiedEdges_++});
+    }
+
+    void dumpTime(std::ostream &os) const
+    {
+        std::unordered_map<std::string, std::vector<Node>> kind2nodes;
+        for (auto &&[id, node] : nodes_)
+            kind2nodes[node.label.kind].push_back(node);
+        for (auto &&[kind, nodes] : kind2nodes) {
+            int64_t total = 0;
+            for (auto &&node : nodes) {
+                assert(node.start && node.end);
+                total += std::chrono::duration_cast<std::chrono::milliseconds>(
+                             *node.end - *node.start)
+                             .count();
+            }
+            os << kind << "\t" << total << "\t" << nodes.size() << std::endl;
+        }
+    }
+
+    void dumpTimeCSV(std::ostream &os) const
+    {
+        using namespace std::chrono;
+
+        for (auto &&[id, node] : nodes_) {
+            using namespace utility;
+            os << "\"" << node.start.value() << "\"";
+            os << ",\"" << node.end.value() << "\"";
+            os << ",\"" << node.index << "\"";
+            os << ",\"" << node.label.id << "\"";
+            os << ",\"" << node.label.kind << "\"";
+            os << ",\"" << node.label.desc << "\"";
+            os << std::endl;
+        }
+    }
+
+    void dumpJSON(std::ostream &os) const
+    {
+        picojson::object nodes;
+        for (auto &&[id, node] : nodes_) {
+            picojson::object json;
+            if (node.start)
+                json.emplace("start", utility::fok(*node.start));
+            if (node.end)
+                json.emplace("end", utility::fok(*node.end));
+            json.emplace("index", static_cast<double>(node.index));
+            json.emplace("id", static_cast<double>(node.label.id));
+            json.emplace("kind", node.label.kind);
+            json.emplace("desc", node.label.desc);
+
+            nodes.emplace(utility::fok(id), json);
+        }
+
+        picojson::array edges;
+        for (auto &&edge : edges_) {
+            picojson::object json;
+            json.emplace("index", static_cast<double>(edge.index));
+            json.emplace("from", static_cast<double>(edge.from));
+            json.emplace("to", static_cast<double>(edge.to));
+
+            edges.emplace_back(json);
+        }
+
+        picojson::object root;
+        root.emplace("nodes", nodes);
+        root.emplace("edges", edges);
+        os << picojson::value(root);
+    }
+
+    void dumpDOT(std::ostream &os) const
+    {
+        os << "digraph progress_graph_maker {" << std::endl;
+        os << "node [ shape = record ];" << std::endl;
+        for (auto &&[id, node] : nodes_) {
+            os << "n" << id << " [label = \"{" << node.label.kind;
+            if (!node.label.desc.empty())
+                os << "|" << node.label.desc;
+            os << "}\"];" << std::endl;
+        }
+        os << std::endl;
+        for (auto &&edge : edges_) {
+            os << "n" << edge.from << " -> "
+               << "n" << edge.to << " [label = \"" << edge.index << "\"];"
+               << std::endl;
+        }
+        os << "}" << std::endl;
+    }
+};
+
 class DepNodeBase {
 private:
     int priority_;
@@ -183,7 +335,8 @@ public:
     virtual void checkValid(error::Stack &err) = 0;
     virtual void notifyOneInputReady() = 0;
     virtual bool areInputsReady() const = 0;
-    virtual void startAsync(WorkerInfo) = 0;
+    virtual void startAsync(WorkerInfo,
+                            ProgressGraphMaker *graph = nullptr) = 0;
     virtual bool hasFinished() const = 0;
     virtual void tick() = 0;  // Reset for next process.
 
@@ -221,7 +374,18 @@ protected:
         return *output_;
     }
 
-    virtual void startAsyncImpl(WorkerInfo wi) = 0;
+    virtual void startAsyncImpl(WorkerInfo wi)
+    {
+        assert(0 && "Unreachable");
+    }
+
+    virtual void startAsyncImpl(WorkerInfo wi, ProgressGraphMaker *graph)
+    {
+        startAsyncImpl(std::move(wi));
+        if (graph) {
+            graph->startNode(this->depnode()->label());
+        }
+    }
 
 public:
     Task()
@@ -288,9 +452,9 @@ public:
         return numReadyInputs_ == inputs_.size();
     }
 
-    void startAsync(WorkerInfo wi) override
+    void startAsync(WorkerInfo wi, ProgressGraphMaker *graph) override
     {
-        startAsyncImpl(std::move(wi));
+        startAsyncImpl(std::move(wi), graph);
     }
 
     template <class Archive>
@@ -380,7 +544,8 @@ inline std::unordered_map<int, int> doTopologicalSort(
 
         for (auto &&childId : node->children) {
             NodePtr child = id2node.at(childId);
-            if (child->hasNoInputsToWaitFor)  // false parent-child relationship
+            if (child->hasNoInputsToWaitFor)  // false parent-child
+                                              // relationship
                 continue;
             numReadyParents.at(child)++;
             assert(child->parents.size() >= numReadyParents.at(child));
@@ -610,7 +775,10 @@ public:
         task_->startAsync(std::move(wi));
     }
 
-    void start(WorkerInfo wi, ProgressGraphMaker &graph);
+    void start(WorkerInfo wi, ProgressGraphMaker &graph)
+    {
+        task_->startAsync(std::move(wi), &graph);
+    }
 
     bool hasFinished() const
     {
@@ -676,159 +844,6 @@ public:
         depnode->hasQueued_ = true;
     }
 };
-
-class ProgressGraphMaker {
-private:
-    struct Node {
-        NodeLabel label;
-        int index;
-        std::optional<std::chrono::system_clock::time_point> start =
-                                                                 std::nullopt,
-                                                             end = std::nullopt;
-    };
-
-    struct Edge {
-        int from, to;
-        int index;
-    };
-
-    std::unordered_map<int, Node> nodes_;
-    std::vector<Edge> edges_;
-
-    int numStartedNodes_, numNotifiedEdges_;
-
-private:
-    Node &node(const NodeLabel &label)
-    {
-        auto [it, emplaced] = nodes_.try_emplace(label.id, Node{label, -1});
-        return it->second;
-    }
-
-public:
-    ProgressGraphMaker() : numStartedNodes_(0), numNotifiedEdges_(0)
-    {
-    }
-
-    void reset()
-    {
-        nodes_.clear();
-        edges_.clear();
-        numStartedNodes_ = 0;
-        numNotifiedEdges_ = 0;
-    }
-
-    void startNode(const NodeLabel &label)
-    {
-        auto &n = node(label);
-        n.index = numStartedNodes_++;
-        assert(!n.start && !n.end);
-        n.start = std::chrono::high_resolution_clock::now();
-    }
-
-    void finishNode(const NodeLabel &label)
-    {
-        auto &n = node(label);
-        assert(n.start && !n.end);
-        n.end = std::chrono::high_resolution_clock::now();
-    }
-
-    void notify(const NodeLabel &from, const NodeLabel &to)
-    {
-        edges_.push_back(Edge{from.id, to.id, numNotifiedEdges_++});
-    }
-
-    void dumpTime(std::ostream &os) const
-    {
-        std::unordered_map<std::string, std::vector<Node>> kind2nodes;
-        for (auto &&[id, node] : nodes_)
-            kind2nodes[node.label.kind].push_back(node);
-        for (auto &&[kind, nodes] : kind2nodes) {
-            int64_t total = 0;
-            for (auto &&node : nodes) {
-                assert(node.start && node.end);
-                total += std::chrono::duration_cast<std::chrono::milliseconds>(
-                             *node.end - *node.start)
-                             .count();
-            }
-            os << kind << "\t" << total << "\t" << nodes.size() << std::endl;
-        }
-    }
-
-    void dumpTimeCSV(std::ostream &os) const
-    {
-        using namespace std::chrono;
-
-        for (auto &&[id, node] : nodes_) {
-            using namespace utility;
-            os << "\"" << node.start.value() << "\"";
-            os << ",\"" << node.end.value() << "\"";
-            os << ",\"" << node.index << "\"";
-            os << ",\"" << node.label.id << "\"";
-            os << ",\"" << node.label.kind << "\"";
-            os << ",\"" << node.label.desc << "\"";
-            os << std::endl;
-        }
-    }
-
-    void dumpJSON(std::ostream &os) const
-    {
-        picojson::object nodes;
-        for (auto &&[id, node] : nodes_) {
-            picojson::object json;
-            if (node.start)
-                json.emplace("start", utility::fok(*node.start));
-            if (node.end)
-                json.emplace("end", utility::fok(*node.end));
-            json.emplace("index", static_cast<double>(node.index));
-            json.emplace("id", static_cast<double>(node.label.id));
-            json.emplace("kind", node.label.kind);
-            json.emplace("desc", node.label.desc);
-
-            nodes.emplace(utility::fok(id), json);
-        }
-
-        picojson::array edges;
-        for (auto &&edge : edges_) {
-            picojson::object json;
-            json.emplace("index", static_cast<double>(edge.index));
-            json.emplace("from", static_cast<double>(edge.from));
-            json.emplace("to", static_cast<double>(edge.to));
-
-            edges.emplace_back(json);
-        }
-
-        picojson::object root;
-        root.emplace("nodes", nodes);
-        root.emplace("edges", edges);
-        os << picojson::value(root);
-    }
-
-    void dumpDOT(std::ostream &os) const
-    {
-        os << "digraph progress_graph_maker {" << std::endl;
-        os << "node [ shape = record ];" << std::endl;
-        for (auto &&[id, node] : nodes_) {
-            os << "n" << id << " [label = \"{" << node.label.kind;
-            if (!node.label.desc.empty())
-                os << "|" << node.label.desc;
-            os << "}\"];" << std::endl;
-        }
-        os << std::endl;
-        for (auto &&edge : edges_) {
-            os << "n" << edge.from << " -> "
-               << "n" << edge.to << " [label = \"" << edge.index << "\"];"
-               << std::endl;
-        }
-        os << "}" << std::endl;
-    }
-};
-
-template <class WorkerInfo>
-void DepNode<WorkerInfo>::start(WorkerInfo wi, ProgressGraphMaker &graph)
-{
-    task_->startAsync(std::move(wi));
-    graph.startNode(label());
-}
 
 template <class WorkerInfo>
 void DepNode<WorkerInfo>::propagate(ReadyQueue<WorkerInfo> &readyQueue)
@@ -1426,9 +1441,13 @@ private:
 private:
     virtual void startSync(WorkerInfo wi) = 0;
 
-    void startAsyncImpl(WorkerInfo wi) override
+    void startAsyncImpl(WorkerInfo wi, ProgressGraphMaker *graph) override
     {
-        thr_ = [this, wi] { startSync(wi); };
+        thr_ = [this, wi, graph] {
+            if (graph)
+                graph->startNode(this->depnode()->label());
+            startSync(wi);
+        };
     }
 
 public:
@@ -1488,8 +1507,11 @@ public:
         return numReadyInputs_ == numInputs_;
     }
 
-    void startAsync(WorkerInfo) override
+    void startAsync(WorkerInfo, ProgressGraphMaker *graph) override
     {
+        if (graph)
+            graph->startNode(this->depnode()->label());
+
         // Nothing to do!
     }
 
