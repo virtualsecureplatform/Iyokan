@@ -324,13 +324,13 @@ end
 reg = TestRegisterer.new
 
 reg.add_in_out "cahp-diamond-00", "test/cahp-diamond.toml",
-               "test/test00.in", "test/test00-diamond.out", ncycles: 8, cufhe_tags: [:fast]
+               "test/test00.in", "test/test00-diamond.out", ncycles: 8
 reg.add_in_out "cahp-emerald-00", "test/cahp-emerald.toml",
                "test/test00.in", "test/test00-emerald.out", ncycles: 6
 reg.add_in_out "cahp-ruby-09", "test/cahp-ruby.toml",
                "test/test09.in", "test/test09-ruby.out", ncycles: 7
 reg.add_in_out "cahp-pearl-09", "test/cahp-pearl.toml",
-               "test/test09.in", "test/test09-pearl.out", ncycles: 3
+               "test/test09.in", "test/test09-pearl.out", ncycles: 3, cufhe_tags: [:fast]
 
 reg.add_in_out "cahp-diamond-mux-00", "test/cahp-diamond-mux.toml",
                "test/test00.in", "test/test00-diamond.out", ncycles: 8
