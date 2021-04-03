@@ -1,20 +1,6 @@
 #include "iyokan_cufhe.hpp"
 #include "packet.hpp"
 
-namespace {
-
-using Name2TFHEppNetMap =
-    std::unordered_map<std::string, std::shared_ptr<TFHEppNetwork>>;
-using Name2CUFHENetMap =
-    std::unordered_map<std::string, std::shared_ptr<CUFHENetwork>>;
-
-template <class T>
-void merge(std::vector<T>& dst, const std::vector<T>& src)
-{
-    dst.reserve(dst.size() + src.size());
-    std::copy(src.begin(), src.end(), std::back_inserter(dst));
-}
-
 std::shared_ptr<cufhe::PubKey> tfhepp2cufhe(const TFHEpp::GateKey& src)
 {
     auto pubkey = std::make_shared<cufhe::PubKey>();
@@ -74,6 +60,20 @@ std::shared_ptr<cufhe::PubKey> tfhepp2cufhe(const TFHEpp::GateKey& src)
     }
 
     return pubkey;
+}
+
+namespace {
+
+using Name2TFHEppNetMap =
+    std::unordered_map<std::string, std::shared_ptr<TFHEppNetwork>>;
+using Name2CUFHENetMap =
+    std::unordered_map<std::string, std::shared_ptr<CUFHENetwork>>;
+
+template <class T>
+void merge(std::vector<T>& dst, const std::vector<T>& src)
+{
+    dst.reserve(dst.size() + src.size());
+    std::copy(src.begin(), src.end(), std::back_inserter(dst));
 }
 
 struct CUFHENetworkWithTFHEpp {
@@ -548,8 +548,7 @@ private:
             auto& bits = resPacket.bits[atPortName];
             if (bits.size() < atPortBit + 1)
                 bits.resize(atPortBit + 1);
-            bits.at(atPortBit) =
-                cufhe2tfhepp(get<TaskCUFHEGateMem>(port)->get());
+            bits.at(atPortBit) = get<TaskCUFHEGateMem>(port)->get();
         }
         // Get values of RAM
         // FIXME: subset of RAMs?
@@ -580,7 +579,7 @@ private:
                      i++) {
                     const auto& ram = *get<TaskCUFHEGateMem>(
                         {bp.name, {"ram", "ramdata", static_cast<int>(i)}});
-                    dst.push_back(cufhe2tfhepp(ram.get()));
+                    dst.push_back(ram.get());
                 }
                 break;
             }
@@ -626,7 +625,7 @@ private:
                         auto& ram = *get<TaskCUFHEGateMem>(
                             {bpram.name,
                              {"ram", "ramdata", static_cast<int>(i)}});
-                        ram.set(*::tfhepp2cufhe(init.at(i)));
+                        ram.set(init.at(i));
                     }
                 }
                 break;
@@ -653,7 +652,7 @@ private:
                  atPortBit) %
                 bits.size();
 
-            get<TaskCUFHEGateMem>(port)->set(*::tfhepp2cufhe(bits.at(index)));
+            get<TaskCUFHEGateMem>(port)->set(bits.at(index));
         }
     }
 
@@ -775,7 +774,7 @@ public:
                     for (size_t i = 0; i < init.size(); i++) {
                         auto& rom = *romnet->get<TaskCUFHEGateMem>(
                             {"rom", "romdata", static_cast<int>(i)});
-                        rom.set(*::tfhepp2cufhe(init.at(i)));
+                        rom.set(init.at(i));
                     }
                 }
 
@@ -873,11 +872,9 @@ public:
         // Reset
         if (currentCycle_ == 0) {
             if (auto reset = maybeGetAt("input", "reset"); reset) {
-                cufhe::Ctxt one, zero;
-                cufhe::ConstantOne(one);
-                cufhe::ConstantZero(zero);
-                cufhe::Synchronize();
-
+                TLWElvl0 one, zero;
+                TFHEpp::HomCONSTANTONE(one);
+                TFHEpp::HomCONSTANTZERO(zero);
                 reset->set(one);
                 runner.run();
                 reset->set(zero);

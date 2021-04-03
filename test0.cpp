@@ -551,6 +551,11 @@ public:
         return sk_;
     }
 
+    const std::shared_ptr<TFHEpp::GateKey>& gk() const
+    {
+        return gk_;
+    }
+
     const TLWElvl0& zero() const
     {
         return zero_;
@@ -646,24 +651,16 @@ void testTFHEppSerialization()
 
 class CUFHETestHelper {
 private:
-    std::shared_ptr<cufhe::PriKey> sk_;
     std::shared_ptr<cufhe::PubKey> gk_;
-    cufhe::Ctxt zero_, one_;
+    cufhe::Ctxt one_, zero_;
 
 private:
     CUFHETestHelper()
     {
-        cufhe::SetSeed();
-
-        sk_ = std::make_shared<cufhe::PriKey>();
-        gk_ = std::make_shared<cufhe::PubKey>();
-        cufhe::KeyGen(*gk_, *sk_);
-
-        cufhe::Ptxt p;
-        p = 0;
-        cufhe::Encrypt(zero_, p, *sk_);
-        p = 1;
-        cufhe::Encrypt(one_, p, *sk_);
+        auto& h = TFHEppTestHelper::instance();
+        gk_ = tfhepp2cufhe(*h.gk());
+        tfhepp2cufheInPlace(one_, h.one());
+        tfhepp2cufheInPlace(zero_, h.zero());
     }
 
 public:
@@ -686,21 +683,6 @@ public:
         static CUFHETestHelper inst;
         return inst;
     }
-
-    const std::shared_ptr<cufhe::PriKey>& sk() const
-    {
-        return sk_;
-    }
-
-    const cufhe::Ctxt& zero() const
-    {
-        return zero_;
-    }
-
-    const cufhe::Ctxt& one() const
-    {
-        return one_;
-    }
 };
 
 void processAllGates(CUFHENetwork& net,
@@ -711,15 +693,14 @@ void processAllGates(CUFHENetwork& net,
 
 void setInput(std::shared_ptr<TaskCUFHEGateMem> task, int val)
 {
-    auto& h = CUFHETestHelper::instance();
+    auto& h = TFHEppTestHelper::instance();
     task->set(val ? h.one() : h.zero());
 }
 
 int getOutput(std::shared_ptr<TaskCUFHEGateMem> task)
 {
-    cufhe::Ptxt p;
-    cufhe::Decrypt(p, task->get(), *CUFHETestHelper::instance().sk());
-    return p.get();
+    return TFHEpp::bootsSymDecrypt({task->get()},
+                                   *TFHEppTestHelper::instance().sk())[0];
 }
 
 void testBridgeBetweenCUFHEAndTFHEpp()
@@ -747,18 +728,18 @@ void testBridgeBetweenCUFHEAndTFHEpp()
     runner.addBridge(bridge0);
     runner.addBridge(bridge1);
 
-    t0->set(*tfhepp2cufhe(ht.one()));
+    t0->set(ht.one());
     runner.run();
-    assert(cufhe2tfhepp(t3->get()) == ht.one());
+    assert(t3->get() == ht.one());
 
     net0->tick();
     net1->tick();
     bridge0->tick();
     bridge1->tick();
 
-    t0->set(*tfhepp2cufhe(ht.zero()));
+    t0->set(ht.zero());
     runner.run();
-    assert(cufhe2tfhepp(t3->get()) == ht.zero());
+    assert(t3->get() == ht.zero());
 }
 #endif
 
