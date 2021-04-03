@@ -378,7 +378,7 @@ reg.add_in_out "ram-8-16-16-08", "test/test-ram-8-16-16.toml",
                "test/test08.in", "test/test08.out", ncycles: 8, set_plain_ncycles: true
 reg.add_in_out "mux-ram-8-16-16-08", "test/test-mux-ram-8-16-16.toml",
                "test/test08.in", "test/test08.out", ncycles: 8, set_plain_ncycles: true
-reg.add_in_out "rom-7-32", "test/test-rom-7-32.toml",
+reg.add_in_out "rom-7-32-12", "test/test-rom-7-32.toml",
                "test/test12.in", "test/test12.out", ncycles: 1, set_plain_ncycles: true
 
 reg.add_in_out("cahp-diamond-dump-prefix-00", "test/cahp-diamond.toml",
