@@ -482,20 +482,20 @@ public:
 
                 // Run
                 runner.run();
-
-                if (opt.dumpTimeCSVPrefix) {
-                    assert(graph);
-                    const std::string filename = fmt::format(
-                        "{}-{}.csv", *opt.dumpTimeCSVPrefix, currentCycle_);
-                    graph->dumpTimeCSV(*utility::openOfstream(filename));
-                }
-                if (opt.dumpGraphJSONPrefix) {
-                    assert(graph);
-                    const std::string filename = fmt::format(
-                        "{}-{}.json", *opt.dumpGraphJSONPrefix, currentCycle_);
-                    graph->dumpJSON(*utility::openOfstream(filename));
-                }
             });
+
+            if (opt.dumpTimeCSVPrefix) {
+                assert(graph);
+                const std::string filename = fmt::format(
+                    "{}-{}.csv", *opt.dumpTimeCSVPrefix, currentCycle_);
+                graph->dumpTimeCSV(*utility::openOfstream(filename));
+            }
+            if (opt.dumpGraphJSONPrefix) {
+                assert(graph);
+                const std::string filename = fmt::format(
+                    "{}-{}.json", *opt.dumpGraphJSONPrefix, currentCycle_);
+                graph->dumpJSON(*utility::openOfstream(filename));
+            }
 
             spdlog::info("\tdone. ({} us)", duration.count());
             if (opt.stdoutCSV)
