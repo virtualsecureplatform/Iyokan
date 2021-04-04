@@ -195,8 +195,7 @@ private:
             }
 
             case RAM_TYPE::MUX: {
-                std::vector<TLWElvl0> &dst =
-                    resPacket.ramInTLWE[bp.name];
+                std::vector<TLWElvl0> &dst = resPacket.ramInTLWE[bp.name];
                 for (size_t i = 0; i < (1 << bp.inAddrWidth) * bp.outRdataWidth;
                      i++) {
                     const auto &ram = *get<TaskTFHEppGateMem>(
