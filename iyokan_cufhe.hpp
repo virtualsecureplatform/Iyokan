@@ -7,14 +7,6 @@
 #include "iyokan.hpp"
 #include "iyokan_tfhepp.hpp"
 
-inline bool StreamQuery(cufhe::Stream st)
-{
-    bool ret = cufhe::StreamQuery(st);
-    if (ret)
-        cudaStreamSynchronize(st.st());
-    return ret;
-}
-
 class CUFHEStream {
 private:
     std::unique_ptr<cufhe::Stream> st_;
@@ -223,7 +215,7 @@ public:
 
     bool hasFinished() const override
     {
-        return getInputSize() == 0 || StreamQuery(*wi_.stream);
+        return getInputSize() == 0 || cufhe::StreamQuery(*wi_.stream);
     }
 
     template <class Archive>
@@ -253,7 +245,7 @@ CEREAL_REGISTER_TYPE(TaskCUFHEGateWIRE);
         }                                                \
         bool hasFinished() const override                \
         {                                                \
-            return StreamQuery(*wi_.stream);             \
+            return cufhe::StreamQuery(*wi_.stream);      \
         }                                                \
         template <class Archive>                         \
         void serialize(Archive& ar)                      \
@@ -638,7 +630,7 @@ public:
 
     bool hasFinished() const override
     {
-        return StreamQuery(*wi_.stream);
+        return cufhe::StreamQuery(*wi_.stream);
     }
 
     template <class Archive>
@@ -678,7 +670,7 @@ public:
 
     bool hasFinished() const override
     {
-        return StreamQuery(*wi_.stream);
+        return cufhe::StreamQuery(*wi_.stream);
     }
 
     template <class Archive>
@@ -757,6 +749,7 @@ public:
                    "Detected infinite loop");
             cufhe_.update();
             tfhepp_.update();
+            cufhe::Synchronize();
         }
     }
 
