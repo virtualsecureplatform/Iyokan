@@ -749,7 +749,6 @@ public:
                    "Detected infinite loop");
             cufhe_.update();
             tfhepp_.update();
-            cufhe::Synchronize();
         }
     }
 
