@@ -42,12 +42,12 @@ using TaskCUFHEGate = Task<cufhe::Ctxt, cufhe::Ctxt, CUFHEWorkerInfo>;
 inline void copyCtxt(cufhe::Ctxt& dst, const cufhe::Ctxt& src,
                      std::shared_ptr<CUFHEStream> stream = nullptr)
 {
-    if (stream) {
-        cufhe::Copy(dst, src, *stream);
-    }
-    else {
-        cufhe::CopyOnHost(dst, src);
-    }
+    // if (stream) {
+    //    cufhe::Copy(dst, src, *stream);
+    //}
+    // else {
+    cufhe::CopyOnHost(dst, src);
+    //}
 }
 
 inline TLWElvl0 cufhe2tfhepp(const cufhe::Ctxt& src)
