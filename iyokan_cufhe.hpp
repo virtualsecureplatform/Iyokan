@@ -7,7 +7,7 @@
 #include "iyokan.hpp"
 #include "iyokan_tfhepp.hpp"
 
-inline void cufheNot(cufhe::Ctxt& out, const cufhe::Ctxt& in, cufhe::Stream st)
+void cufheNot(cufhe::Ctxt& out, const cufhe::Ctxt& in, cufhe::Stream st)
 {
     for (int i = 0; i <= in.lwe_sample_->n(); i++)
         out.lwe_sample_->data()[i] = -in.lwe_sample_->data()[i];
