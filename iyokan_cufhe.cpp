@@ -523,6 +523,8 @@ private:
                 TFHEpp::bootsSymDecrypt(std::vector{task->realin1}, *sk_).at(0);
             bool prealin2 =
                 TFHEpp::bootsSymDecrypt(std::vector{task->realin2}, *sk_).at(0);
+            bool prealout =
+                TFHEpp::bootsSymDecrypt(std::vector{task->realout}, *sk_).at(0);
             bool pin0 = TFHEpp::bootsSymDecrypt(std::vector{in0}, *sk_).at(0);
             bool pin1 = TFHEpp::bootsSymDecrypt(std::vector{in1}, *sk_).at(0);
             bool pin2 = TFHEpp::bootsSymDecrypt(std::vector{in2}, *sk_).at(0);
@@ -533,6 +535,8 @@ private:
                 spdlog::warn(">>>>>>>>>>>> prealin1 != pin1");
             if (prealin2 != pin2)
                 spdlog::warn(">>>>>>>>>>>> prealin2 != pin2");
+            if (prealout != pout)
+                spdlog::warn(">>>>>>>>>>>> prealout != pout");
             isCorrect = pout == (!pin2 ? pin0 : pin1);
         }
         else if (label.kind == "WIRE") {

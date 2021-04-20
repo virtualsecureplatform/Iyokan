@@ -233,6 +233,7 @@ CEREAL_REGISTER_TYPE(TaskCUFHEGateWIRE);
                                                          \
     public:                                              \
         TLWElvl0 realin0, realin1, realin2;              \
+        mutable TLWElvl0 realout;                        \
                                                          \
     private:                                             \
         void startAsyncImpl(CUFHEWorkerInfo wi) override \
@@ -253,7 +254,13 @@ CEREAL_REGISTER_TYPE(TaskCUFHEGateWIRE);
         }                                                \
         bool hasFinished() const override                \
         {                                                \
-            return cufhe::StreamQuery(*wi_.stream);      \
+            if (cufhe::StreamQuery(*wi_.stream)) {       \
+                cufhe2tfheppInPlace(realout, output());  \
+                return true;                             \
+            }                                            \
+            else {                                       \
+                return false;                            \
+            }                                            \
         }                                                \
         template <class Archive>                         \
         void serialize(Archive& ar)                      \
