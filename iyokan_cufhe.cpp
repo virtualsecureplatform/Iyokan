@@ -523,6 +523,20 @@ private:
             bool pout = TFHEpp::bootsSymDecrypt(std::vector{out}, *sk_).at(0);
             isCorrect = pout == (!pin2 ? pin0 : pin1);
         }
+        else if (label.kind == "WIRE") {
+            auto task = std::dynamic_pointer_cast<TaskCUFHEGateWIRE>(taskbase);
+            assert(task);
+            if (task->getInputSize() == 1) {
+                TLWElvl0 in0, out;
+                cufhe2tfheppInPlace(in0, task->input(0));
+                cufhe2tfheppInPlace(out, task->output());
+                bool pin0 =
+                    TFHEpp::bootsSymDecrypt(std::vector{in0}, *sk_).at(0);
+                bool pout =
+                    TFHEpp::bootsSymDecrypt(std::vector{out}, *sk_).at(0);
+                isCorrect = pin0 == pout;
+            }
+        }
 
         if (!isCorrect.value_or(true)) {
             spdlog::warn("!!!INVALID GATE RESULT!!! {} {} {}", label.id,
