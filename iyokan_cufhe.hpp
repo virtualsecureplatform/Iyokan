@@ -237,6 +237,7 @@ CEREAL_REGISTER_TYPE(TaskCUFHEGateWIRE);
             wi_ = std::move(wi);                         \
             auto st = wi_.stream;                        \
             (expr);                                      \
+            cufhe::Synchronize();                        \
         }                                                \
                                                          \
     public:                                              \
@@ -748,7 +749,6 @@ public:
             assert((cufhe_.isRunning() || tfhepp_.isRunning()) &&
                    "Detected infinite loop");
             cufhe_.update();
-            cufhe::Synchronize();
             tfhepp_.update();
         }
     }
