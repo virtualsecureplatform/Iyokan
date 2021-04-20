@@ -30,6 +30,7 @@ public:
 
 struct CUFHEWorkerInfo {
     std::shared_ptr<CUFHEStream> stream;
+    std::shared_ptr<const TFHEpp::GateKey> gk;
 };
 
 CEREAL_REGISTER_TYPE(BridgeDepNode<TFHEppWorkerInfo, CUFHEWorkerInfo>);
@@ -304,10 +305,12 @@ private:
 public:
     CUFHEWorker(ReadyQueue<CUFHEWorkerInfo>& readyQueue,
                 size_t& numFinishedTargets,
+                std::shared_ptr<const TFHEpp::GateKey> gk,
                 std::shared_ptr<ProgressGraphMaker> graph)
         : Worker(readyQueue, numFinishedTargets, graph)
     {
         wi_.stream = std::make_shared<CUFHEStream>();
+        wi_.gk = gk;
     }
 };
 
@@ -701,7 +704,7 @@ public:
         : graph_(std::move(graph))
     {
         for (int i = 0; i < numCUFHEWorkers; i++)
-            cufhe_.addWorker(graph_);
+            cufhe_.addWorker(wi.gateKey, graph_);
         for (int i = 0; i < numTFHEppWorkers; i++)
             tfhepp_.addWorker(wi, graph_);
     }
@@ -766,5 +769,7 @@ public:
 bool isSerializedCUFHEFrontend(const std::string& filepath);
 void doCUFHE(const Options& opt);
 void processAllGates(CUFHENetwork& net, int numWorkers,
+                     const std::shared_ptr<const TFHEpp::GateKey> gk,
                      std::shared_ptr<ProgressGraphMaker> graph = nullptr);
+std::shared_ptr<cufhe::PubKey> tfhepp2cufhe(const TFHEpp::GateKey& src);
 #endif

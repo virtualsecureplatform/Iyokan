@@ -14,6 +14,7 @@ void merge(std::vector<T>& dst, const std::vector<T>& src)
     dst.reserve(dst.size() + src.size());
     std::copy(src.begin(), src.end(), std::back_inserter(dst));
 }
+}  // namespace
 
 std::shared_ptr<cufhe::PubKey> tfhepp2cufhe(const TFHEpp::GateKey& src)
 {
@@ -76,6 +77,7 @@ std::shared_ptr<cufhe::PubKey> tfhepp2cufhe(const TFHEpp::GateKey& src)
     return pubkey;
 }
 
+namespace {
 struct CUFHENetworkWithTFHEpp {
     std::shared_ptr<CUFHENetwork> cufheNet;
     std::shared_ptr<TFHEppNetwork> tfheppNet;
@@ -953,6 +955,7 @@ public:
 }  // namespace
 
 void processAllGates(CUFHENetwork& net, int numWorkers,
+                     const std::shared_ptr<const TFHEpp::GateKey> gk,
                      std::shared_ptr<ProgressGraphMaker> graph)
 {
     ReadyQueue<CUFHEWorkerInfo> readyQueue;
@@ -962,7 +965,7 @@ void processAllGates(CUFHENetwork& net, int numWorkers,
     size_t numFinishedTargets = 0;
     std::vector<CUFHEWorker> workers;
     for (int i = 0; i < numWorkers; i++)
-        workers.emplace_back(readyQueue, numFinishedTargets, graph);
+        workers.emplace_back(readyQueue, numFinishedTargets, gk, graph);
 
     // Process all targets.
     while (numFinishedTargets < net.numNodes()) {

@@ -551,6 +551,11 @@ public:
         return sk_;
     }
 
+    const std::shared_ptr<TFHEpp::GateKey>& gk() const
+    {
+        return gk_;
+    }
+
     const TLWElvl0& zero() const
     {
         return zero_;
@@ -646,24 +651,13 @@ void testTFHEppSerialization()
 
 class CUFHETestHelper {
 private:
-    std::shared_ptr<cufhe::PriKey> sk_;
-    std::shared_ptr<cufhe::PubKey> gk_;
     cufhe::Ctxt zero_, one_;
 
 private:
     CUFHETestHelper()
     {
-        cufhe::SetSeed();
-
-        sk_ = std::make_shared<cufhe::PriKey>();
-        gk_ = std::make_shared<cufhe::PubKey>();
-        cufhe::KeyGen(*gk_, *sk_);
-
-        cufhe::Ptxt p;
-        p = 0;
-        cufhe::Encrypt(zero_, p, *sk_);
-        p = 1;
-        cufhe::Encrypt(one_, p, *sk_);
+        tfhepp2cufheInPlace(zero_, TFHEppTestHelper::instance().zero());
+        tfhepp2cufheInPlace(one_, TFHEppTestHelper::instance().one());
     }
 
 public:
@@ -671,7 +665,8 @@ public:
     public:
         CUFHEManager()
         {
-            cufhe::Initialize(*CUFHETestHelper::instance().gk_);
+            cufhe::Initialize(
+                *tfhepp2cufhe(*TFHEppTestHelper::instance().gk()));
         }
 
         ~CUFHEManager()
@@ -685,11 +680,6 @@ public:
     {
         static CUFHETestHelper inst;
         return inst;
-    }
-
-    const std::shared_ptr<cufhe::PriKey>& sk() const
-    {
-        return sk_;
     }
 
     const cufhe::Ctxt& zero() const
@@ -706,7 +696,7 @@ public:
 void processAllGates(CUFHENetwork& net,
                      std::shared_ptr<ProgressGraphMaker> graph = nullptr)
 {
-    processAllGates(net, 240, graph);
+    processAllGates(net, 240, TFHEppTestHelper::instance().gk(), graph);
 }
 
 void setInput(std::shared_ptr<TaskCUFHEGateMem> task, int val)
@@ -717,9 +707,10 @@ void setInput(std::shared_ptr<TaskCUFHEGateMem> task, int val)
 
 int getOutput(std::shared_ptr<TaskCUFHEGateMem> task)
 {
-    cufhe::Ptxt p;
-    cufhe::Decrypt(p, task->get(), *CUFHETestHelper::instance().sk());
-    return p.get();
+    TLWElvl0 tlwe;
+    cufhe2tfheppInPlace(tlwe, task->get());
+    return TFHEpp::bootsSymDecrypt({tlwe},
+                                   *TFHEppTestHelper::instance().sk())[0];
 }
 
 void testBridgeBetweenCUFHEAndTFHEpp()
