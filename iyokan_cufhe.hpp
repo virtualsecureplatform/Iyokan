@@ -7,12 +7,6 @@
 #include "iyokan.hpp"
 #include "iyokan_tfhepp.hpp"
 
-void cufheNot(cufhe::Ctxt& out, const cufhe::Ctxt& in, cufhe::Stream st)
-{
-    for (int i = 0; i <= in.lwe_sample_->n(); i++)
-        out.lwe_sample_->data()[i] = -in.lwe_sample_->data()[i];
-}
-
 class CUFHEStream {
 private:
     std::unique_ptr<cufhe::Stream> st_;
@@ -270,7 +264,7 @@ DEFINE_TASK_GATE(XOR, 2, cufhe::Xor(output(), input(0), input(1), *st));
 DEFINE_TASK_GATE(XNOR, 2, cufhe::Xnor(output(), input(0), input(1), *st));
 DEFINE_TASK_GATE(MUX, 3,
                  cufhe::Mux(output(), input(2), input(1), input(0), *st));
-DEFINE_TASK_GATE(NOT, 1, cufheNot(output(), input(0), *st));
+DEFINE_TASK_GATE(NOT, 1, cufhe::Not(output(), input(0), *st));
 #undef DEFINE_TASK_GATE
 
 class CUFHENetworkBuilder
