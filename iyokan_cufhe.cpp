@@ -519,12 +519,20 @@ private:
             cufhe2tfheppInPlace(out, task->output());
             bool prealin0 =
                 TFHEpp::bootsSymDecrypt(std::vector{task->realin0}, *sk_).at(0);
+            bool prealin1 =
+                TFHEpp::bootsSymDecrypt(std::vector{task->realin1}, *sk_).at(0);
+            bool prealin2 =
+                TFHEpp::bootsSymDecrypt(std::vector{task->realin2}, *sk_).at(0);
             bool pin0 = TFHEpp::bootsSymDecrypt(std::vector{in0}, *sk_).at(0);
             bool pin1 = TFHEpp::bootsSymDecrypt(std::vector{in1}, *sk_).at(0);
             bool pin2 = TFHEpp::bootsSymDecrypt(std::vector{in2}, *sk_).at(0);
             bool pout = TFHEpp::bootsSymDecrypt(std::vector{out}, *sk_).at(0);
             if (prealin0 != pin0)
                 spdlog::warn(">>>>>>>>>>>> prealin0 != pin0");
+            if (prealin1 != pin1)
+                spdlog::warn(">>>>>>>>>>>> prealin1 != pin1");
+            if (prealin2 != pin2)
+                spdlog::warn(">>>>>>>>>>>> prealin2 != pin2");
             isCorrect = pout == (!pin2 ? pin0 : pin1);
         }
         else if (label.kind == "WIRE") {

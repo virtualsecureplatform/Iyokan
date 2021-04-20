@@ -232,14 +232,18 @@ CEREAL_REGISTER_TYPE(TaskCUFHEGateWIRE);
         CUFHEWorkerInfo wi_;                             \
                                                          \
     public:                                              \
-        TLWElvl0 realin0;                                \
+        TLWElvl0 realin0, realin1, realin2;              \
                                                          \
     private:                                             \
         void startAsyncImpl(CUFHEWorkerInfo wi) override \
         {                                                \
             wi_ = std::move(wi);                         \
             auto st = wi_.stream;                        \
-            cufhe2tfheppInPlace(realin0, input(0));      \
+            if (numInputs == 3) {                        \
+                cufhe2tfheppInPlace(realin0, input(0));  \
+                cufhe2tfheppInPlace(realin1, input(1));  \
+                cufhe2tfheppInPlace(realin2, input(2));  \
+            }                                            \
             (expr);                                      \
         }                                                \
                                                          \
