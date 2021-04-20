@@ -402,7 +402,17 @@ private:
 
         NodeLabel label = depnode->label();
         std::optional<bool> isCorrect;
-        if (label.kind == "AND") {
+        if (label.kind == "NOT") {
+            auto task = std::dynamic_pointer_cast<TaskCUFHEGateNOT>(taskbase);
+            assert(task);
+            TLWElvl0 in0, out;
+            cufhe2tfheppInPlace(in0, task->input(0));
+            cufhe2tfheppInPlace(out, task->output());
+            bool pin0 = TFHEpp::bootsSymDecrypt(std::vector{in0}, *sk_).at(0);
+            bool pout = TFHEpp::bootsSymDecrypt(std::vector{out}, *sk_).at(0);
+            isCorrect = (pin0 ? !pout : pout);
+        }
+        else if (label.kind == "AND") {
             auto task = std::dynamic_pointer_cast<TaskCUFHEGateAND>(taskbase);
             assert(task);
             TLWElvl0 in0, in1, out;
@@ -438,6 +448,9 @@ private:
             bool pin1 = TFHEpp::bootsSymDecrypt(std::vector{in1}, *sk_).at(0);
             bool pout = TFHEpp::bootsSymDecrypt(std::vector{out}, *sk_).at(0);
             isCorrect = (pin0 && !pin1 ? pout : !pout);
+        }
+        else {
+            // FIXME: Add support for more gates
         }
 
         if (!isCorrect.value_or(true)) {
