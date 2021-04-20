@@ -449,8 +449,79 @@ private:
             bool pout = TFHEpp::bootsSymDecrypt(std::vector{out}, *sk_).at(0);
             isCorrect = (pin0 && !pin1 ? pout : !pout);
         }
-        else {
-            // FIXME: Add support for more gates
+        else if (label.kind == "OR") {
+            auto task = std::dynamic_pointer_cast<TaskCUFHEGateOR>(taskbase);
+            assert(task);
+            TLWElvl0 in0, in1, out;
+            cufhe2tfheppInPlace(in0, task->input(0));
+            cufhe2tfheppInPlace(in1, task->input(1));
+            cufhe2tfheppInPlace(out, task->output());
+            bool pin0 = TFHEpp::bootsSymDecrypt(std::vector{in0}, *sk_).at(0);
+            bool pin1 = TFHEpp::bootsSymDecrypt(std::vector{in1}, *sk_).at(0);
+            bool pout = TFHEpp::bootsSymDecrypt(std::vector{out}, *sk_).at(0);
+            isCorrect = (pin0 || pin1 ? pout : !pout);
+        }
+        else if (label.kind == "NOR") {
+            auto task = std::dynamic_pointer_cast<TaskCUFHEGateNOR>(taskbase);
+            assert(task);
+            TLWElvl0 in0, in1, out;
+            cufhe2tfheppInPlace(in0, task->input(0));
+            cufhe2tfheppInPlace(in1, task->input(1));
+            cufhe2tfheppInPlace(out, task->output());
+            bool pin0 = TFHEpp::bootsSymDecrypt(std::vector{in0}, *sk_).at(0);
+            bool pin1 = TFHEpp::bootsSymDecrypt(std::vector{in1}, *sk_).at(0);
+            bool pout = TFHEpp::bootsSymDecrypt(std::vector{out}, *sk_).at(0);
+            isCorrect = !(pin0 || pin1) ? pout : !pout;
+        }
+        else if (label.kind == "ORNOT") {
+            auto task = std::dynamic_pointer_cast<TaskCUFHEGateORNOT>(taskbase);
+            assert(task);
+            TLWElvl0 in0, in1, out;
+            cufhe2tfheppInPlace(in0, task->input(0));
+            cufhe2tfheppInPlace(in1, task->input(1));
+            cufhe2tfheppInPlace(out, task->output());
+            bool pin0 = TFHEpp::bootsSymDecrypt(std::vector{in0}, *sk_).at(0);
+            bool pin1 = TFHEpp::bootsSymDecrypt(std::vector{in1}, *sk_).at(0);
+            bool pout = TFHEpp::bootsSymDecrypt(std::vector{out}, *sk_).at(0);
+            isCorrect = (pin0 || !pin1) ? pout : !pout;
+        }
+        else if (label.kind == "XOR") {
+            auto task = std::dynamic_pointer_cast<TaskCUFHEGateXOR>(taskbase);
+            assert(task);
+            TLWElvl0 in0, in1, out;
+            cufhe2tfheppInPlace(in0, task->input(0));
+            cufhe2tfheppInPlace(in1, task->input(1));
+            cufhe2tfheppInPlace(out, task->output());
+            bool pin0 = TFHEpp::bootsSymDecrypt(std::vector{in0}, *sk_).at(0);
+            bool pin1 = TFHEpp::bootsSymDecrypt(std::vector{in1}, *sk_).at(0);
+            bool pout = TFHEpp::bootsSymDecrypt(std::vector{out}, *sk_).at(0);
+            isCorrect = (pin0 && !pin1) || (!pin0 && pin1) ? pout : !pout;
+        }
+        else if (label.kind == "XNOR") {
+            auto task = std::dynamic_pointer_cast<TaskCUFHEGateXNOR>(taskbase);
+            assert(task);
+            TLWElvl0 in0, in1, out;
+            cufhe2tfheppInPlace(in0, task->input(0));
+            cufhe2tfheppInPlace(in1, task->input(1));
+            cufhe2tfheppInPlace(out, task->output());
+            bool pin0 = TFHEpp::bootsSymDecrypt(std::vector{in0}, *sk_).at(0);
+            bool pin1 = TFHEpp::bootsSymDecrypt(std::vector{in1}, *sk_).at(0);
+            bool pout = TFHEpp::bootsSymDecrypt(std::vector{out}, *sk_).at(0);
+            isCorrect = !((pin0 && !pin1) || (!pin0 && pin1)) ? pout : !pout;
+        }
+        else if (label.kind == "MUX") {
+            auto task = std::dynamic_pointer_cast<TaskCUFHEGateMUX>(taskbase);
+            assert(task);
+            TLWElvl0 in0, in1, in2, out;
+            cufhe2tfheppInPlace(in0, task->input(0));
+            cufhe2tfheppInPlace(in1, task->input(1));
+            cufhe2tfheppInPlace(in2, task->input(2));
+            cufhe2tfheppInPlace(out, task->output());
+            bool pin0 = TFHEpp::bootsSymDecrypt(std::vector{in0}, *sk_).at(0);
+            bool pin1 = TFHEpp::bootsSymDecrypt(std::vector{in1}, *sk_).at(0);
+            bool pin2 = TFHEpp::bootsSymDecrypt(std::vector{in2}, *sk_).at(0);
+            bool pout = TFHEpp::bootsSymDecrypt(std::vector{out}, *sk_).at(0);
+            isCorrect = pout == (!pin2 ? pin0 : pin1);
         }
 
         if (!isCorrect.value_or(true)) {
