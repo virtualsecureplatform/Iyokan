@@ -749,8 +749,6 @@ public:
                    "Detected infinite loop");
             cufhe_.update();
             tfhepp_.update();
-
-            std::this_thread::sleep_for(std::chrono::milliseconds(100));
         }
     }
 
