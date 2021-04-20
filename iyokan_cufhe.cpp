@@ -383,6 +383,74 @@ public:
     }
 };
 
+class ResultVerifyVisitor : public GraphVisitor {
+private:
+    std::shared_ptr<TFHEpp::SecretKey> sk_;
+
+public:
+    ResultVerifyVisitor(const std::shared_ptr<TFHEpp::SecretKey>& sk) : sk_(sk)
+    {
+    }
+
+private:
+    void onStart(DepNodeBase& depnodebase) override
+    {
+        auto depnode = dynamic_cast<DepNode<CUFHEWorkerInfo>*>(&depnodebase);
+        if (!depnode)
+            return;
+        auto taskbase = depnode->task();
+
+        NodeLabel label = depnode->label();
+        std::optional<bool> isCorrect;
+        if (label.kind == "AND") {
+            auto task = std::dynamic_pointer_cast<TaskCUFHEGateAND>(taskbase);
+            assert(task);
+            TLWElvl0 in0, in1, out;
+            cufhe2tfheppInPlace(in0, task->input(0));
+            cufhe2tfheppInPlace(in1, task->input(1));
+            cufhe2tfheppInPlace(out, task->output());
+            bool pin0 = TFHEpp::bootsSymDecrypt(std::vector{in0}, *sk_).at(0);
+            bool pin1 = TFHEpp::bootsSymDecrypt(std::vector{in1}, *sk_).at(0);
+            bool pout = TFHEpp::bootsSymDecrypt(std::vector{out}, *sk_).at(0);
+            isCorrect = (pin0 && pin1 ? pout : !pout);
+        }
+        else if (label.kind == "NAND") {
+            auto task = std::dynamic_pointer_cast<TaskCUFHEGateNAND>(taskbase);
+            assert(task);
+            TLWElvl0 in0, in1, out;
+            cufhe2tfheppInPlace(in0, task->input(0));
+            cufhe2tfheppInPlace(in1, task->input(1));
+            cufhe2tfheppInPlace(out, task->output());
+            bool pin0 = TFHEpp::bootsSymDecrypt(std::vector{in0}, *sk_).at(0);
+            bool pin1 = TFHEpp::bootsSymDecrypt(std::vector{in1}, *sk_).at(0);
+            bool pout = TFHEpp::bootsSymDecrypt(std::vector{out}, *sk_).at(0);
+            isCorrect = (!(pin0 && pin1) ? pout : !pout);
+        }
+        else if (label.kind == "ANDNOT") {
+            auto task =
+                std::dynamic_pointer_cast<TaskCUFHEGateANDNOT>(taskbase);
+            assert(task);
+            TLWElvl0 in0, in1, out;
+            cufhe2tfheppInPlace(in0, task->input(0));
+            cufhe2tfheppInPlace(in1, task->input(1));
+            cufhe2tfheppInPlace(out, task->output());
+            bool pin0 = TFHEpp::bootsSymDecrypt(std::vector{in0}, *sk_).at(0);
+            bool pin1 = TFHEpp::bootsSymDecrypt(std::vector{in1}, *sk_).at(0);
+            bool pout = TFHEpp::bootsSymDecrypt(std::vector{out}, *sk_).at(0);
+            isCorrect = (pin0 && !pin1 ? pout : !pout);
+        }
+
+        if (!isCorrect.value_or(true)) {
+            spdlog::warn("!!!INVALID GATE RESULT!!! {} {} {}", label.id,
+                         label.kind, label.desc);
+        }
+    }
+
+    void onEnd() override
+    {
+    }
+};
+
 struct CUFHERunParameter {
     NetworkBlueprint blueprint;
     int numCPUWorkers, numGPUWorkers, numGPU, numCycles;
@@ -920,6 +988,15 @@ public:
                 const std::string filename = fmt::format(
                     "{}-{}.json", *opt.dumpGraphJSONPrefix, currentCycle_);
                 graph->dumpJSON(*utility::openOfstream(filename));
+            }
+            if (opt.secretKey) {
+                auto sk = std::make_shared<TFHEpp::SecretKey>();
+                readFromArchive(*sk, *opt.secretKey);
+                ResultVerifyVisitor vis{sk};
+                for (auto&& p : name2tnet_)
+                    p.second->visit(vis);
+                for (auto&& p : name2cnet_)
+                    p.second->visit(vis);
             }
 
             spdlog::info("\tdone. ({} us)", duration.count());

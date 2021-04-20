@@ -290,6 +290,10 @@ public:
     {
     }
 
+    virtual ~DepNodeBase()
+    {
+    }
+
     int priority() const noexcept
     {
         return priority_;
@@ -356,7 +360,7 @@ private:
     // Use weak_ptr here in order to avoid circular references.
     std::vector<std::weak_ptr<const InType>> inputs_;
 
-protected:
+public:
     const InType &input(size_t index) const
     {
         std::shared_ptr<const InType> in = inputs_.at(index).lock();
