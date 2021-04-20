@@ -748,6 +748,7 @@ public:
             assert((cufhe_.isRunning() || tfhepp_.isRunning()) &&
                    "Detected infinite loop");
             cufhe_.update();
+            cufhe::Synchronize();
             tfhepp_.update();
         }
     }
