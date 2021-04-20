@@ -236,6 +236,54 @@ CEREAL_REGISTER_TYPE(TaskCUFHEGateWIRE);
         void startAsyncImpl(CUFHEWorkerInfo wi) override \
         {                                                \
             wi_ = std::move(wi);                         \
+            TLWElvl0 in0, in1, in2, out;                 \
+            if (getInputSize() >= 1)                     \
+                cufhe2tfheppInPlace(in0, input(0));      \
+            if (getInputSize() >= 2)                     \
+                cufhe2tfheppInPlace(in1, input(1));      \
+            if (getInputSize() >= 3)                     \
+                cufhe2tfheppInPlace(in1, input(2));      \
+            (expr);                                      \
+            tfhepp2cufheInPlace(output(), out);          \
+        }                                                \
+                                                         \
+    public:                                              \
+        TaskCUFHEGate##name() : TaskCUFHEGate(numInputs) \
+        {                                                \
+        }                                                \
+        bool hasFinished() const override                \
+        {                                                \
+            return true;                                 \
+        }                                                \
+        template <class Archive>                         \
+        void serialize(Archive& ar)                      \
+        {                                                \
+            ar(cereal::base_class<TaskCUFHEGate>(this)); \
+        }                                                \
+    };                                                   \
+    CEREAL_REGISTER_TYPE(TaskCUFHEGate##name);
+DEFINE_TASK_GATE(AND, 2, TFHEpp::HomAND(out, in0, in1, *wi_.gk));
+DEFINE_TASK_GATE(NAND, 2, TFHEpp::HomNAND(out, in0, in1, *wi_.gk));
+DEFINE_TASK_GATE(ANDNOT, 2, TFHEpp::HomANDYN(out, in0, in1, *wi_.gk));
+DEFINE_TASK_GATE(OR, 2, TFHEpp::HomOR(out, in0, in1, *wi_.gk));
+DEFINE_TASK_GATE(NOR, 2, TFHEpp::HomNOR(out, in0, in1, *wi_.gk));
+DEFINE_TASK_GATE(ORNOT, 2, TFHEpp::HomORYN(out, in0, in1, *wi_.gk));
+DEFINE_TASK_GATE(XOR, 2, TFHEpp::HomXOR(out, in0, in1, *wi_.gk));
+DEFINE_TASK_GATE(XNOR, 2, TFHEpp::HomXNOR(out, in0, in1, *wi_.gk));
+DEFINE_TASK_GATE(MUX, 3, TFHEpp::HomMUX(out, in2, in1, in0, *wi_.gk));
+DEFINE_TASK_GATE(NOT, 1, TFHEpp::HomNOT(out, in0));
+#undef DEFINE_TASK_GATE
+
+/*
+#define DEFINE_TASK_GATE(name, numInputs, expr)          \
+    class TaskCUFHEGate##name : public TaskCUFHEGate {   \
+    private:                                             \
+        CUFHEWorkerInfo wi_;                             \
+                                                         \
+    private:                                             \
+        void startAsyncImpl(CUFHEWorkerInfo wi) override \
+        {                                                \
+            wi_ = std::move(wi);                         \
             auto st = wi_.stream;                        \
             (expr);                                      \
         }                                                \
@@ -267,6 +315,7 @@ DEFINE_TASK_GATE(MUX, 3,
                  cufhe::Mux(output(), input(2), input(1), input(0), *st));
 DEFINE_TASK_GATE(NOT, 1, cufhe::Not(output(), input(0), *st));
 #undef DEFINE_TASK_GATE
+*/
 
 class CUFHENetworkBuilder
     : public NetworkBuilder<TaskCUFHEGate, TaskCUFHEGateMem, TaskCUFHEGateDFF,
