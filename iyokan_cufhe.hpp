@@ -231,13 +231,16 @@ CEREAL_REGISTER_TYPE(TaskCUFHEGateWIRE);
     private:                                             \
         CUFHEWorkerInfo wi_;                             \
                                                          \
+    public:                                              \
+        TLWElvl0 realin0;                                \
+                                                         \
     private:                                             \
         void startAsyncImpl(CUFHEWorkerInfo wi) override \
         {                                                \
             wi_ = std::move(wi);                         \
             auto st = wi_.stream;                        \
+            cufhe2tfheppInPlace(realin0, input(0));      \
             (expr);                                      \
-            cufhe::Synchronize();                        \
         }                                                \
                                                          \
     public:                                              \
