@@ -387,11 +387,13 @@ class ResultVerifyVisitor : public GraphVisitor {
 private:
     std::unordered_map<int, graph::NodePtr> id2node_;
     std::shared_ptr<TFHEpp::SecretKey> sk_;
+    std::shared_ptr<TFHEpp::GateKey> gk_;
 
 public:
     ResultVerifyVisitor(std::unordered_map<int, graph::NodePtr> id2node,
-                        const std::shared_ptr<TFHEpp::SecretKey>& sk)
-        : id2node_(std::move(id2node)), sk_(sk)
+                        const std::shared_ptr<TFHEpp::SecretKey>& sk,
+                        const std::shared_ptr<TFHEpp::GateKey>& gk)
+        : id2node_(std::move(id2node)), sk_(sk), gk_(gk)
     {
     }
 
@@ -515,7 +517,7 @@ private:
         else if (label.kind == "MUX") {
             auto task = std::dynamic_pointer_cast<TaskCUFHEGateMUX>(taskbase);
             assert(task);
-            TLWElvl0 in0, in1, in2, out;
+            TLWElvl0 in0, in1, in2, out, calcout;
             cufhe2tfheppInPlace(in0, task->input(0));
             cufhe2tfheppInPlace(in1, task->input(1));
             cufhe2tfheppInPlace(in2, task->input(2));
@@ -543,6 +545,13 @@ private:
             if (task->dupcopied)
                 spdlog::warn(">>>>>>>>>>>> dup copied!");
             isCorrect = pout == (!pin2 ? pin0 : pin1);
+            if (!isCorrect.value_or(true)) {
+                TFHEpp::HomMUX(calcout, in2, in1, in0, *gk_);
+                bool pcalcout =
+                    TFHEpp::bootsSymDecrypt(std::vector{calcout}, *sk_).at(0);
+                spdlog::warn(">>>>>>>>>>>> {} {} {} {} {}", pin0, pin1, pin2,
+                             pout, pcalcout);
+            }
         }
         else if (label.kind == "WIRE") {
             auto task = std::dynamic_pointer_cast<TaskCUFHEGateWIRE>(taskbase);
@@ -1117,13 +1126,14 @@ public:
             }
             if (opt.secretKey) {
                 auto sk = std::make_shared<TFHEpp::SecretKey>();
+                auto gk = std::make_shared<TFHEpp::GateKey>(*sk);
                 readFromArchive(*sk, *opt.secretKey);
                 GraphVisitor grvis;
                 for (auto&& p : name2tnet_)
                     p.second->visit(grvis);
                 for (auto&& p : name2cnet_)
                     p.second->visit(grvis);
-                ResultVerifyVisitor vis{grvis.getMap(), sk};
+                ResultVerifyVisitor vis{grvis.getMap(), sk, gk};
                 for (auto&& p : name2tnet_)
                     p.second->visit(vis);
                 for (auto&& p : name2cnet_)
