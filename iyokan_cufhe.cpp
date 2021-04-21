@@ -517,17 +517,11 @@ private:
         else if (label.kind == "MUX") {
             auto task = std::dynamic_pointer_cast<TaskCUFHEGateMUX>(taskbase);
             assert(task);
-            TLWElvl0 in0, in1, in2, out, calcout, calcout2;
+            TLWElvl0 in0, in1, in2, out, calcout;
             cufhe2tfheppInPlace(in0, task->input(0));
             cufhe2tfheppInPlace(in1, task->input(1));
             cufhe2tfheppInPlace(in2, task->input(2));
             cufhe2tfheppInPlace(out, task->output());
-            cufhe::Ctxt calcout2_ctxt;
-            CUFHEStream st;
-            cufhe::Mux(calcout2_ctxt, task->input(2), task->input(1),
-                       task->input(0), st);
-            cufhe::Synchronize();
-            cufhe2tfheppInPlace(calcout2, calcout2_ctxt);
             bool prealin0 =
                 TFHEpp::bootsSymDecrypt(std::vector{task->realin0}, *sk_).at(0);
             bool prealin1 =
@@ -540,8 +534,6 @@ private:
             bool pin1 = TFHEpp::bootsSymDecrypt(std::vector{in1}, *sk_).at(0);
             bool pin2 = TFHEpp::bootsSymDecrypt(std::vector{in2}, *sk_).at(0);
             bool pout = TFHEpp::bootsSymDecrypt(std::vector{out}, *sk_).at(0);
-            bool pcalcout2 =
-                TFHEpp::bootsSymDecrypt(std::vector{calcout2}, *sk_).at(0);
             if (prealin0 != pin0)
                 spdlog::warn(">>>>>>>>>>>> prealin0 != pin0");
             if (prealin1 != pin1)
@@ -554,9 +546,20 @@ private:
                 spdlog::warn(">>>>>>>>>>>> dup copied!");
             isCorrect = pout == (!pin2 ? pin0 : pin1);
             if (!isCorrect.value_or(true)) {
+                TLWElvl0 calcout2;
+                cufhe::Ctxt calcout2_ctxt;
+                CUFHEStream st;
+                cufhe::Mux(calcout2_ctxt, task->input(2), task->input(1),
+                           task->input(0), st);
+                cufhe::Synchronize();
+                cufhe2tfheppInPlace(calcout2, calcout2_ctxt);
+                bool pcalcout2 =
+                    TFHEpp::bootsSymDecrypt(std::vector{calcout2}, *sk_).at(0);
+
                 TFHEpp::HomMUX(calcout, in2, in1, in0, *gk_);
                 bool pcalcout =
                     TFHEpp::bootsSymDecrypt(std::vector{calcout}, *sk_).at(0);
+
                 spdlog::warn(">>>>>>>>>>>> {} {} {} {} {} {} {}", pin0, pin1,
                              pin2, pout, pcalcout2, pcalcout,
                              (!pin2 ? pin0 : pin1));
