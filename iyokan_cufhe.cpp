@@ -385,10 +385,13 @@ public:
 
 class ResultVerifyVisitor : public GraphVisitor {
 private:
+    std::unordered_map<int, graph::NodePtr> id2node_;
     std::shared_ptr<TFHEpp::SecretKey> sk_;
 
 public:
-    ResultVerifyVisitor(const std::shared_ptr<TFHEpp::SecretKey>& sk) : sk_(sk)
+    ResultVerifyVisitor(std::unordered_map<int, graph::NodePtr> id2node,
+                        const std::shared_ptr<TFHEpp::SecretKey>& sk)
+        : id2node_(std::move(id2node)), sk_(sk)
     {
     }
 
@@ -559,7 +562,7 @@ private:
         if (!isCorrect.value_or(true)) {
             spdlog::warn("!!!INVALID GATE RESULT!!! {} {} {}", label.id,
                          label.kind, label.desc);
-            const auto& m = getMap();
+            const auto& m = id2node_;
             graph::NodePtr n = m.at(label.id);
             for (int p : n->parents) {
                 graph::NodePtr n1 = m.at(p);
@@ -1115,7 +1118,12 @@ public:
             if (opt.secretKey) {
                 auto sk = std::make_shared<TFHEpp::SecretKey>();
                 readFromArchive(*sk, *opt.secretKey);
-                ResultVerifyVisitor vis{sk};
+                GraphVisitor grvis;
+                for (auto&& p : name2tnet_)
+                    p.second->visit(grvis);
+                for (auto&& p : name2cnet_)
+                    p.second->visit(grvis);
+                ResultVerifyVisitor vis{grvis.getMap(), sk};
                 for (auto&& p : name2tnet_)
                     p.second->visit(vis);
                 for (auto&& p : name2cnet_)
