@@ -1086,9 +1086,10 @@ public:
                 reset->set(zero);
 
                 if (opt.secretKey) {
+                    spdlog::debug("Verifying gate results");
                     auto sk = std::make_shared<TFHEpp::SecretKey>();
-                    auto gk = std::make_shared<TFHEpp::GateKey>(*sk);
                     readFromArchive(*sk, *opt.secretKey);
+                    auto gk = std::make_shared<TFHEpp::GateKey>(*sk);
                     GraphVisitor grvis;
                     for (auto&& p : name2tnet_)
                         p.second->visit(grvis);
@@ -1141,9 +1142,10 @@ public:
                 graph->dumpJSON(*utility::openOfstream(filename));
             }
             if (opt.secretKey) {
+                spdlog::debug("Verifying gate results");
                 auto sk = std::make_shared<TFHEpp::SecretKey>();
-                auto gk = std::make_shared<TFHEpp::GateKey>(*sk);
                 readFromArchive(*sk, *opt.secretKey);
+                auto gk = std::make_shared<TFHEpp::GateKey>(*sk);
                 GraphVisitor grvis;
                 for (auto&& p : name2tnet_)
                     p.second->visit(grvis);
