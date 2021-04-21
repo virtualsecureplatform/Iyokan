@@ -537,6 +537,8 @@ private:
                 spdlog::warn(">>>>>>>>>>>> prealin2 != pin2");
             if (prealout != pout)
                 spdlog::warn(">>>>>>>>>>>> prealout != pout");
+            if (task->dupcopied)
+                spdlog::warn(">>>>>>>>>>>> dup copied!");
             isCorrect = pout == (!pin2 ? pin0 : pin1);
         }
         else if (label.kind == "WIRE") {

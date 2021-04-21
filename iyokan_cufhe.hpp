@@ -234,6 +234,7 @@ CEREAL_REGISTER_TYPE(TaskCUFHEGateWIRE);
     public:                                              \
         TLWElvl0 realin0, realin1, realin2;              \
         mutable TLWElvl0 realout;                        \
+        mutable bool copied, dupcopied;                  \
                                                          \
     private:                                             \
         void startAsyncImpl(CUFHEWorkerInfo wi) override \
@@ -245,6 +246,7 @@ CEREAL_REGISTER_TYPE(TaskCUFHEGateWIRE);
                 cufhe2tfheppInPlace(realin1, input(1));  \
                 cufhe2tfheppInPlace(realin2, input(2));  \
             }                                            \
+            copied = dupcopied = false;                  \
             (expr);                                      \
         }                                                \
                                                          \
@@ -255,6 +257,9 @@ CEREAL_REGISTER_TYPE(TaskCUFHEGateWIRE);
         bool hasFinished() const override                \
         {                                                \
             if (cufhe::StreamQuery(*wi_.stream)) {       \
+                if (copied)                              \
+                    dupcopied = true;                    \
+                copied = true;                           \
                 cufhe2tfheppInPlace(realout, output());  \
                 return true;                             \
             }                                            \
