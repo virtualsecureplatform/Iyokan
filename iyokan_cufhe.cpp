@@ -549,8 +549,8 @@ private:
                 TFHEpp::HomMUX(calcout, in2, in1, in0, *gk_);
                 bool pcalcout =
                     TFHEpp::bootsSymDecrypt(std::vector{calcout}, *sk_).at(0);
-                spdlog::warn(">>>>>>>>>>>> {} {} {} {} {}", pin0, pin1, pin2,
-                             pout, pcalcout);
+                spdlog::warn(">>>>>>>>>>>> {} {} {} {} {} {}", pin0, pin1, pin2,
+                             pout, pcalcout, (!pin2 ? pin0 : pin1));
             }
         }
         else if (label.kind == "WIRE") {
