@@ -1084,6 +1084,22 @@ public:
                 reset->set(one);
                 runner.run();
                 reset->set(zero);
+
+                if (opt.secretKey) {
+                    auto sk = std::make_shared<TFHEpp::SecretKey>();
+                    auto gk = std::make_shared<TFHEpp::GateKey>(*sk);
+                    readFromArchive(*sk, *opt.secretKey);
+                    GraphVisitor grvis;
+                    for (auto&& p : name2tnet_)
+                        p.second->visit(grvis);
+                    for (auto&& p : name2cnet_)
+                        p.second->visit(grvis);
+                    ResultVerifyVisitor vis{grvis.getMap(), sk, gk};
+                    for (auto&& p : name2tnet_)
+                        p.second->visit(vis);
+                    for (auto&& p : name2cnet_)
+                        p.second->visit(vis);
+                }
             }
         }
 
