@@ -559,6 +559,13 @@ private:
         if (!isCorrect.value_or(true)) {
             spdlog::warn("!!!INVALID GATE RESULT!!! {} {} {}", label.id,
                          label.kind, label.desc);
+            const auto& m = getMap();
+            graph::NodePtr n = m.at(label.id);
+            for (int p : n->parents) {
+                graph::NodePtr n1 = m.at(p);
+                spdlog::warn("\t {} {} {}", n1->label.id, n1->label.kind,
+                             n1->label.desc);
+            }
         }
     }
 
