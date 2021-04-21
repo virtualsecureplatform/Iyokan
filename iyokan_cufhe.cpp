@@ -551,7 +551,9 @@ private:
                 CUFHEStream st;
                 cufhe::Mux(calcout2_ctxt, task->input(2), task->input(1),
                            task->input(0), st);
-                cufhe::Synchronize();
+                // cufhe::Synchronize();
+                while (!cufhe::StreamQuery(st))
+                    ;
                 cufhe2tfheppInPlace(calcout2, calcout2_ctxt);
                 bool pcalcout2 =
                     TFHEpp::bootsSymDecrypt(std::vector{calcout2}, *sk_).at(0);
