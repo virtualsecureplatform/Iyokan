@@ -859,16 +859,14 @@ void testCUFHE()
     cufhe::KeyGen(gk, sk);
     cufhe::Initialize(gk);
 
-    const size_t N = 10, M = 1000;
-    cufhe::Ctxt ca, cb, cc, cres[N][M];
-    cufhe::Ptxt pa, pb, pc;
+    const size_t N = 20, M = 1000;
+    cufhe::Ctxt ca, cb, cres[N][M];
+    cufhe::Ptxt pa, pb;
     pa = true;
     pb = false;
-    pc = true;
-    uint32_t expected = pa.get() ? pb.get() : pc.get();
+    uint32_t expected = !(pa.get() && pb.get());
     Encrypt(ca, pa, sk);
     Encrypt(cb, pb, sk);
-    Encrypt(cc, pc, sk);
     for (size_t i = 0; i < N; i++)
         for (size_t j = 0; j < M; j++)
             if (expected)
@@ -882,7 +880,7 @@ void testCUFHE()
 
     int workingIndex[M] = {};
     for (size_t i = 0; i < M; i++)
-        cufhe::Mux(cres[0][i], ca, cb, cc, st[i]);
+        cufhe::Nand(cres[0][i], ca, cb, st[i]);
     while (true) {
         bool cont = false;
         for (size_t i = 0; i < M; i++) {
@@ -894,7 +892,7 @@ void testCUFHE()
                 int j = ++workingIndex[i];
                 if (j == N)
                     continue;
-                cufhe::Mux(cres[j][i], ca, cb, cc, st[i]);
+                cufhe::Nand(cres[j][i], ca, cb, st[i]);
             }
         }
         if (!cont)
@@ -910,8 +908,9 @@ void testCUFHE()
         }
     }
     if (errcount != 0)
-        spdlog::error("cuFHE is broken! {}/{}", errcount, N * M);
+        spdlog::error("cuFHE is broken! {}/({} * {})", errcount, N, M);
     assert(errcount == 0);
+
     for (size_t i = 0; i < M; i++)
         st[i].Destroy();
 }
