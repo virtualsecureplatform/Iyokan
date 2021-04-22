@@ -851,6 +851,63 @@ void testBlueprint()
     }
 }
 
+#ifdef IYOKAN_CUDA_ENABLED
+void testCUFHE()
+{
+    const size_t N = 10, M = 1000;
+    auto& h = CUFHETestHelper::instance();
+    cufhe::Ctxt ca, cb, cc, cres[N][M];
+    cufhe::Ptxt pa, pb, pc;
+    pa = true;
+    pb = false;
+    pc = true;
+    uint32_t expected = pa.get() ? pb.get() : pc.get();
+    Encrypt(ca, pa, *h.sk());
+    Encrypt(cb, pb, *h.sk());
+    Encrypt(cc, pc, *h.sk());
+    for (size_t i = 0; i < N; i++)
+        for (size_t j = 0; j < M; j++)
+            if (expected)
+                cufhe::ConstantZero(cres[i][j]);
+            else
+                cufhe::ConstantOne(cres[i][j]);
+
+    CUFHEStream st[M];
+    int workingIndex[M] = {};
+    for (size_t i = 0; i < M; i++)
+        cufhe::Mux(cres[0][i], ca, cb, cc, st[i]);
+    while (true) {
+        bool cont = false;
+        for (size_t i = 0; i < M; i++) {
+            if (workingIndex[i] == N)
+                continue;
+            cont = true;
+
+            if (cufhe::StreamQuery(st[i])) {
+                int j = ++workingIndex[i];
+                if (j == N)
+                    continue;
+                cufhe::Mux(cres[j][i], ca, cb, cc, st[i]);
+            }
+        }
+        if (!cont)
+            break;
+    }
+    size_t errcount = 0;
+    for (size_t i = 0; i < N; i++) {
+        for (size_t j = 0; j < M; j++) {
+            cufhe::Ptxt decres;
+            Decrypt(decres, cres[i][j], *h.sk());
+            if (expected != decres.get())
+                errcount++;
+        }
+    }
+    if (errcount != 0)
+        spdlog::error("cuFHE is broken! {}/{}", errcount, N * M);
+    assert(errcount == 0);
+}
+#endif
+
 int main()
 {
     AsyncThread::setNumThreads(std::thread::hardware_concurrency());
@@ -900,6 +957,7 @@ int main()
         testFromJSONtest_counter_4bit<CUFHENetworkBuilder>();
         testPrioritySetVisitor<CUFHENetworkBuilder>();
         testBridgeBetweenCUFHEAndTFHEpp();
+        testCUFHE();
     }
 #endif
 
