@@ -273,56 +273,33 @@ private:
     std::vector<TRLWElvl1> UROMUX_temp;
 
 private:
-    TRLWElvl1 UROMUX()
+    void UROMUX(TRLWElvl1 &result)
     {
+        const size_t numTRLWE = data_.size();
+        const size_t log2NumTRLWE = inAddrWidth_ - log2NumWordsPerTRLWE_;
+        assert(numTRLWE == (1 << log2NumTRLWE));
+
         std::vector<TRLWElvl1> &temp = UROMUX_temp;
-        temp.resize(data_.size() / 2);
+        temp.resize(numTRLWE / 2);
 
-        uint32_t log2NumTRLWE = inAddrWidth_ - log2NumWordsPerTRLWE_;
-        assert(data_.size() == (1 << log2NumTRLWE));
-
-        if (log2NumTRLWE == 0)  // data_.size() == 1
-            return data_[0];
-
-        for (int index = 0; index < data_.size() / 2; index++)
-            CMUXFFTlvl1(temp[index], input(log2NumWordsPerTRLWE_),
-                        data_[2 * index], data_[2 * index + 1]);
-
-        if (log2NumTRLWE == 1)  // data_.size() == 2
-            return temp[0];
-
-        for (uint32_t bit = 0; bit < log2NumTRLWE - 2; bit++) {
-            uint32_t stride = 1 << bit;
-            for (int index = 0; index < (data_.size() >> (bit + 2)); index++) {
-                CMUXFFTlvl1(temp[(2 * index) * stride],
-                            input(log2NumWordsPerTRLWE_ + bit + 1),
-                            temp[(2 * index) * stride],
-                            temp[(2 * index + 1) * stride]);
+        for (size_t bit = 0; bit < log2NumTRLWE; bit++) {
+            size_t numCMUX = (numTRLWE >> (bit + 1));
+            for (size_t i = 0; i < numCMUX; i++) {
+                auto &in = (bit == 0 ? data_ : temp);
+                auto &out = (bit == log2NumTRLWE - 1 ? result : temp[i]);
+                CMUXFFTlvl1(out, input(log2NumWordsPerTRLWE_ + bit), in[2 * i],
+                            in[2 * i + 1]);
             }
         }
-
-        TRLWElvl1 res;
-        uint32_t stride = 1 << (inAddrWidth_ - log2NumWordsPerTRLWE_ - 2);
-        CMUXFFTlvl1(res, input(inAddrWidth_ - 1), temp[0], temp[stride]);
-        return res;
     }
 
     void LROMUX(const uint32_t N, const TRLWElvl1 &data)
     {
-        TRLWElvl1 temp;
         TRLWElvl1 &acc = output();
-        TFHEpp::PolynomialMulByXaiMinusOnelvl1(temp[0], data[0],
-                                               2 * N - (N >> 1));
-        TFHEpp::PolynomialMulByXaiMinusOnelvl1(temp[1], data[1],
-                                               2 * N - (N >> 1));
-        trgswfftExternalProductlvl1(temp, temp,
-                                    input(log2NumWordsPerTRLWE_ - 1));
-        for (uint32_t i = 0; i < N; i++) {
-            acc[0][i] = temp[0][i] + data[0][i];
-            acc[1][i] = temp[1][i] + data[1][i];
-        }
+        acc = data;
 
-        for (uint32_t bit = 2; bit <= log2NumWordsPerTRLWE_; bit++) {
+        TRLWElvl1 temp;
+        for (uint32_t bit = 1; bit <= log2NumWordsPerTRLWE_; bit++) {
             TFHEpp::PolynomialMulByXaiMinusOnelvl1(temp[0], acc[0],
                                                    2 * N - (N >> bit));
             TFHEpp::PolynomialMulByXaiMinusOnelvl1(temp[1], acc[1],
@@ -338,7 +315,8 @@ private:
 
     void startSync(TFHEppWorkerInfo wi) override
     {
-        TRLWElvl1 data = UROMUX();
+        TRLWElvl1 data;
+        UROMUX(data);
         LROMUX(TFHEpp::lvl1param::n, data);
     }
 
