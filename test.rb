@@ -360,7 +360,7 @@ reg.add_in_out "cahp-pearl-mux-10", "test/cahp-pearl-mux.toml",
                "test/test10.in", "test/test10-pearl.out", ncycles: 264, tfhe_tags: nil
 
 reg.add_in_out "cahp-ruby-mux-1KiB-11", "test/cahp-ruby-mux-1KiB.toml",
-               "test/test11.in", "test/test11.out", ncycles: 8
+               "test/test11.in", "test/test11.out", ncycles: 7
 
 reg.add_in_out "addr-4bit-04", "test/test-addr-4bit.toml",
                "test/test04.in", "test/test04.out", ncycles: 1, set_plain_ncycles: true
