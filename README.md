@@ -166,6 +166,7 @@ Run Ruby script `test.rb` at Iyokan's root directory like this
 (assume that target binaries are in `build/bin/`):
 
 ```
+$ sudo gem install toml-rb
 $ ruby test.rb build/bin
 ```
 
