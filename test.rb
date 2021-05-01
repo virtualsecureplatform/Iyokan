@@ -17,6 +17,7 @@ $bkey = "_test_bk"
 $has_any_error = false
 $IYOKAN_ARGS = []
 $SKIP_PREFACE = false
+$REPEAT = 1
 
 ##### utility #####
 
@@ -88,6 +89,7 @@ end
 opt = OptionParser.new
 opt.on("--skip-preface") { |v| $SKIP_PREFACE = true }
 opt.on("--iyokan-arg ARG") { |v| $IYOKAN_ARGS.push v }
+opt.on("--repeat NUM") { |v| $REPEAT = v.to_i }
 opt.banner += " PATH [fast|plain|tfhe|cufhe|TEST-NAME]"
 opt.parse! ARGV
 unless ARGV.size >= 2
@@ -172,15 +174,18 @@ class TestRunner
   end
 
   def run
-    @tests.each do |test|
-      $logger.info "Test #{test[:name]} running..."
-      start = Time.now
-      begin
-        test[:body].call
-        $logger.info "Test #{test[:name]} done. (#{Time.now - start} sec.)"
-      rescue
-        $logger.fatal "Test #{test[:name]} failed! (#{Time.now - start} sec.)"
-        raise $!  # re-throw the exception
+    $REPEAT.times do |i|
+      $logger.info "Iteration #{i + 1}/#{$REPEAT}"
+      @tests.each do |test|
+        $logger.info "Test #{test[:name]} running..."
+        start = Time.now
+        begin
+          test[:body].call
+          $logger.info "Test #{test[:name]} done. (#{Time.now - start} sec.)"
+        rescue
+          $logger.fatal "Test #{test[:name]} failed! (#{Time.now - start} sec.)"
+          raise $!  # re-throw the exception
+        end
       end
     end
   end
