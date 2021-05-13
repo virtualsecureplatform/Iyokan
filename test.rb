@@ -387,6 +387,8 @@ reg.add_in_out "rom-7-32-12", "test/test-rom-7-32.toml",
                "test/test12.in", "test/test12.out", ncycles: 1, set_plain_ncycles: true
 reg.add_in_out "counter-4bit-13", "test/test-counter-4bit.toml",
                "test/test13.in", "test/test13.out", ncycles: 3, set_plain_ncycles: true
+reg.add_in_out "cahp-ruby-14", "test/cahp-ruby.toml",
+               "test/test14.in", "test/test14.out", ncycles: 20, set_plain_ncycles: true, tfhe_tags: nil, cufhe_tags: nil
 
 reg.add_in_out("cahp-diamond-dump-prefix-00", "test/cahp-diamond.toml",
                "test/test00.in", "test/test00-diamond.out",
