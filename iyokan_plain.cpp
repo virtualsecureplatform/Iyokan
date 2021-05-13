@@ -434,14 +434,13 @@ public:
 
         // Get # of cycles
         int numCycles = pr_.numCycles;
-        if (numCycles < 0)
-            numCycles = std::numeric_limits<int>::max();
 
         // Go computing
         {
             auto finflag = maybeGetAt("output", "finflag");
 
-            for (int i = 0; i < numCycles; i++, currentCycle_++) {
+            for (int i = 0; numCycles < 0 || i < numCycles;
+                 i++, currentCycle_++) {
                 using namespace utility;
 
                 spdlog::info("#{}", currentCycle_ + 1);
@@ -484,7 +483,7 @@ public:
                     std::cout << std::chrono::system_clock::now() << ",end,"
                               << currentCycle_ + 1 << std::endl;
 
-                if (finflag && finflag->get() == 1_b) {
+                if (numCycles < 0 && finflag && finflag->get() == 1_b) {
                     spdlog::info("break.");
                     currentCycle_++;
                     break;
