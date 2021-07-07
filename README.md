@@ -110,7 +110,7 @@ $ iyokan plain --blueprint test/test-div-8bit.toml \
 The result will be stored into `result.plain.packet`. Let's inspect its content:
 
 ```
-$ iyokan packet2toml --in result.plain.packet
+$ iyokan-packet packet2toml --in result.plain.packet
 rom = []
 cycles = 1
 ram = []
