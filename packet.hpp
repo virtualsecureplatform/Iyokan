@@ -108,6 +108,8 @@ inline std::vector<TRLWElvl1> encryptROM(const TFHEpp::SecretKey& key,
         if (i % P::n == P::n - 1)
             ret.push_back(trlweSymEncryptlvl1(pmu, P::α, key.key.lvl1));
     }
+    if (src.size() % P::n != 0)
+        ret.push_back(trlweSymEncryptlvl1(pmu, P::α, key.key.lvl1));
 
     return ret;
 }

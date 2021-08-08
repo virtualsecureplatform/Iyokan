@@ -266,7 +266,7 @@ CEREAL_REGISTER_TYPE(TaskTFHEppCBInv);
 class TaskTFHEppROMUX
     : public TaskAsync<TRGSWFFTlvl1, TRLWElvl1, TFHEppWorkerInfo> {
 private:
-    size_t inAddrWidth_, numWordsPerTRLWE_, log2NumWordsPerTRLWE_;
+    size_t inAddrWidth_, log2NumWordsPerTRLWE_;
     std::vector<TRLWElvl1> data_;
 
     // Workplace for UROMUX()
@@ -275,6 +275,11 @@ private:
 private:
     void UROMUX(TRLWElvl1 &result)
     {
+        if (inAddrWidth_ <= log2NumWordsPerTRLWE_) {
+            result = data_[0];
+            return;
+        }
+
         const size_t numTRLWE = data_.size();
         const size_t log2NumTRLWE = inAddrWidth_ - log2NumWordsPerTRLWE_;
         assert(numTRLWE == (1 << log2NumTRLWE));
@@ -300,6 +305,8 @@ private:
 
         TRLWElvl1 temp;
         for (uint32_t bit = 1; bit <= log2NumWordsPerTRLWE_; bit++) {
+            if (log2NumWordsPerTRLWE_ - bit >= inAddrWidth_)
+                continue;
             TFHEpp::PolynomialMulByXaiMinusOnelvl1(temp[0], acc[0],
                                                    2 * N - (N >> bit));
             TFHEpp::PolynomialMulByXaiMinusOnelvl1(temp[1], acc[1],
@@ -330,11 +337,12 @@ public:
           inAddrWidth_(inAddrWidth)
     {
         assert(TFHEpp::lvl1param::nbit >= log2OutRdataWidth);
-        assert(inAddrWidth >= TFHEpp::lvl1param::nbit - log2OutRdataWidth);
 
         log2NumWordsPerTRLWE_ = TFHEpp::lvl1param::nbit - log2OutRdataWidth;
-        numWordsPerTRLWE_ = 1 << log2NumWordsPerTRLWE_;
-        data_.resize(1 << (inAddrWidth - log2NumWordsPerTRLWE_));
+        if (inAddrWidth < log2NumWordsPerTRLWE_)
+            data_.resize(1);
+        else
+            data_.resize(1 << (inAddrWidth - log2NumWordsPerTRLWE_));
     }
 
     size_t size() const
@@ -352,7 +360,7 @@ public:
     {
         ar(cereal::base_class<
                TaskAsync<TRGSWFFTlvl1, TRLWElvl1, TFHEppWorkerInfo>>(this),
-           inAddrWidth_, numWordsPerTRLWE_, log2NumWordsPerTRLWE_, data_);
+           inAddrWidth_, log2NumWordsPerTRLWE_, data_);
     }
 };
 CEREAL_REGISTER_TYPE(TaskTFHEppROMUX);
@@ -863,6 +871,8 @@ inline TaskNetwork<TFHEppWorkerInfo> makeTFHEppROMNetwork(
 {
     size_t outRdataWidth = 1 << log2OutRdataWidth,
            log2NumWordsPerTRLWE = TFHEpp::lvl1param::nbit - log2OutRdataWidth;
+    if (inAddrWidth < log2NumWordsPerTRLWE)
+        log2NumWordsPerTRLWE = inAddrWidth;
 
     /*
        INPUT (addr[0])  ----------- CB -----+-----+  +-- SEI --- OUTPUT
