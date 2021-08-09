@@ -1,0 +1,10 @@
+[[builtin]]
+type = "rom"
+name = "rom"
+in_addr_width = 4
+out_rdata_width = 8
+
+[connect]
+"rom/addr[0:3]" = "@addr[0:3]"
+"@rdata[0:7]" = "rom/rdata[0:7]"
+
