@@ -827,7 +827,7 @@ public:
                 p.second->visit(grvis);
             for (auto&& p : name2cnet_)
                 p.second->visit(grvis);
-            PrioritySetVisitor privis{graph::doTopologicalSort(grvis.getMap())};
+            PrioritySetVisitor privis{graph::doRankuSort(grvis.getMap())};
             for (auto&& p : name2tnet_)
                 p.second->visit(privis);
             for (auto&& p : name2cnet_)

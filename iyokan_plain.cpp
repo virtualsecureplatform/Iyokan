@@ -400,7 +400,7 @@ public:
             GraphVisitor grvis;
             for (auto &&p : name2net_)
                 p.second->visit(grvis);
-            PrioritySetVisitor privis{graph::doTopologicalSort(grvis.getMap())};
+            PrioritySetVisitor privis{graph::doRankuSort(grvis.getMap())};
             for (auto &&p : name2net_)
                 p.second->visit(privis);
         }
