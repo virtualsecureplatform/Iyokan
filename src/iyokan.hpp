@@ -374,7 +374,7 @@ protected:
         return *output_;
     }
 
-    virtual void startAsyncImpl(WorkerInfo wi)
+    virtual void startAsyncImpl(WorkerInfo /* wi */)
     {
         assert(0 && "Unreachable");
     }

@@ -18,7 +18,10 @@ int main(int argc, char **argv)
 
     enum class TYPE { PLAIN, TFHE } type;
     Options opt;
-    bool enableGPU = false, verbose = false, quiet = false;
+#ifdef IYOKAN_CUDA_ENABLED
+    bool enableGPU = false;
+#endif
+    bool verbose = false, quiet = false;
 
     {
         CLI::App *plain = app.add_subcommand("plain", "");

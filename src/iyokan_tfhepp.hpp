@@ -320,7 +320,7 @@ private:
         }
     }
 
-    void startSync(TFHEppWorkerInfo wi) override
+    void startSync(TFHEppWorkerInfo /* wi */) override
     {
         TRLWElvl1 data;
         UROMUX(data);

@@ -788,8 +788,8 @@ void testBlueprint()
     {
         const auto& rams = blueprint.builtinRAMs();
         assert(rams.size() == 2);
-        assert(rams[0].name == "ramA" && rams[1].name == "ramB" ||
-               rams[1].name == "ramA" && rams[0].name == "ramB");
+        assert((rams[0].name == "ramA" && rams[1].name == "ramB") ||
+               (rams[1].name == "ramA" && rams[0].name == "ramB"));
         assert(rams[0].inAddrWidth == 8);
         assert(rams[0].inWdataWidth == 8);
         assert(rams[0].outRdataWidth == 8);

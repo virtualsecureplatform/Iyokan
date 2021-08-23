@@ -137,72 +137,11 @@ void capTFHEppNetWithCUFHEWIRE(CUFHENetworkWithTFHEpp& net)
         net.cufheNet = std::make_shared<CUFHENetwork>(std::move(bc));
 }
 
-void connectCUFHENetWithTFHEppNet(
-    CUFHENetwork& cufhe, TFHEppNetwork& tfhepp,
-    std::vector<
-        std::shared_ptr<BridgeDepNode<CUFHEWorkerInfo, TFHEppWorkerInfo>>>&
-        brCUFHE2TFHEpp,
-    std::vector<
-        std::shared_ptr<BridgeDepNode<TFHEppWorkerInfo, CUFHEWorkerInfo>>>&
-        brTFHEpp2CUFHE,
-    const std::vector<std::tuple<std::string, int, std::string, int>>& lhs2rhs,
-    const std::vector<std::tuple<std::string, int, std::string, int>>& rhs2lhs)
-{
-    for (auto&& [lPortName, lPortBit, rPortName, rPortBit] : lhs2rhs) {
-        /*
-           CUFHE OUTPUT --> Bridge --> CUFHE2TFHEpp --> TFHEpp INPUT
-        */
-        auto in = cufhe.get<TaskCUFHEGate>("output", lPortName, lPortBit);
-        auto out = tfhepp.get<TaskTFHEppGate>("input", rPortName, rPortBit);
-        assert(in);
-        assert(out);
-
-        // Add the task cufhe2tfhepp to the network tfhepp.
-        NetworkBuilderBase<TFHEppWorkerInfo> b;
-        auto cufhe2tfhepp = std::make_shared<TaskCUFHE2TFHEpp>();
-        b.addTask(NodeLabel{"cufhe2tfhepp", ""}, cufhe2tfhepp);
-        TFHEppNetwork net = std::move(b);
-        tfhepp = tfhepp.merge(net);
-
-        // CUFHE OUTPUT --> Bridge --> CUFHE2TFHEpp
-        brCUFHE2TFHEpp.push_back(connectWithBridge(in, cufhe2tfhepp));
-
-        // CUFHE2TFHEpp --> TFHEpp INPUT
-        out->acceptOneMoreInput();
-        connectTasks(cufhe2tfhepp, out);
-    }
-
-    for (auto&& [rPortName, rPortBit, lPortName, lPortBit] : rhs2lhs) {
-        /*
-           TFHEpp OUTPUT --> TFHEpp2CUFHE --> Bridge --> CUFHE INPUT
-        */
-        auto in = tfhepp.get<TaskTFHEppGate>("output", rPortName, rPortBit);
-        auto out = cufhe.get<TaskCUFHEGate>("input", lPortName, lPortBit);
-        assert(in);
-        assert(out);
-
-        // Add the task tfhepp2cufhe to the network tfhepp.
-        NetworkBuilderBase<TFHEppWorkerInfo> b;
-        auto tfhepp2cufhe = std::make_shared<TaskTFHEpp2CUFHE>();
-        b.addTask(NodeLabel{"tfhepp2cufhe", ""}, tfhepp2cufhe);
-        TFHEppNetwork net = std::move(b);
-        tfhepp = tfhepp.merge(net);
-
-        // TFHEpp OUTPUT --> TFHEpp2CUFHE
-        connectTasks(in, tfhepp2cufhe);
-
-        // TFHEpp2CUFHE --> Bridge --> CUFHE INPUT
-        out->acceptOneMoreInput();
-        brTFHEpp2CUFHE.push_back(connectWithBridge(tfhepp2cufhe, out));
-    }
-}
-
 void makeTFHEppRAMNetworkForCUFHEImpl(
     NetworkBuilderBase<CUFHEWorkerInfo>& bc,
     NetworkBuilderBase<TFHEppWorkerInfo>& bt,
-    std::vector<
-        std::shared_ptr<BridgeDepNode<CUFHEWorkerInfo, TFHEppWorkerInfo>>>&
-        bridge0,
+    std::vector<std::shared_ptr<
+        BridgeDepNode<CUFHEWorkerInfo, TFHEppWorkerInfo>>>& /* bridge0 */,
     std::vector<
         std::shared_ptr<BridgeDepNode<TFHEppWorkerInfo, CUFHEWorkerInfo>>>&
         bridge1,
