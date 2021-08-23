@@ -54,8 +54,8 @@ inline TLWElvl0 cufhe2tfhepp(const cufhe::Ctxt& src)
 {
     // FIXME: Check if TFHEpp's parameters are the same as cuFHE's.
     TLWElvl0 tlwe;
-    constexpr size_t n = tlwe.size();
-    for (int i = 0; i < n + 1; i++)
+    constexpr size_t size = tlwe.size();
+    for (int i = 0; i < size; i++)
         tlwe[i] = src.lwe_sample_->data()[i];
 
     return tlwe;
@@ -66,8 +66,8 @@ inline void cufhe2tfheppInPlace(TLWElvl0& dst, const cufhe::Ctxt& src)
     // FIXME: Check if TFHEpp's parameters are the same as cuFHE's.
     // NOTE: dst.size() is not compile-time constant expression, though I don't
     // know why.
-    constexpr size_t n = TLWElvl0{}.size();
-    for (int i = 0; i < n + 1; i++)
+    constexpr size_t size = TLWElvl0{}.size();
+    for (int i = 0; i < size; i++)
         dst[i] = src.lwe_sample_->data()[i];
 }
 
