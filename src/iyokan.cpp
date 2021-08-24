@@ -23,6 +23,9 @@ int main(int argc, char **argv)
 #endif
     bool verbose = false, quiet = false;
 
+    std::map<std::string, SCHED> mapSched{{"topo", SCHED::TOPO},
+                                          {"ranku", SCHED::RANKU}};
+
     {
         CLI::App *plain = app.add_subcommand("plain", "");
         plain->parse_complete_callback([&] { type = TYPE::PLAIN; });
@@ -41,6 +44,8 @@ int main(int argc, char **argv)
         plain->add_option("--dump-time-csv-prefix", opt.dumpTimeCSVPrefix, "");
         plain->add_option("--dump-graph-json-prefix", opt.dumpGraphJSONPrefix,
                           "");
+        plain->add_option("--sched", opt.sched, "")
+            ->transform(CLI::CheckedTransformer(mapSched, CLI::ignore_case));
 
         auto ogroups = plain->add_option_group("run in plaintext",
                                                "Run in plaintext mode");
@@ -83,6 +88,8 @@ int main(int argc, char **argv)
         tfhe->add_option("--dump-time-csv-prefix", opt.dumpTimeCSVPrefix, "");
         tfhe->add_option("--dump-graph-json-prefix", opt.dumpGraphJSONPrefix,
                          "");
+        tfhe->add_option("--sched", opt.sched, "")
+            ->transform(CLI::CheckedTransformer(mapSched, CLI::ignore_case));
 
         tfhe->add_option("--secret-key", opt.secretKey, "")
             ->check(CLI::ExistingFile);
@@ -159,6 +166,20 @@ int main(int argc, char **argv)
     if (opt.dumpGraphJSONPrefix)
         spdlog::info("\t--dump-graph-json-prefix: {}",
                      *opt.dumpGraphJSONPrefix);
+    if (opt.sched != SCHED::UND) {
+        std::string str;
+        switch (opt.sched) {
+        case SCHED::TOPO:
+            str = "topo";
+            break;
+        case SCHED::RANKU:
+            str = "ranku";
+            break;
+        default:
+            error::die("unreachable");
+        }
+        spdlog::info("\t--sched: {}", str);
+    }
 
     // Process depending on the options chosen.
     if (quiet)

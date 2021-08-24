@@ -48,6 +48,7 @@ struct PlainRunParameter {
     NetworkBlueprint blueprint;
     int numCPUWorkers, numCycles;
     std::string inputFile, outputFile;
+    SCHED sched;
 
     PlainRunParameter()
     {
@@ -61,6 +62,7 @@ struct PlainRunParameter {
         numCycles = opt.numCycles.value_or(-1);
         inputFile = opt.inputFile.value();
         outputFile = opt.outputFile.value();
+        sched = opt.sched == SCHED::UND ? SCHED::RANKU : opt.sched;
     }
 
     void overwrite(const Options &opt)
@@ -400,9 +402,21 @@ public:
             GraphVisitor grvis;
             for (auto &&p : name2net_)
                 p.second->visit(grvis);
-            PrioritySetVisitor privis{graph::doRankuSort(grvis.getMap())};
+
+            std::optional<PrioritySetVisitor> privis;
+            switch (pr_.sched) {
+            case SCHED::TOPO:
+                privis.emplace(graph::doTopologicalSort(grvis.getMap()));
+                break;
+            case SCHED::RANKU:
+                privis.emplace(graph::doRankuSort(grvis.getMap()));
+                break;
+            default:
+                error::die("unreachable");
+            }
+
             for (auto &&p : name2net_)
-                p.second->visit(privis);
+                p.second->visit(privis.value());
         }
     }
 

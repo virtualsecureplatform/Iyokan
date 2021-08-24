@@ -2021,12 +2021,19 @@ public:
     }
 };
 
+enum class SCHED {
+    UND,
+    TOPO,
+    RANKU,
+};
+
 struct Options {
     std::optional<NetworkBlueprint> blueprint;
     std::optional<int> numCPUWorkers, numGPUWorkers, numGPU, numCycles;
     std::optional<std::string> bkeyFile, inputFile, outputFile, secretKey,
         dumpPrefix, snapshotFile, resumeFile;
     std::optional<std::string> dumpTimeCSVPrefix, dumpGraphJSONPrefix;
+    SCHED sched = SCHED::UND;
     bool stdoutCSV = false;
 };
 

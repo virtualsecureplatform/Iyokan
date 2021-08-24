@@ -326,6 +326,7 @@ struct CUFHERunParameter {
     NetworkBlueprint blueprint;
     int numCPUWorkers, numGPUWorkers, numGPU, numCycles;
     std::string bkeyFile, inputFile, outputFile;
+    SCHED sched;
 
     CUFHERunParameter()
     {
@@ -342,6 +343,7 @@ struct CUFHERunParameter {
         bkeyFile = opt.bkeyFile.value();
         inputFile = opt.inputFile.value();
         outputFile = opt.outputFile.value();
+        sched = opt.sched == SCHED::UND ? SCHED::RANKU : opt.sched;
     }
 
     void overwrite(const Options& opt)
@@ -766,11 +768,23 @@ public:
                 p.second->visit(grvis);
             for (auto&& p : name2cnet_)
                 p.second->visit(grvis);
-            PrioritySetVisitor privis{graph::doRankuSort(grvis.getMap())};
+
+            std::optional<PrioritySetVisitor> privis;
+            switch (pr_.sched) {
+            case SCHED::TOPO:
+                privis.emplace(graph::doTopologicalSort(grvis.getMap()));
+                break;
+            case SCHED::RANKU:
+                privis.emplace(graph::doRankuSort(grvis.getMap()));
+                break;
+            default:
+                error::die("unreachable");
+            }
+
             for (auto&& p : name2tnet_)
-                p.second->visit(privis);
+                p.second->visit(privis.value());
             for (auto&& p : name2cnet_)
-                p.second->visit(privis);
+                p.second->visit(privis.value());
         }
     }
 
