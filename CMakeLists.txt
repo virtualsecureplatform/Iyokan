@@ -24,10 +24,11 @@ find_package(Sanitizers)
 find_package(Backward)
 
 set(USE_80BIT_SECURITY ON CACHE BOOL "")
-add_subdirectory(thirdparty/TFHEpp)
 if (IYOKAN_ENABLE_CUDA)
     enable_language(CUDA)
-    add_subdirectory(thirdparty/cuFHE/cufhe)
+    add_subdirectory(thirdparty/cuFHE)
+else()
+    add_subdirectory(thirdparty/cuFHE/thirdparties/TFHEpp)
 endif(IYOKAN_ENABLE_CUDA)
 add_subdirectory(thirdparty/spdlog)
 
