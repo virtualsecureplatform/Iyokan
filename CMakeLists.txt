@@ -24,10 +24,11 @@ find_package(Sanitizers)
 find_package(Backward)
 
 set(USE_80BIT_SECURITY ON CACHE BOOL "")
-add_subdirectory(thirdparty/TFHEpp)
 if (IYOKAN_ENABLE_CUDA)
     enable_language(CUDA)
-    add_subdirectory(thirdparty/cuFHE/cufhe)
+    add_subdirectory(thirdparty/cuFHE)
+else()
+    add_subdirectory(thirdparty/cuFHE/thirdparties/TFHEpp)
 endif(IYOKAN_ENABLE_CUDA)
 add_subdirectory(thirdparty/spdlog)
 
@@ -43,6 +44,7 @@ set(IYOKAN_INCLUDE_DIRS
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/toml11>
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/spdlog/include>
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/fmt/include>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/cuFHE/include>
 )
 if (IYOKAN_ENABLE_CUDA)
     list(APPEND IYOKAN_INCLUDE_DIRS ${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES})

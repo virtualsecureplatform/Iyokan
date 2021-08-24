@@ -1,11 +1,9 @@
 #ifndef VIRTUALSECUREPLATFORM_IYOKAN_CUFHE_HPP
 #define VIRTUALSECUREPLATFORM_IYOKAN_CUFHE_HPP
 
-#include <cufhe.h>
-#include <cufhe_gpu.cuh>
-
 #include "iyokan.hpp"
 #include "iyokan_tfhepp.hpp"
+#include "tfhepp_cufhe_wrapper.hpp"
 
 class CUFHEStream {
 private:
@@ -39,57 +37,9 @@ CEREAL_REGISTER_TYPE(TaskBlackHole<CUFHEWorkerInfo>);
 
 using TaskCUFHEGate = Task<cufhe::Ctxt, cufhe::Ctxt, CUFHEWorkerInfo>;
 
-inline void copyCtxt(cufhe::Ctxt& dst, const cufhe::Ctxt& src,
-                     std::shared_ptr<CUFHEStream> stream = nullptr)
+inline void copyCtxt(cufhe::Ctxt& dst, const cufhe::Ctxt& src)
 {
-    if (stream) {
-        cufhe::Copy(dst, src, *stream);
-    }
-    else {
-        cufhe::CopyOnHost(dst, src);
-    }
-}
-
-inline TLWElvl0 cufhe2tfhepp(const cufhe::Ctxt& src)
-{
-    // FIXME: Check if TFHEpp's parameters are the same as cuFHE's.
-    TLWElvl0 tlwe;
-    constexpr size_t size = tlwe.size();
-    for (int i = 0; i < size; i++)
-        tlwe[i] = src.lwe_sample_->data()[i];
-
-    return tlwe;
-}
-
-inline void cufhe2tfheppInPlace(TLWElvl0& dst, const cufhe::Ctxt& src)
-{
-    // FIXME: Check if TFHEpp's parameters are the same as cuFHE's.
-    // NOTE: dst.size() is not compile-time constant expression, though I don't
-    // know why.
-    constexpr size_t size = TLWElvl0{}.size();
-    for (int i = 0; i < size; i++)
-        dst[i] = src.lwe_sample_->data()[i];
-}
-
-inline std::shared_ptr<cufhe::Ctxt> tfhepp2cufhe(const TLWElvl0& src)
-{
-    // FIXME: Check if TFHEpp's parameters are the same as cuFHE's.
-    const int32_t n = cufhe::GetDefaultParam()->lwe_n_;
-
-    auto ctxt = std::make_shared<cufhe::Ctxt>();
-    for (int i = 0; i < n + 1; i++)
-        ctxt->lwe_sample_->data()[i] = src[i];
-
-    return ctxt;
-}
-
-inline void tfhepp2cufheInPlace(cufhe::Ctxt& dst, const TLWElvl0& src)
-{
-    // FIXME: Check if TFHEpp's parameters are the same as cuFHE's.
-    const int32_t n = cufhe::GetDefaultParam()->lwe_n_;
-    int* p = dst.lwe_sample_->data();
-    for (int i = 0; i < n + 1; i++)
-        p[i] = src[i];
+    cufhe::CopyOnHost(dst, const_cast<cufhe::Ctxt&>(src));
 }
 
 namespace cufhe {
@@ -125,7 +75,7 @@ public:
     {
     }
 
-    void set(const cufhe::Ctxt& newval)
+    void set(cufhe::Ctxt& newval)
     {
         copyCtxt(output(), newval);
     }
@@ -152,7 +102,7 @@ protected:
 public:
     TaskCUFHEGateDFF() : TaskCUFHEGateMem(1)
     {
-        cufhe::ConstantZero(output());
+        setCtxtZero(output());
     }
 
     bool areInputsReady() const override
@@ -197,7 +147,8 @@ private:
             // Nothing to do!
             break;
         case 1:
-            copyCtxt(output(), input(0), wi_.stream);
+            // FIXME: Optimization by using stream?
+            copyCtxt(output(), input(0));
             break;
         default:
             assert(false);
@@ -226,33 +177,38 @@ public:
 };
 CEREAL_REGISTER_TYPE(TaskCUFHEGateWIRE);
 
-#define DEFINE_TASK_GATE(name, numInputs, expr)          \
-    class TaskCUFHEGate##name : public TaskCUFHEGate {   \
-    private:                                             \
-        CUFHEWorkerInfo wi_;                             \
-                                                         \
-    private:                                             \
-        void startAsyncImpl(CUFHEWorkerInfo wi) override \
-        {                                                \
-            wi_ = std::move(wi);                         \
-            auto st = wi_.stream;                        \
-            (expr);                                      \
-        }                                                \
-                                                         \
-    public:                                              \
-        TaskCUFHEGate##name() : TaskCUFHEGate(numInputs) \
-        {                                                \
-        }                                                \
-        bool hasFinished() const override                \
-        {                                                \
-            return cufhe::StreamQuery(*wi_.stream);      \
-        }                                                \
-        template <class Archive>                         \
-        void serialize(Archive& ar)                      \
-        {                                                \
-            ar(cereal::base_class<TaskCUFHEGate>(this)); \
-        }                                                \
-    };                                                   \
+#define DEFINE_TASK_GATE(name, numInputs, expr)                           \
+    class TaskCUFHEGate##name : public TaskCUFHEGate {                    \
+    private:                                                              \
+        CUFHEWorkerInfo wi_;                                              \
+                                                                          \
+    private:                                                              \
+        void startAsyncImpl(CUFHEWorkerInfo wi) override                  \
+        {                                                                 \
+            wi_ = std::move(wi);                                          \
+            auto st = wi_.stream;                                         \
+            (expr);                                                       \
+        }                                                                 \
+                                                                          \
+        cufhe::Ctxt& input(size_t index)                                  \
+        {                                                                 \
+            return const_cast<cufhe::Ctxt&>(TaskCUFHEGate::input(index)); \
+        }                                                                 \
+                                                                          \
+    public:                                                               \
+        TaskCUFHEGate##name() : TaskCUFHEGate(numInputs)                  \
+        {                                                                 \
+        }                                                                 \
+        bool hasFinished() const override                                 \
+        {                                                                 \
+            return cufhe::StreamQuery(*wi_.stream);                       \
+        }                                                                 \
+        template <class Archive>                                          \
+        void serialize(Archive& ar)                                       \
+        {                                                                 \
+            ar(cereal::base_class<TaskCUFHEGate>(this));                  \
+        }                                                                 \
+    };                                                                    \
     CEREAL_REGISTER_TYPE(TaskCUFHEGate##name);
 DEFINE_TASK_GATE(AND, 2, cufhe::And(output(), input(0), input(1), *st));
 DEFINE_TASK_GATE(NAND, 2, cufhe::Nand(output(), input(0), input(1), *st));
@@ -471,8 +427,9 @@ public:
                         ((memFirstIndex_ + i) >> j) & 1u
                             ? inputAddrs_[j].lock()->normal
                             : inputAddrs_[j].lock()->inverted;
-                    CMUXFFTlvl1(output.trlwehost, in, output.trlwehost,
-                                mem.lock()->trlwehost);
+                    TFHEpp::CMUXFFT<Lvl1>(output.trlwehost, in,
+                                          output.trlwehost,
+                                          mem.lock()->trlwehost);
                 }
             }
         };
@@ -529,22 +486,25 @@ private:
         };
 
         for (uint32_t index = 0; index < num_trlwe / 2; index++) {
-            CMUXFFTlvl1(temp_[index], addr(0), data_[2 * index]->trlwehost,
-                        data_[2 * index + 1]->trlwehost);
+            TFHEpp::CMUXFFT<Lvl1>(temp_[index], addr(0),
+                                  data_[2 * index]->trlwehost,
+                                  data_[2 * index + 1]->trlwehost);
         }
 
         for (uint32_t bit = 0; bit < (addrWidth - 2); bit++) {
             const uint32_t stride = 1 << bit;
             for (uint32_t index = 0; index < (num_trlwe >> (bit + 2));
                  index++) {
-                CMUXFFTlvl1(temp_[(2 * index) * stride], addr(bit + 1),
-                            temp_[(2 * index) * stride],
-                            temp_[(2 * index + 1) * stride]);
+                TFHEpp::CMUXFFT<Lvl1>(temp_[(2 * index) * stride],
+                                      addr(bit + 1),
+                                      temp_[(2 * index) * stride],
+                                      temp_[(2 * index + 1) * stride]);
             }
         }
 
         const uint32_t stride = 1 << (addrWidth - 2);
-        CMUXFFTlvl1(output(), addr(addrWidth - 1), temp_[0], temp_[stride]);
+        TFHEpp::CMUXFFT<Lvl1>(output(), addr(addrWidth - 1), temp_[0],
+                              temp_[stride]);
     }
 
     void startSync(TFHEppWorkerInfo) override
@@ -654,8 +614,8 @@ private:
     void startAsyncImpl(CUFHEWorkerInfo wi) override
     {
         wi_ = std::move(wi);
-        cufhe::GateBootstrappingTLWE2TRLWElvl01NTT(*mem_.lock(), input(0),
-                                                   *wi_.stream);
+        cufhe::GateBootstrappingTLWE2TRLWElvl01NTT(
+            *mem_.lock(), const_cast<cufhe::Ctxt&>(input(0)), *wi_.stream);
     }
 
 public:
