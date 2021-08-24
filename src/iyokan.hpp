@@ -515,6 +515,23 @@ using NodePtr = std::shared_ptr<graph::Node>;
 inline std::unordered_map<int, int> doRankuSort(
     const std::unordered_map<int, graph::NodePtr> &id2node)
 {
+    // c.f. https://en.wikipedia.org/wiki/Heterogeneous_Earliest_Finish_Time
+    // FIXME: Take communication costs into account
+    // FIXME: Tune computation costs by dynamic measurements
+
+    std::unordered_map<std::string, int> compCost = {
+        {"DFF", 0},          {"WIRE", 0},         {"INPUT", 0},
+        {"OUTPUT", 0},       {"AND", 10},         {"NAND", 10},
+        {"ANDNOT", 10},      {"OR", 10},          {"NOR", 10},
+        {"ORNOT", 10},       {"XOR", 10},         {"XNOR", 10},
+        {"MUX", 20},         {"NOT", 0},          {"CB", 100},
+        {"CBInv", 100},      {"CBWithInv", 100},  {"MUXWoSE", 20},
+        {"CMUXs", 10},       {"SEI", 0},          {"GB", 10},
+        {"ROMUX", 10},       {"RAMUX", 10},       {"SEI&KS", 5},
+        {"cufhe2tfhepp", 0}, {"tfhepp2cufhe", 0}, {"bridge", 0},
+        {"RAMWriter", 0},    {"RAMReader", 0},    {"ROM", 0},
+    };
+
     auto isPseudoInit = [&](int id) {
         return id2node.at(id)->hasNoInputsToWaitFor;
     };
@@ -550,7 +567,10 @@ inline std::unordered_map<int, int> doRankuSort(
             if (!child->hasNoInputsToWaitFor)
                 pri = std::max(pri, node2pri.at(child));
         }
-        auto [it, inserted] = node2pri.emplace(node, pri + 1);
+        if (compCost.find(node->label.kind) == compCost.end())
+            spdlog::info("{}", node->label.kind);
+        int w = compCost.at(node->label.kind);
+        auto [it, inserted] = node2pri.emplace(node, pri + w);
         assert(inserted);
 
         if (node->hasNoInputsToWaitFor)
