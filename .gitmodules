@@ -1,9 +1,6 @@
 [submodule "picojson"]
 	path = thirdparty/picojson
 	url = https://github.com/kazuho/picojson.git
-[submodule "TFHEpp"]
-	path = thirdparty/TFHEpp
-	url = https://github.com/virtualsecureplatform/TFHEpp.git
 [submodule "ThreadPool"]
 	path = thirdparty/ThreadPool
 	url = https://github.com/progschj/ThreadPool.git
