@@ -824,7 +824,7 @@ void testBlueprint()
     }
 
     {
-        const Port& port = blueprint.at("reset").value();
+        const Port port = blueprint.at("reset").value();
         assert(port.nodeName == "core");
         assert(port.portLabel.kind == "input");
         assert(port.portLabel.portName == "reset");
@@ -832,7 +832,7 @@ void testBlueprint()
     }
 
     {
-        const Port& port = blueprint.at("finflag").value();
+        const Port port = blueprint.at("finflag").value();
         assert(port.nodeName == "core");
         assert(port.portLabel.kind == "output");
         assert(port.portLabel.portName == "io_finishFlag");
@@ -841,7 +841,7 @@ void testBlueprint()
 
     for (int ireg = 0; ireg < 16; ireg++) {
         for (int ibit = 0; ibit < 16; ibit++) {
-            const Port& port =
+            const Port port =
                 blueprint.at(utility::fok("reg_x", ireg), ibit).value();
             assert(port.nodeName == "core");
             assert(port.portLabel.portName ==
