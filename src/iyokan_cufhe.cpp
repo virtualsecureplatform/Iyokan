@@ -15,67 +15,6 @@ void merge(std::vector<T>& dst, const std::vector<T>& src)
     std::copy(src.begin(), src.end(), std::back_inserter(dst));
 }
 
-std::shared_ptr<cufhe::PubKey> tfhepp2cufhe(const TFHEpp::GateKey& src)
-{
-    auto pubkey = std::make_shared<cufhe::PubKey>();
-
-    // FIXME: Check if TFHEpp's parameters are the same as cuFHE's.
-    auto cufheParams = cufhe::GetDefaultParam();
-    const int32_t n = cufheParams->lwe_n_;
-    const int32_t N = cufheParams->tlwe_n_;
-    const int32_t k = cufheParams->tlwe_k_;
-    const int32_t l = cufheParams->tgsw_decomp_size_;
-    const int32_t ksk_t = cufheParams->keyswitching_decomp_size_;
-    const int32_t ksk_n = N * k;
-    const int32_t ksk_base = (1 << cufheParams->keyswitching_decomp_bits_);
-
-    // Read the bootstrapping key.
-    for (int p = 0; p < n; p++) {
-        const TRGSWFFTlvl1& trgswfft = src.bkfftlvl01[p];
-        for (int q = 0; q < (k + 1) * l; q++) {
-            for (int r = 0; r < (k + 1); r++) {
-                Polynomiallvl1 poly;
-                TwistFFTlvl1(poly, trgswfft[q][r]);
-                for (int s = 0; s < N; s++) {
-                    int index = ((p * ((k + 1) * l) + q) * (k + 1) + r) * N + s;
-                    pubkey->bk_->data()[index] = poly[s];
-                }
-            }
-        }
-    }
-
-    // Read the key switch key.
-    for (int p = 0; p < ksk_n; p++) {
-        for (int q = 0; q < ksk_t; q++) {
-            // r = 0
-            {
-                cufhe::LWESample to = pubkey->ksk_->ExtractLWESample(
-                    pubkey->ksk_->GetLWESampleIndex(p, q, 0));
-                for (int s = 0; s < n; s++)
-                    to.data()[s] = 0;
-                to.data()[n] = 0;
-            }
-            // r >= 1
-            for (int r = 1; r < ksk_base; r++) {
-                assert(static_cast<size_t>(p) < src.ksk.size());
-                assert(static_cast<size_t>(q) < src.ksk[p].size());
-                assert(static_cast<size_t>(r - 1) < src.ksk[p][q].size());
-
-                const TLWElvl0& from = src.ksk[p][q][r - 1];
-                cufhe::LWESample to = pubkey->ksk_->ExtractLWESample(
-                    pubkey->ksk_->GetLWESampleIndex(p, q, r));
-                for (int s = 0; s < n; s++) {
-                    assert(static_cast<size_t>(s) < from.size());
-                    to.data()[s] = from[s];
-                }
-                to.data()[n] = from[n];
-            }
-        }
-    }
-
-    return pubkey;
-}
-
 struct CUFHENetworkWithTFHEpp {
     std::shared_ptr<CUFHENetwork> cufheNet;
     std::shared_ptr<TFHEppNetwork> tfheppNet;
@@ -611,8 +550,9 @@ private:
     {
         assert(!cufheInitialized_);
         cufhe::SetGPUNum(pr_.numGPU);
-        cufhe::SetSeed();
-        cufhe::Initialize(*tfhepp2cufhe(*bkey_.gk));
+        auto gk = std::make_shared<GateKey>();
+        ifftGateKey(*gk, *bkey_.gk);
+        cufhe::Initialize(*gk);
         cufheInitialized_ = true;
     }
 
@@ -827,9 +767,8 @@ public:
         if (currentCycle_ == 0) {
             if (auto reset = maybeGetAt("input", "reset"); reset) {
                 cufhe::Ctxt one, zero;
-                cufhe::ConstantOne(one);
-                cufhe::ConstantZero(zero);
-                cufhe::Synchronize();
+                setCtxtOne(one);
+                setCtxtZero(zero);
 
                 reset->set(one);
                 runner.run();

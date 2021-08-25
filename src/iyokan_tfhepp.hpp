@@ -5,12 +5,12 @@
 
 #include "iyokan.hpp"
 
-#include "tfhepp_wrapper.hpp"
+#include "tfhepp_cufhe_wrapper.hpp"
 
 struct TFHEppWorkerInfo {
     const TFHEpp::lweParams params;
     std::shared_ptr<const TFHEpp::GateKey> gateKey;
-    std::shared_ptr<const TFHEpp::CircuitKeylvl01> circuitKey;
+    std::shared_ptr<const CircuitKey> circuitKey;
 };
 
 using TaskAsyncTFHEpp = TaskAsync<TLWElvl0, TLWElvl0, TFHEppWorkerInfo>;
@@ -181,9 +181,9 @@ private:
                 TFHEpp::CircuitBootstrappingPartial(trgswupper, trgswlower,
                                                     input(0), *ck, i);
                 for (size_t j = 0; j < 2; j++) {
-                    TwistIFFTlvl1(output()[i][j], trgswupper[j]);
-                    TwistIFFTlvl1(output()[i + TFHEpp::lvl1param::l][j],
-                                  trgswlower[j]);
+                    TFHEpp::TwistIFFT<Lvl1>(output()[i][j], trgswupper[j]);
+                    TFHEpp::TwistIFFT<Lvl1>(
+                        output()[i + TFHEpp::lvl1param::l][j], trgswlower[j]);
                 }
             };
     }
@@ -234,9 +234,9 @@ private:
                 TFHEpp::CircuitBootstrappingPartial(trgswupper, trgswlower,
                                                     invtlwe_, *ck, i);
                 for (size_t j = 0; j < 2; j++) {
-                    TwistIFFTlvl1(output()[i][j], trgswupper[j]);
-                    TwistIFFTlvl1(output()[i + TFHEpp::lvl1param::l][j],
-                                  trgswlower[j]);
+                    TFHEpp::TwistIFFT<Lvl1>(output()[i][j], trgswupper[j]);
+                    TFHEpp::TwistIFFT<Lvl1>(
+                        output()[i + TFHEpp::lvl1param::l][j], trgswlower[j]);
                 }
             };
     }
@@ -292,8 +292,8 @@ private:
             for (size_t i = 0; i < numCMUX; i++) {
                 auto &in = (bit == 0 ? data_ : temp);
                 auto &out = (bit == log2NumTRLWE - 1 ? result : temp[i]);
-                CMUXFFTlvl1(out, input(log2NumWordsPerTRLWE_ + bit), in[2 * i],
-                            in[2 * i + 1]);
+                TFHEpp::CMUXFFT<Lvl1>(out, input(log2NumWordsPerTRLWE_ + bit),
+                                      in[2 * i], in[2 * i + 1]);
             }
         }
     }
@@ -307,12 +307,12 @@ private:
         for (uint32_t bit = 1; bit <= log2NumWordsPerTRLWE_; bit++) {
             if (log2NumWordsPerTRLWE_ - bit >= inAddrWidth_)
                 continue;
-            TFHEpp::PolynomialMulByXaiMinusOnelvl1(temp[0], acc[0],
-                                                   2 * N - (N >> bit));
-            TFHEpp::PolynomialMulByXaiMinusOnelvl1(temp[1], acc[1],
-                                                   2 * N - (N >> bit));
-            trgswfftExternalProductlvl1(temp, temp,
-                                        input(log2NumWordsPerTRLWE_ - bit));
+            TFHEpp::PolynomialMulByXaiMinusOne<Lvl1>(temp[0], acc[0],
+                                                     2 * N - (N >> bit));
+            TFHEpp::PolynomialMulByXaiMinusOne<Lvl1>(temp[1], acc[1],
+                                                     2 * N - (N >> bit));
+            TFHEpp::trgswfftExternalProduct<Lvl1>(
+                temp, temp, input(log2NumWordsPerTRLWE_ - bit));
             for (uint32_t i = 0; i < N; i++) {
                 acc[0][i] += temp[0][i];
                 acc[1][i] += temp[1][i];
@@ -375,8 +375,8 @@ private:
         const KeySwitchingKey &ksk = wi.gateKey->ksk;
 
         TLWElvl1 reslvl1;
-        SampleExtractIndexlvl1(reslvl1, input(0), index_);
-        IdentityKeySwitchlvl10(output(), reslvl1, ksk);
+        TFHEpp::SampleExtractIndex<Lvl1>(reslvl1, input(0), index_);
+        TFHEpp::IdentityKeySwitch<Lvl10>(output(), reslvl1, ksk);
     }
 
 public:
@@ -474,22 +474,24 @@ private:
         };
 
         for (uint32_t index = 0; index < num_trlwe / 2; index++) {
-            CMUXFFTlvl1(temp_[index], addr(0), *data_[2 * index],
-                        *data_[2 * index + 1]);
+            TFHEpp::CMUXFFT<Lvl1>(temp_[index], addr(0), *data_[2 * index],
+                                  *data_[2 * index + 1]);
         }
 
         for (uint32_t bit = 0; bit < (addrWidth - 2); bit++) {
             const uint32_t stride = 1 << bit;
             for (uint32_t index = 0; index < (num_trlwe >> (bit + 2));
                  index++) {
-                CMUXFFTlvl1(temp_[(2 * index) * stride], addr(bit + 1),
-                            temp_[(2 * index) * stride],
-                            temp_[(2 * index + 1) * stride]);
+                TFHEpp::CMUXFFT<Lvl1>(temp_[(2 * index) * stride],
+                                      addr(bit + 1),
+                                      temp_[(2 * index) * stride],
+                                      temp_[(2 * index + 1) * stride]);
             }
         }
 
         const uint32_t stride = 1 << (addrWidth - 2);
-        CMUXFFTlvl1(output(), addr(addrWidth - 1), temp_[0], temp_[stride]);
+        TFHEpp::CMUXFFT<Lvl1>(output(), addr(addrWidth - 1), temp_[0],
+                              temp_[stride]);
     }
 
     void startSync(TFHEppWorkerInfo) override
@@ -552,7 +554,8 @@ private:
     void startSync(TFHEppWorkerInfo wi) override
     {
         auto gk = wi.gateKey;
-        TFHEpp::HomMUXwoSE(output(), input(2), input(1), input(0), *gk);
+        TFHEpp::HomMUXwoSE<Lvl01>(output(), input(2), input(1), input(0),
+                                  gk->bkfftlvl01);
     }
 
 public:
@@ -672,7 +675,7 @@ public:
                 const TRGSWFFTlvl1 &in = (memIndex_ >> j) & 1u
                                              ? inputAddrs_[j].lock()->normal
                                              : inputAddrs_[j].lock()->inverted;
-                CMUXFFTlvl1(*output_, in, *output_, *mem_.lock());
+                TFHEpp::CMUXFFT<Lvl1>(*output_, in, *output_, *mem_.lock());
             }
         };
     }
@@ -696,7 +699,8 @@ private:
     void startSync(TFHEppWorkerInfo wi) override
     {
         const TFHEpp::GateKey &gk = *wi.gateKey;
-        GateBootstrappingTLWE2TRLWEFFTlvl01(*mem_.lock(), input(0), gk);
+        TFHEpp::GateBootstrappingTLWE2TRLWEFFT<Lvl01>(*mem_.lock(), input(0),
+                                                      gk.bkfftlvl01);
     }
 
 public:

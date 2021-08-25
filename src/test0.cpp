@@ -1,4 +1,5 @@
 #include "iyokan.hpp"
+#include "tfhepp_cufhe_wrapper.hpp"
 
 #include <fmt/printf.h>
 #include <fstream>
@@ -515,16 +516,16 @@ void testProgressGraphMaker()
 
 class TFHEppTestHelper {
 private:
-    std::shared_ptr<TFHEpp::SecretKey> sk_;
-    std::shared_ptr<TFHEpp::GateKey> gk_;
-    std::shared_ptr<TFHEpp::CircuitKeylvl01> ck_;
+    std::shared_ptr<SecretKey> sk_;
+    std::shared_ptr<GateKeyFFT> gk_;
+    std::shared_ptr<CircuitKey> ck_;
     TLWElvl0 zero_, one_;
 
 private:
     TFHEppTestHelper()
     {
-        sk_ = std::make_shared<TFHEpp::SecretKey>();
-        gk_ = std::make_shared<TFHEpp::GateKey>(*sk_);
+        sk_ = std::make_shared<SecretKey>();
+        gk_ = std::make_shared<GateKeyFFT>(*sk_);
         zero_ = TFHEpp::bootsSymEncrypt({0}, *sk_).at(0);
         one_ = TFHEpp::bootsSymEncrypt({1}, *sk_).at(0);
     }
@@ -538,7 +539,7 @@ public:
 
     void prepareCircuitKey()
     {
-        ck_ = std::make_shared<TFHEpp::CircuitKeylvl01>(*sk_);
+        ck_ = std::make_shared<CircuitKey>(*sk_);
     }
 
     TFHEppWorkerInfo wi() const
@@ -546,9 +547,14 @@ public:
         return TFHEppWorkerInfo{TFHEpp::lweParams{}, gk_, ck_};
     }
 
-    const std::shared_ptr<TFHEpp::SecretKey>& sk() const
+    const std::shared_ptr<SecretKey>& sk() const
     {
         return sk_;
+    }
+
+    const std::shared_ptr<GateKeyFFT>& gk() const
+    {
+        return gk_;
     }
 
     const TLWElvl0& zero() const
@@ -584,16 +590,16 @@ int getOutput(std::shared_ptr<TaskTFHEppGateMem> task)
 void testTFHEppSerialization()
 {
     auto& h = TFHEppTestHelper::instance();
-    const std::shared_ptr<const TFHEpp::SecretKey>& sk = h.sk();
-    const std::shared_ptr<const TFHEpp::GateKey>& gk = h.wi().gateKey;
+    const std::shared_ptr<const SecretKey>& sk = h.sk();
+    const std::shared_ptr<const GateKeyFFT>& gk = h.wi().gateKey;
 
     // Test for secret key
     {
         // Dump
         writeToArchive("_test_sk", *sk);
         // Load
-        auto sk2 = std::make_shared<TFHEpp::SecretKey>();
-        readFromArchive<TFHEpp::SecretKey>(*sk2, "_test_sk");
+        auto sk2 = std::make_shared<SecretKey>();
+        readFromArchive<SecretKey>(*sk2, "_test_sk");
 
         auto zero = TFHEpp::bootsSymEncrypt({0}, *sk2).at(0);
         auto one = TFHEpp::bootsSymEncrypt({1}, *sk2).at(0);
@@ -609,8 +615,8 @@ void testTFHEppSerialization()
         // Dump
         writeToArchive(ss, *gk);
         // Load
-        auto gk2 = std::make_shared<TFHEpp::GateKey>();
-        readFromArchive<TFHEpp::GateKey>(*gk2, ss);
+        auto gk2 = std::make_shared<GateKeyFFT>();
+        readFromArchive<GateKeyFFT>(*gk2, ss);
 
         auto zero = TFHEpp::bootsSymEncrypt({0}, *sk).at(0);
         auto one = TFHEpp::bootsSymEncrypt({1}, *sk).at(0);
@@ -646,24 +652,16 @@ void testTFHEppSerialization()
 
 class CUFHETestHelper {
 private:
-    std::shared_ptr<cufhe::PriKey> sk_;
-    std::shared_ptr<cufhe::PubKey> gk_;
+    std::shared_ptr<GateKey> gk_;
     cufhe::Ctxt zero_, one_;
 
 private:
     CUFHETestHelper()
     {
-        cufhe::SetSeed();
-
-        sk_ = std::make_shared<cufhe::PriKey>();
-        gk_ = std::make_shared<cufhe::PubKey>();
-        cufhe::KeyGen(*gk_, *sk_);
-
-        cufhe::Ptxt p;
-        p = 0;
-        cufhe::Encrypt(zero_, p, *sk_);
-        p = 1;
-        cufhe::Encrypt(one_, p, *sk_);
+        gk_ = std::make_shared<GateKey>();
+        ifftGateKey(*gk_, *TFHEppTestHelper::instance().gk());
+        setCtxtZero(zero_);
+        setCtxtOne(one_);
     }
 
 public:
@@ -686,21 +684,6 @@ public:
         static CUFHETestHelper inst;
         return inst;
     }
-
-    const std::shared_ptr<cufhe::PriKey>& sk() const
-    {
-        return sk_;
-    }
-
-    const cufhe::Ctxt& zero() const
-    {
-        return zero_;
-    }
-
-    const cufhe::Ctxt& one() const
-    {
-        return one_;
-    }
 };
 
 void processAllGates(CUFHENetwork& net,
@@ -711,15 +694,18 @@ void processAllGates(CUFHENetwork& net,
 
 void setInput(std::shared_ptr<TaskCUFHEGateMem> task, int val)
 {
-    auto& h = CUFHETestHelper::instance();
-    task->set(val ? h.one() : h.zero());
+    cufhe::Ctxt ctxt;
+    if (val)
+        setCtxtOne(ctxt);
+    else
+        setCtxtZero(ctxt);
+    task->set(ctxt);
 }
 
 int getOutput(std::shared_ptr<TaskCUFHEGateMem> task)
 {
-    cufhe::Ptxt p;
-    cufhe::Decrypt(p, task->get(), *CUFHETestHelper::instance().sk());
-    return p.get();
+    return decryptTLWELvl0(cufhe2tfhepp(task->get()),
+                           *TFHEppTestHelper::instance().sk());
 }
 
 void testBridgeBetweenCUFHEAndTFHEpp()
