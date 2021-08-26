@@ -13,7 +13,7 @@ add_custom_command(OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/mux-ram-9-16-16.o
 
 ##### iyokan
 add_executable(iyokan
-    iyokan.cpp iyokan_plain.cpp iyokan_tfhepp.cpp error.cpp
+    main.cpp iyokan_plain.cpp iyokan_tfhepp.cpp error.cpp
     ${CMAKE_CURRENT_BINARY_DIR}/mux-ram-8-8-8.o
     ${CMAKE_CURRENT_BINARY_DIR}/mux-ram-8-16-16.o
     ${CMAKE_CURRENT_BINARY_DIR}/mux-ram-9-16-16.o)
