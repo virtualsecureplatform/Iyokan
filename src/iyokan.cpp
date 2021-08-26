@@ -99,7 +99,17 @@ int main(int argc, char **argv)
 #ifdef IYOKAN_CUDA_ENABLED
         tfhe->add_option("--gpu", opt.numGPUWorkers, "")
             ->check(CLI::PositiveNumber);
-        tfhe->add_option("--gpu_num", opt.numGPU, "")
+        tfhe->add_option_function<int>(
+                "--gpu_num",
+                [&](const int &v) {
+                    spdlog::warn(
+                        "Option --gpu_num is deprecated. Use --num-gpu "
+                        "instead.");
+                    opt.numGPU.emplace(v);
+                },
+                "")
+            ->check(CLI::PositiveNumber);
+        tfhe->add_option("--num-gpu", opt.numGPU, "")
             ->check(CLI::PositiveNumber);
 #endif
 
