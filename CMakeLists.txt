@@ -23,7 +23,6 @@ find_package(OpenMP REQUIRED)
 find_package(Sanitizers)
 find_package(Backward)
 
-set(USE_80BIT_SECURITY ON CACHE BOOL "")
 if (IYOKAN_ENABLE_CUDA)
     enable_language(CUDA)
     add_subdirectory(thirdparty/cuFHE)
@@ -50,9 +49,6 @@ if (IYOKAN_ENABLE_CUDA)
     list(APPEND IYOKAN_INCLUDE_DIRS ${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES})
 endif(IYOKAN_ENABLE_CUDA)
 set(IYOKAN_LIBS tfhe++ Threads::Threads OpenMP::OpenMP_CXX Backward::Backward stdc++fs)
-set(IYOKAN_COMPILE_DEFINITIONS
-    USE_80BIT_SECURITY # For TFHEpp headers
-)
 
 set(CMAKE_C_FLAGS "")
 set(CMAKE_C_FLAGS_DEBUG "")
