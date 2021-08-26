@@ -29,6 +29,10 @@ $ cmake -DIYOKAN_ENABLE_CUDA=On -DCMAKE_BUILD_TYPE=Release \
         ..
 ```
 
+CMake builds Iyokan with 128-bit security by default.
+If you want weaker (but faster and more memory efficient) security,
+use `-DIYOKAN_80BIT_SECURITY=On`.
+
 ## Tutorial
 
 Write a circuit you want to run in [Chisel3](https://www.chisel-lang.org/)

@@ -1,5 +1,7 @@
 cmake_minimum_required(VERSION 3.16)
 
+option(IYOKAN_80BIT_SECURITY "Use 80-bit security parameter for TFHE and cuFHE" OFF)
+
 set(CMAKE_MODULE_PATH
     ${CMAKE_SOURCE_DIR}
     "${CMAKE_SOURCE_DIR}/thirdparty/sanitizers-cmake/cmake"
@@ -23,6 +25,9 @@ find_package(OpenMP REQUIRED)
 find_package(Sanitizers)
 find_package(Backward)
 
+if (IYOKAN_80BIT_SECURITY)
+    set(USE_80BIT_SECURITY ON CACHE BOOL "")
+endif()
 if (IYOKAN_ENABLE_CUDA)
     enable_language(CUDA)
     add_subdirectory(thirdparty/cuFHE)
@@ -49,6 +54,10 @@ if (IYOKAN_ENABLE_CUDA)
     list(APPEND IYOKAN_INCLUDE_DIRS ${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES})
 endif(IYOKAN_ENABLE_CUDA)
 set(IYOKAN_LIBS tfhe++ Threads::Threads OpenMP::OpenMP_CXX Backward::Backward stdc++fs)
+if (IYOKAN_80BIT_SECURITY)
+    # For TFHEpp headers
+    set(IYOKAN_COMPILE_DEFINITIONS USE_80BIT_SECURITY)
+endif()
 
 set(CMAKE_C_FLAGS "")
 set(CMAKE_C_FLAGS_DEBUG "")
