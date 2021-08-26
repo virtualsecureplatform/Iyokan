@@ -544,7 +544,7 @@ public:
 
     TFHEppWorkerInfo wi() const
     {
-        return TFHEppWorkerInfo{TFHEpp::lweParams{}, gk_, ck_};
+        return TFHEppWorkerInfo{gk_, ck_};
     }
 
     const std::shared_ptr<SecretKey>& sk() const

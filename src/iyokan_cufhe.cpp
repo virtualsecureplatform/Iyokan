@@ -751,9 +751,8 @@ public:
         auto graph = opt.dumpTimeCSVPrefix || opt.dumpGraphJSONPrefix
                          ? std::make_shared<ProgressGraphMaker>()
                          : nullptr;
-        CUFHENetworkRunner runner{
-            pr_.numGPUWorkers, pr_.numCPUWorkers,
-            TFHEppWorkerInfo{TFHEpp::lweParams{}, bkey_.gk, bkey_.ck}, graph};
+        CUFHENetworkRunner runner{pr_.numGPUWorkers, pr_.numCPUWorkers,
+                                  TFHEppWorkerInfo{bkey_.gk, bkey_.ck}, graph};
         for (auto&& p : name2cnet_)
             runner.addNetwork(p.second);
         for (auto&& p : name2tnet_)

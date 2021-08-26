@@ -8,7 +8,6 @@
 #include "tfhepp_cufhe_wrapper.hpp"
 
 struct TFHEppWorkerInfo {
-    const TFHEpp::lweParams params;
     std::shared_ptr<const TFHEpp::GateKey> gateKey;
     std::shared_ptr<const CircuitKey> circuitKey;
 };
