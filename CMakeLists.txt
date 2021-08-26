@@ -56,7 +56,7 @@ endif(IYOKAN_ENABLE_CUDA)
 set(IYOKAN_LIBS tfhe++ Threads::Threads OpenMP::OpenMP_CXX Backward::Backward stdc++fs)
 if (IYOKAN_80BIT_SECURITY)
     # For TFHEpp headers
-    set(IYOKAN_COMPILE_DEFINITIONS USE_80BIT_SECURITY)
+    list(APPEND IYOKAN_COMPILE_DEFINITIONS USE_80BIT_SECURITY)
 endif()
 
 set(CMAKE_C_FLAGS "")
@@ -65,5 +65,22 @@ set(CMAKE_C_FLAGS_RELEASE "")
 set(CMAKE_CXX_FLAGS "")
 set(CMAKE_CXX_FLAGS_DEBUG "")
 set(CMAKE_CXX_FLAGS_RELEASE "")
+
+# Get git revision
+# Thanks to: https://stackoverflow.com/a/6526533
+set(IYOKAN_GIT_REVISION "unknown")
+if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/.git)
+    find_package(Git)
+    if(GIT_FOUND)
+        execute_process(
+            COMMAND ${GIT_EXECUTABLE} rev-parse --short HEAD
+            WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+            OUTPUT_VARIABLE "IYOKAN_GIT_REVISION"
+            ERROR_QUIET
+            OUTPUT_STRIP_TRAILING_WHITESPACE)
+        message(STATUS "Git revision: ${IYOKAN_GIT_REVISION}")
+    endif(GIT_FOUND)
+endif(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/.git)
+list(APPEND IYOKAN_COMPILE_DEFINITIONS IYOKAN_GIT_REVISION="${IYOKAN_GIT_REVISION}")
 
 add_subdirectory(src)
