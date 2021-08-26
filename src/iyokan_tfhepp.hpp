@@ -8,7 +8,7 @@
 #include "tfhepp_cufhe_wrapper.hpp"
 
 struct TFHEppWorkerInfo {
-    std::shared_ptr<const TFHEpp::GateKey> gateKey;
+    std::shared_ptr<const GateKeyFFT> gateKey;
     std::shared_ptr<const CircuitKey> circuitKey;
 };
 
@@ -697,7 +697,7 @@ private:
 private:
     void startSync(TFHEppWorkerInfo wi) override
     {
-        const TFHEpp::GateKey &gk = *wi.gateKey;
+        const GateKeyFFT &gk = *wi.gateKey;
         TFHEpp::GateBootstrappingTLWE2TRLWEFFT<Lvl01>(*mem_.lock(), input(0),
                                                       gk.bkfftlvl01);
     }

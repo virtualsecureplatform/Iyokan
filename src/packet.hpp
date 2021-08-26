@@ -66,7 +66,7 @@ inline uint64_t bitvec2i(const std::vector<Bit>& src, int start = 0,
 }
 
 struct TFHEppBKey {
-    std::shared_ptr<TFHEpp::GateKey> gk;
+    std::shared_ptr<GateKeyFFT> gk;
     std::shared_ptr<CircuitKey> ck;
 
     TFHEppBKey()
@@ -74,7 +74,7 @@ struct TFHEppBKey {
     }
 
     TFHEppBKey(const TFHEpp::SecretKey& sk)
-        : gk(std::make_shared<TFHEpp::GateKey>(sk)),
+        : gk(std::make_shared<GateKeyFFT>(sk)),
           ck(std::make_shared<CircuitKey>(sk))
     {
     }
