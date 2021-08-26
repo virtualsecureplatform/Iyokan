@@ -12,11 +12,11 @@ struct TFHEppWorkerInfo {
     std::shared_ptr<const CircuitKey> circuitKey;
 };
 
-using TaskAsyncTFHEpp = TaskAsync<TLWElvl0, TLWElvl0, TFHEppWorkerInfo>;
-using TaskTFHEppGate = Task<TLWElvl0, TLWElvl0, TFHEppWorkerInfo>;
-using TaskTFHEppGateMem = TaskMem<TLWElvl0, TLWElvl0, TFHEppWorkerInfo>;
+using TaskAsyncTFHEpp = TaskAsync<TLWELvl0, TLWELvl0, TFHEppWorkerInfo>;
+using TaskTFHEppGate = Task<TLWELvl0, TLWELvl0, TFHEppWorkerInfo>;
+using TaskTFHEppGateMem = TaskMem<TLWELvl0, TLWELvl0, TFHEppWorkerInfo>;
 
-class TaskTFHEppGateDFF : public TaskDFF<TLWElvl0, TLWElvl0, TFHEppWorkerInfo> {
+class TaskTFHEppGateDFF : public TaskDFF<TLWELvl0, TLWELvl0, TFHEppWorkerInfo> {
 public:
     TaskTFHEppGateDFF()
     {
@@ -26,14 +26,14 @@ public:
     template <class Archive>
     void serialize(Archive &ar)
     {
-        ar(cereal::base_class<TaskDFF<TLWElvl0, TLWElvl0, TFHEppWorkerInfo>>(
+        ar(cereal::base_class<TaskDFF<TLWELvl0, TLWELvl0, TFHEppWorkerInfo>>(
             this));
     }
 };
 CEREAL_REGISTER_TYPE(TaskTFHEppGateDFF);
 
 class TaskTFHEppGateWIRE
-    : public TaskMem<TLWElvl0, TLWElvl0, TFHEppWorkerInfo> {
+    : public TaskMem<TLWELvl0, TLWELvl0, TFHEppWorkerInfo> {
 private:
     AsyncThread thr_;
 
@@ -64,7 +64,7 @@ public:
     }
 
     TaskTFHEppGateWIRE(bool inputNeeded)
-        : TaskMem<TLWElvl0, TLWElvl0, TFHEppWorkerInfo>(inputNeeded ? 1 : 0)
+        : TaskMem<TLWELvl0, TLWELvl0, TFHEppWorkerInfo>(inputNeeded ? 1 : 0)
     {
     }
 
@@ -76,7 +76,7 @@ public:
     template <class Archive>
     void serialize(Archive &ar)
     {
-        ar(cereal::base_class<TaskMem<TLWElvl0, TLWElvl0, TFHEppWorkerInfo>>(
+        ar(cereal::base_class<TaskMem<TLWELvl0, TLWELvl0, TFHEppWorkerInfo>>(
             this));
     }
 };
@@ -161,7 +161,7 @@ public:
     }
 };
 
-class TaskTFHEppCB : public Task<TLWElvl0, TRGSWFFTlvl1, TFHEppWorkerInfo> {
+class TaskTFHEppCB : public Task<TLWELvl0, TRGSWLvl1FFT, TFHEppWorkerInfo> {
 private:
     AsyncThread thrs_[TFHEpp::lvl1param::l];
 
@@ -176,7 +176,7 @@ private:
                 auto ck = wi.circuitKey;
                 assert(ck);
 
-                TRLWElvl1 trgswupper, trgswlower;
+                TRLWELvl1 trgswupper, trgswlower;
                 TFHEpp::CircuitBootstrappingPartial(trgswupper, trgswlower,
                                                     input(0), *ck, i);
                 for (size_t j = 0; j < 2; j++) {
@@ -188,7 +188,7 @@ private:
     }
 
 public:
-    TaskTFHEppCB() : Task<TLWElvl0, TRGSWFFTlvl1, TFHEppWorkerInfo>(1)
+    TaskTFHEppCB() : Task<TLWELvl0, TRGSWLvl1FFT, TFHEppWorkerInfo>(1)
     {
     }
 
@@ -203,16 +203,16 @@ public:
     template <class Archive>
     void serialize(Archive &ar)
     {
-        ar(cereal::base_class<Task<TLWElvl0, TRGSWFFTlvl1, TFHEppWorkerInfo>>(
+        ar(cereal::base_class<Task<TLWELvl0, TRGSWLvl1FFT, TFHEppWorkerInfo>>(
             this));
     }
 };
 CEREAL_REGISTER_TYPE(TaskTFHEppCB);
 
-class TaskTFHEppCBInv : public Task<TLWElvl0, TRGSWFFTlvl1, TFHEppWorkerInfo> {
+class TaskTFHEppCBInv : public Task<TLWELvl0, TRGSWLvl1FFT, TFHEppWorkerInfo> {
 private:
     AsyncThread thrs_[TFHEpp::lvl1param::l];
-    TLWElvl0 invtlwe_;
+    TLWELvl0 invtlwe_;
 
 private:
     void startAsyncImpl(TFHEppWorkerInfo wi, ProgressGraphMaker *graph) override
@@ -229,7 +229,7 @@ private:
                 auto ck = wi.circuitKey;
                 assert(ck);
 
-                TRLWElvl1 trgswupper, trgswlower;
+                TRLWELvl1 trgswupper, trgswlower;
                 TFHEpp::CircuitBootstrappingPartial(trgswupper, trgswlower,
                                                     invtlwe_, *ck, i);
                 for (size_t j = 0; j < 2; j++) {
@@ -241,7 +241,7 @@ private:
     }
 
 public:
-    TaskTFHEppCBInv() : Task<TLWElvl0, TRGSWFFTlvl1, TFHEppWorkerInfo>(1)
+    TaskTFHEppCBInv() : Task<TLWELvl0, TRGSWLvl1FFT, TFHEppWorkerInfo>(1)
     {
     }
 
@@ -256,23 +256,23 @@ public:
     template <class Archive>
     void serialize(Archive &ar)
     {
-        ar(cereal::base_class<Task<TLWElvl0, TRGSWFFTlvl1, TFHEppWorkerInfo>>(
+        ar(cereal::base_class<Task<TLWELvl0, TRGSWLvl1FFT, TFHEppWorkerInfo>>(
             this));
     }
 };
 CEREAL_REGISTER_TYPE(TaskTFHEppCBInv);
 
 class TaskTFHEppROMUX
-    : public TaskAsync<TRGSWFFTlvl1, TRLWElvl1, TFHEppWorkerInfo> {
+    : public TaskAsync<TRGSWLvl1FFT, TRLWELvl1, TFHEppWorkerInfo> {
 private:
     size_t inAddrWidth_, log2NumWordsPerTRLWE_;
-    std::vector<TRLWElvl1> data_;
+    std::vector<TRLWELvl1> data_;
 
     // Workplace for UROMUX()
-    std::vector<TRLWElvl1> UROMUX_temp;
+    std::vector<TRLWELvl1> UROMUX_temp;
 
 private:
-    void UROMUX(TRLWElvl1 &result)
+    void UROMUX(TRLWELvl1 &result)
     {
         if (inAddrWidth_ <= log2NumWordsPerTRLWE_) {
             result = data_[0];
@@ -283,7 +283,7 @@ private:
         const size_t log2NumTRLWE = inAddrWidth_ - log2NumWordsPerTRLWE_;
         assert(numTRLWE == (1 << log2NumTRLWE));
 
-        std::vector<TRLWElvl1> &temp = UROMUX_temp;
+        std::vector<TRLWELvl1> &temp = UROMUX_temp;
         temp.resize(numTRLWE / 2);
 
         for (size_t bit = 0; bit < log2NumTRLWE; bit++) {
@@ -297,12 +297,12 @@ private:
         }
     }
 
-    void LROMUX(const uint32_t N, const TRLWElvl1 &data)
+    void LROMUX(const uint32_t N, const TRLWELvl1 &data)
     {
-        TRLWElvl1 &acc = output();
+        TRLWELvl1 &acc = output();
         acc = data;
 
-        TRLWElvl1 temp;
+        TRLWELvl1 temp;
         for (uint32_t bit = 1; bit <= log2NumWordsPerTRLWE_; bit++) {
             if (log2NumWordsPerTRLWE_ - bit >= inAddrWidth_)
                 continue;
@@ -321,7 +321,7 @@ private:
 
     void startSync(TFHEppWorkerInfo /* wi */) override
     {
-        TRLWElvl1 data;
+        TRLWELvl1 data;
         UROMUX(data);
         LROMUX(TFHEpp::lvl1param::n, data);
     }
@@ -332,7 +332,7 @@ public:
     }
 
     TaskTFHEppROMUX(size_t inAddrWidth, size_t log2OutRdataWidth)
-        : TaskAsync<TRGSWFFTlvl1, TRLWElvl1, TFHEppWorkerInfo>(inAddrWidth),
+        : TaskAsync<TRGSWLvl1FFT, TRLWELvl1, TFHEppWorkerInfo>(inAddrWidth),
           inAddrWidth_(inAddrWidth)
     {
         assert(TFHEpp::lvl1param::nbit >= log2OutRdataWidth);
@@ -349,7 +349,7 @@ public:
         return data_.size();
     }
 
-    void set(size_t index, TRLWElvl1 val)
+    void set(size_t index, TRLWELvl1 val)
     {
         data_.at(index) = val;
     }
@@ -358,13 +358,13 @@ public:
     void serialize(Archive &ar)
     {
         ar(cereal::base_class<
-               TaskAsync<TRGSWFFTlvl1, TRLWElvl1, TFHEppWorkerInfo>>(this),
+               TaskAsync<TRGSWLvl1FFT, TRLWELvl1, TFHEppWorkerInfo>>(this),
            inAddrWidth_, log2NumWordsPerTRLWE_, data_);
     }
 };
 CEREAL_REGISTER_TYPE(TaskTFHEppROMUX);
 
-class TaskTFHEppSEI : public TaskAsync<TRLWElvl1, TLWElvl0, TFHEppWorkerInfo> {
+class TaskTFHEppSEI : public TaskAsync<TRLWELvl1, TLWELvl0, TFHEppWorkerInfo> {
 private:
     size_t index_;
 
@@ -373,7 +373,7 @@ private:
     {
         const KeySwitchingKey &ksk = wi.gateKey->ksk;
 
-        TLWElvl1 reslvl1;
+        TLWELvl1 reslvl1;
         TFHEpp::SampleExtractIndex<Lvl1>(reslvl1, input(0), index_);
         TFHEpp::IdentityKeySwitch<Lvl10>(output(), reslvl1, ksk);
     }
@@ -384,22 +384,22 @@ public:
     }
 
     TaskTFHEppSEI(size_t index)
-        : TaskAsync<TRLWElvl1, TLWElvl0, TFHEppWorkerInfo>(1), index_(index)
+        : TaskAsync<TRLWELvl1, TLWELvl0, TFHEppWorkerInfo>(1), index_(index)
     {
     }
 
     template <class Archive>
     void serialize(Archive &ar)
     {
-        ar(cereal::base_class<TaskAsync<TRLWElvl1, TLWElvl0, TFHEppWorkerInfo>>(
+        ar(cereal::base_class<TaskAsync<TRLWELvl1, TLWELvl0, TFHEppWorkerInfo>>(
                this),
            index_);
     }
 };
 CEREAL_REGISTER_TYPE(TaskTFHEppSEI);
 
-struct TRGSWFFTlvl1Pair {
-    TRGSWFFTlvl1 normal, inverted;
+struct TRGSWLvl1FFTPair {
+    TRGSWLvl1FFT normal, inverted;
 
     template <class Archive>
     void serialize(Archive &ar)
@@ -409,7 +409,7 @@ struct TRGSWFFTlvl1Pair {
 };
 
 class TaskTFHEppCBWithInv
-    : public Task<TLWElvl0, TRGSWFFTlvl1Pair, TFHEppWorkerInfo> {
+    : public Task<TLWELvl0, TRGSWLvl1FFTPair, TFHEppWorkerInfo> {
 private:
     AsyncThread thrs_[TFHEpp::lvl1param::l];
 
@@ -435,7 +435,7 @@ private:
 
 public:
     TaskTFHEppCBWithInv()
-        : Task<TLWElvl0, TRGSWFFTlvl1Pair, TFHEppWorkerInfo>(1)
+        : Task<TLWELvl0, TRGSWLvl1FFTPair, TFHEppWorkerInfo>(1)
     {
     }
 
@@ -451,16 +451,16 @@ public:
     void serialize(Archive &ar)
     {
         ar(cereal::base_class<
-            Task<TLWElvl0, TRGSWFFTlvl1Pair, TFHEppWorkerInfo>>(this));
+            Task<TLWELvl0, TRGSWLvl1FFTPair, TFHEppWorkerInfo>>(this));
     }
 };
 CEREAL_REGISTER_TYPE(TaskTFHEppCBWithInv);
 
 class TaskTFHEppRAMUX
-    : public TaskAsync<TRGSWFFTlvl1Pair, TRLWElvl1, TFHEppWorkerInfo> {
+    : public TaskAsync<TRGSWLvl1FFTPair, TRLWELvl1, TFHEppWorkerInfo> {
 private:
-    std::vector<std::shared_ptr<TRLWElvl1>> data_;
-    std::vector<TRLWElvl1> temp_;  // temporary workspace for RAMUX()
+    std::vector<std::shared_ptr<TRLWELvl1>> data_;
+    std::vector<TRLWELvl1> temp_;  // temporary workspace for RAMUX()
 
 private:
     void RAMUX()
@@ -468,7 +468,7 @@ private:
         const size_t addrWidth = getAddressWidth();
         const uint32_t num_trlwe = 1 << addrWidth;
         temp_.resize(num_trlwe / 2);
-        auto addr = [this](size_t i) -> const TRGSWFFTlvl1 & {
+        auto addr = [this](size_t i) -> const TRGSWLvl1FFT & {
             return input(i).inverted;
         };
 
@@ -504,12 +504,12 @@ public:
     }
 
     TaskTFHEppRAMUX(size_t addressWidth)
-        : TaskAsync<TRGSWFFTlvl1Pair, TRLWElvl1, TFHEppWorkerInfo>(
+        : TaskAsync<TRGSWLvl1FFTPair, TRLWELvl1, TFHEppWorkerInfo>(
               addressWidth),
           data_(1 << addressWidth)
     {
         for (auto &p : data_)
-            p = std::make_shared<TRLWElvl1>();
+            p = std::make_shared<TRLWELvl1>();
     }
 
     size_t getAddressWidth() const
@@ -522,17 +522,17 @@ public:
         return 1 << getAddressWidth();
     }
 
-    std::shared_ptr<const TRLWElvl1> get(size_t addr) const
+    std::shared_ptr<const TRLWELvl1> get(size_t addr) const
     {
         return data_.at(addr);
     }
 
-    std::shared_ptr<TRLWElvl1> &get(size_t addr)
+    std::shared_ptr<TRLWELvl1> &get(size_t addr)
     {
         return data_.at(addr);
     }
 
-    void set(size_t addr, TRLWElvl1 val)
+    void set(size_t addr, TRLWELvl1 val)
     {
         *data_.at(addr) = std::move(val);
     }
@@ -541,14 +541,14 @@ public:
     void serialize(Archive &ar)
     {
         ar(cereal::base_class<
-               TaskAsync<TRGSWFFTlvl1Pair, TRLWElvl1, TFHEppWorkerInfo>>(this),
+               TaskAsync<TRGSWLvl1FFTPair, TRLWELvl1, TFHEppWorkerInfo>>(this),
            data_);
     }
 };
 CEREAL_REGISTER_TYPE(TaskTFHEppRAMUX);
 
 class TaskTFHEppGateMUXWoSE
-    : public TaskAsync<TLWElvl0, TRLWElvl1, TFHEppWorkerInfo> {
+    : public TaskAsync<TLWELvl0, TRLWELvl1, TFHEppWorkerInfo> {
 private:
     void startSync(TFHEppWorkerInfo wi) override
     {
@@ -559,14 +559,14 @@ private:
 
 public:
     TaskTFHEppGateMUXWoSE()
-        : TaskAsync<TLWElvl0, TRLWElvl1, TFHEppWorkerInfo>(3)
+        : TaskAsync<TLWELvl0, TRLWELvl1, TFHEppWorkerInfo>(3)
     {
     }
 
     template <class Archive>
     void serialize(Archive &ar)
     {
-        ar(cereal::base_class<TaskAsync<TLWElvl0, TRLWElvl1, TFHEppWorkerInfo>>(
+        ar(cereal::base_class<TaskAsync<TLWELvl0, TRLWELvl1, TFHEppWorkerInfo>>(
             this));
     }
 };
@@ -575,11 +575,11 @@ CEREAL_REGISTER_TYPE(TaskTFHEppGateMUXWoSE);
 class TaskTFHEppRAMCMUXs : public TaskBase<TFHEppWorkerInfo> {
 private:
     size_t numReadyInputs_, memIndex_;
-    std::shared_ptr<TRLWElvl1> output_;
-    std::vector<std::weak_ptr<const TRGSWFFTlvl1Pair>> inputAddrs_;
-    std::weak_ptr<const TRLWElvl1> inputWritten_;
+    std::shared_ptr<TRLWELvl1> output_;
+    std::vector<std::weak_ptr<const TRGSWLvl1FFTPair>> inputAddrs_;
+    std::weak_ptr<const TRLWELvl1> inputWritten_;
 
-    std::weak_ptr<const TRLWElvl1> mem_;
+    std::weak_ptr<const TRLWELvl1> mem_;
 
     AsyncThread thr_;
 
@@ -588,11 +588,11 @@ public:
     {
     }
 
-    TaskTFHEppRAMCMUXs(size_t addressWidth, std::weak_ptr<const TRLWElvl1> mem,
+    TaskTFHEppRAMCMUXs(size_t addressWidth, std::weak_ptr<const TRLWELvl1> mem,
                        size_t memIndex)
         : numReadyInputs_(0),
           memIndex_(memIndex),
-          output_(std::make_shared<TRLWElvl1>()),
+          output_(std::make_shared<TRLWELvl1>()),
           inputAddrs_(addressWidth),
           mem_(std::move(mem))
     {
@@ -644,7 +644,7 @@ public:
         return thr_.hasFinished();
     }
 
-    void addInputPtr(const std::shared_ptr<const TRGSWFFTlvl1Pair> &input)
+    void addInputPtr(const std::shared_ptr<const TRGSWLvl1FFTPair> &input)
     {
         auto it = std::find_if(inputAddrs_.begin(), inputAddrs_.end(),
                                [](auto &&in) { return in.use_count() == 0; });
@@ -652,13 +652,13 @@ public:
         *it = input;
     }
 
-    void addInputPtr(const std::shared_ptr<const TRLWElvl1> &input)
+    void addInputPtr(const std::shared_ptr<const TRLWELvl1> &input)
     {
         assert(inputWritten_.use_count() == 0);
         inputWritten_ = input;
     }
 
-    std::shared_ptr<const TRLWElvl1> getOutputPtr() const
+    std::shared_ptr<const TRLWELvl1> getOutputPtr() const
     {
         return output_;
     }
@@ -671,7 +671,7 @@ public:
 
             *output_ = *inputWritten_.lock();
             for (size_t j = 0; j < getAddressWidth(); j++) {
-                const TRGSWFFTlvl1 &in = (memIndex_ >> j) & 1u
+                const TRGSWLvl1FFT &in = (memIndex_ >> j) & 1u
                                              ? inputAddrs_[j].lock()->normal
                                              : inputAddrs_[j].lock()->inverted;
                 TFHEpp::CMUXFFT<Lvl1>(*output_, in, *output_, *mem_.lock());
@@ -690,9 +690,9 @@ public:
 CEREAL_REGISTER_TYPE(TaskTFHEppRAMCMUXs);
 
 class TaskTFHEppRAMGateBootstrapping
-    : public TaskAsync<TLWElvl0, uint8_t /* dummy */, TFHEppWorkerInfo> {
+    : public TaskAsync<TLWELvl0, uint8_t /* dummy */, TFHEppWorkerInfo> {
 private:
-    std::weak_ptr<TRLWElvl1> mem_;
+    std::weak_ptr<TRLWELvl1> mem_;
 
 private:
     void startSync(TFHEppWorkerInfo wi) override
@@ -707,8 +707,8 @@ public:
     {
     }
 
-    TaskTFHEppRAMGateBootstrapping(std::weak_ptr<TRLWElvl1> mem)
-        : TaskAsync<TLWElvl0, uint8_t /* dummy */, TFHEppWorkerInfo>(1),
+    TaskTFHEppRAMGateBootstrapping(std::weak_ptr<TRLWELvl1> mem)
+        : TaskAsync<TLWELvl0, uint8_t /* dummy */, TFHEppWorkerInfo>(1),
           mem_(std::move(mem))
     {
     }
@@ -716,7 +716,7 @@ public:
     template <class Archive>
     void serialize(Archive &ar)
     {
-        ar(cereal::base_class<TaskAsync<TLWElvl0, uint8_t, TFHEppWorkerInfo>>(
+        ar(cereal::base_class<TaskAsync<TLWELvl0, uint8_t, TFHEppWorkerInfo>>(
                this),
            mem_);
     }

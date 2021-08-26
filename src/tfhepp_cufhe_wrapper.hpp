@@ -23,13 +23,6 @@ using SecretKey = TFHEpp::SecretKey;
 using CircuitKey = TFHEpp::CircuitKey<Lvl02, Lvl21>;
 using KeySwitchingKey = TFHEpp::KeySwitchingKey<Lvl10>;
 
-// FIXME: Deprecated types. Remove them for the future.
-using Polynomiallvl1 = PolyLvl1;
-using TLWElvl0 = TLWELvl0;
-using TLWElvl1 = TLWELvl1;
-using TRGSWFFTlvl1 = TRGSWLvl1FFT;
-using TRLWElvl1 = TRLWELvl1;
-
 inline bool decryptTLWELvl0(const TLWELvl0& src, const SecretKey& sk)
 {
     return TFHEpp::bootsSymDecrypt({src}, sk).at(0);
@@ -40,27 +33,27 @@ inline bool decryptTLWELvl0(const TLWELvl0& src, const SecretKey& sk)
 #include <cufhe.h>
 #include <cufhe_gpu.cuh>
 
-inline TLWElvl0 cufhe2tfhepp(const cufhe::Ctxt& src)
+inline TLWELvl0 cufhe2tfhepp(const cufhe::Ctxt& src)
 {
     // Assume src.tlwehost has valid data
     return src.tlwehost;
 }
 
-inline void cufhe2tfheppInPlace(TLWElvl0& dst, const cufhe::Ctxt& src)
+inline void cufhe2tfheppInPlace(TLWELvl0& dst, const cufhe::Ctxt& src)
 {
     // Assume src.tlwehost has valid data
     // FIXME: Optimization using in-place property?
     dst = src.tlwehost;
 }
 
-inline std::shared_ptr<cufhe::Ctxt> tfhepp2cufhe(const TLWElvl0& src)
+inline std::shared_ptr<cufhe::Ctxt> tfhepp2cufhe(const TLWELvl0& src)
 {
     auto c = std::make_shared<cufhe::Ctxt>();
     c->tlwehost = src;
     return c;
 }
 
-inline void tfhepp2cufheInPlace(cufhe::Ctxt& dst, const TLWElvl0& src)
+inline void tfhepp2cufheInPlace(cufhe::Ctxt& dst, const TLWELvl0& src)
 {
     dst.tlwehost = src;
 }

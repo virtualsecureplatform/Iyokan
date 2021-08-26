@@ -180,7 +180,7 @@ private:
             using RAM_TYPE = blueprint::BuiltinRAM::TYPE;
             switch (bp.type) {
             case RAM_TYPE::CMUX_MEMORY: {
-                std::vector<TRLWElvl1> &dst = resPacket.ram[bp.name];
+                std::vector<TRLWELvl1> &dst = resPacket.ram[bp.name];
                 assert(dst.size() == 0);
                 const size_t dataWidth = bp.inWdataWidth;
                 for (int bit = 0; bit < dataWidth; bit++) {
@@ -197,7 +197,7 @@ private:
             }
 
             case RAM_TYPE::MUX: {
-                std::vector<TLWElvl0> &dst = resPacket.ramInTLWE[bp.name];
+                std::vector<TLWELvl0> &dst = resPacket.ramInTLWE[bp.name];
                 for (size_t i = 0; i < (1 << bp.inAddrWidth) * bp.outRdataWidth;
                      i++) {
                     const auto &ram = *get<TaskTFHEppGateMem>(
@@ -346,7 +346,7 @@ public:
                 // Set initial ROM data
                 if (auto it = reqPacket_.rom.find(bprom.name);
                     it != reqPacket_.rom.end()) {
-                    std::vector<TRLWElvl1> &init = it->second;
+                    std::vector<TRLWELvl1> &init = it->second;
                     auto &rom =
                         *get<TaskTFHEppROMUX>({bprom.name, {"rom", "all", 0}});
 
@@ -369,7 +369,7 @@ public:
                 // Set initial data
                 if (auto it = reqPacket_.romInTLWE.find(bprom.name);
                     it != reqPacket_.romInTLWE.end()) {
-                    std::vector<TLWElvl0> &init = it->second;
+                    std::vector<TLWELvl0> &init = it->second;
                     if (init.size() !=
                         (1 << bprom.inAddrWidth) * bprom.outRdataWidth)
                         error::die(
@@ -462,7 +462,7 @@ public:
         // Reset
         if (currentCycle_ == 0) {
             if (auto reset = maybeGetAt("input", "reset"); reset) {
-                TLWElvl0 one, zero;
+                TLWELvl0 one, zero;
                 TFHEpp::HomCONSTANTONE(one);
                 TFHEpp::HomCONSTANTZERO(zero);
 

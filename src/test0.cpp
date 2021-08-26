@@ -519,7 +519,7 @@ private:
     std::shared_ptr<SecretKey> sk_;
     std::shared_ptr<GateKeyFFT> gk_;
     std::shared_ptr<CircuitKey> ck_;
-    TLWElvl0 zero_, one_;
+    TLWELvl0 zero_, one_;
 
 private:
     TFHEppTestHelper()
@@ -557,12 +557,12 @@ public:
         return gk_;
     }
 
-    const TLWElvl0& zero() const
+    const TLWELvl0& zero() const
     {
         return zero_;
     }
 
-    const TLWElvl0& one() const
+    const TLWELvl0& one() const
     {
         return one_;
     }
@@ -603,7 +603,7 @@ void testTFHEppSerialization()
 
         auto zero = TFHEpp::bootsSymEncrypt({0}, *sk2).at(0);
         auto one = TFHEpp::bootsSymEncrypt({1}, *sk2).at(0);
-        TLWElvl0 res;
+        TLWELvl0 res;
         TFHEpp::HomANDNY(res, zero, one, *gk);
         assert(TFHEpp::bootsSymDecrypt({res}, *sk2).at(0) == 1);
     }
@@ -620,7 +620,7 @@ void testTFHEppSerialization()
 
         auto zero = TFHEpp::bootsSymEncrypt({0}, *sk).at(0);
         auto one = TFHEpp::bootsSymEncrypt({1}, *sk).at(0);
-        TLWElvl0 res;
+        TLWELvl0 res;
         TFHEpp::HomANDNY(res, zero, one, *gk2);
         assert(TFHEpp::bootsSymDecrypt({res}, *sk).at(0) == 1);
     }
@@ -638,7 +638,7 @@ void testTFHEppSerialization()
         }
 
         {
-            TLWElvl0 res, zero, one;
+            TLWELvl0 res, zero, one;
             readFromArchive(zero, ss);
             readFromArchive(one, ss);
             TFHEpp::HomANDNY(res, zero, one, *gk);

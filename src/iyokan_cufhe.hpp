@@ -52,7 +52,7 @@ void save(Archive& ar, const Ctxt& ctxt)
 template <class Archive>
 void load(Archive& ar, Ctxt& ctxt)
 {
-    TLWElvl0 tlwe;
+    TLWELvl0 tlwe;
     ar(tlwe);
     copyCtxt(ctxt, *tfhepp2cufhe(tlwe));
 }
@@ -268,7 +268,7 @@ public:
 };
 
 class TaskCUFHE2TFHEpp
-    : public TaskAsync<cufhe::Ctxt, TLWElvl0, TFHEppWorkerInfo> {
+    : public TaskAsync<cufhe::Ctxt, TLWELvl0, TFHEppWorkerInfo> {
 private:
     void startSync(TFHEppWorkerInfo) override
     {
@@ -276,7 +276,7 @@ private:
     }
 
 public:
-    TaskCUFHE2TFHEpp() : TaskAsync<cufhe::Ctxt, TLWElvl0, TFHEppWorkerInfo>(1)
+    TaskCUFHE2TFHEpp() : TaskAsync<cufhe::Ctxt, TLWELvl0, TFHEppWorkerInfo>(1)
     {
     }
 
@@ -284,13 +284,13 @@ public:
     void serialize(Archive& ar)
     {
         ar(cereal::base_class<
-            TaskAsync<cufhe::Ctxt, TLWElvl0, TFHEppWorkerInfo>>(this));
+            TaskAsync<cufhe::Ctxt, TLWELvl0, TFHEppWorkerInfo>>(this));
     }
 };
 CEREAL_REGISTER_TYPE(TaskCUFHE2TFHEpp);
 
 class TaskTFHEpp2CUFHE
-    : public TaskAsync<TLWElvl0, cufhe::Ctxt, TFHEppWorkerInfo> {
+    : public TaskAsync<TLWELvl0, cufhe::Ctxt, TFHEppWorkerInfo> {
 private:
     void startSync(TFHEppWorkerInfo) override
     {
@@ -298,7 +298,7 @@ private:
     }
 
 public:
-    TaskTFHEpp2CUFHE() : TaskAsync<TLWElvl0, cufhe::Ctxt, TFHEppWorkerInfo>(1)
+    TaskTFHEpp2CUFHE() : TaskAsync<TLWELvl0, cufhe::Ctxt, TFHEppWorkerInfo>(1)
     {
     }
 
@@ -306,7 +306,7 @@ public:
     void serialize(Archive& ar)
     {
         ar(cereal::base_class<
-            TaskAsync<TLWElvl0, cufhe::Ctxt, TFHEppWorkerInfo>>(this));
+            TaskAsync<TLWELvl0, cufhe::Ctxt, TFHEppWorkerInfo>>(this));
     }
 };
 CEREAL_REGISTER_TYPE(TaskTFHEpp2CUFHE);
@@ -316,8 +316,8 @@ private:
     size_t numReadyInputs_, memFirstIndex_;
     std::shared_ptr<std::vector<std::shared_ptr<cufhe::cuFHETRLWElvl1>>>
         outputs_;
-    std::vector<std::weak_ptr<const TRGSWFFTlvl1Pair>> inputAddrs_;
-    std::weak_ptr<const TRLWElvl1> inputWritten_;
+    std::vector<std::weak_ptr<const TRGSWLvl1FFTPair>> inputAddrs_;
+    std::weak_ptr<const TRLWELvl1> inputWritten_;
 
     std::vector<std::weak_ptr<cufhe::cuFHETRLWElvl1>> mem_;
 
@@ -391,7 +391,7 @@ public:
         return thr_.hasFinished();
     }
 
-    void addInputPtr(const std::shared_ptr<const TRGSWFFTlvl1Pair>& input)
+    void addInputPtr(const std::shared_ptr<const TRGSWLvl1FFTPair>& input)
     {
         auto it = std::find_if(inputAddrs_.begin(), inputAddrs_.end(),
                                [](auto&& in) { return in.use_count() == 0; });
@@ -399,7 +399,7 @@ public:
         *it = input;
     }
 
-    void addInputPtr(const std::shared_ptr<const TRLWElvl1>& input)
+    void addInputPtr(const std::shared_ptr<const TRLWELvl1>& input)
     {
         assert(inputWritten_.use_count() == 0);
         inputWritten_ = input;
@@ -423,7 +423,7 @@ public:
                 output.trlwehost = *inputWritten_.lock();
                 auto& mem = mem_[i];
                 for (size_t j = 0; j < getAddressWidth(); j++) {
-                    const TRGSWFFTlvl1& in =
+                    const TRGSWLvl1FFT& in =
                         ((memFirstIndex_ + i) >> j) & 1u
                             ? inputAddrs_[j].lock()->normal
                             : inputAddrs_[j].lock()->inverted;
@@ -445,8 +445,8 @@ public:
 };
 CEREAL_REGISTER_TYPE(TaskTFHEppRAMCMUXsForCUFHE);
 
-class TaskTFHEpp2CUFHETRLWElvl1
-    : public TaskAsync<TRLWElvl1, cufhe::cuFHETRLWElvl1, TFHEppWorkerInfo> {
+class TaskTFHEpp2CUFHETRLWELvl1
+    : public TaskAsync<TRLWELvl1, cufhe::cuFHETRLWElvl1, TFHEppWorkerInfo> {
 private:
     void startSync(TFHEppWorkerInfo) override
     {
@@ -454,8 +454,8 @@ private:
     }
 
 public:
-    TaskTFHEpp2CUFHETRLWElvl1()
-        : TaskAsync<TRLWElvl1, cufhe::cuFHETRLWElvl1, TFHEppWorkerInfo>(1)
+    TaskTFHEpp2CUFHETRLWELvl1()
+        : TaskAsync<TRLWELvl1, cufhe::cuFHETRLWElvl1, TFHEppWorkerInfo>(1)
     {
     }
 
@@ -463,17 +463,17 @@ public:
     void serialize(Archive& ar)
     {
         ar(cereal::base_class<
-            TaskAsync<TRLWElvl1, cufhe::cuFHETRLWElvl1, TFHEppWorkerInfo>>(
+            TaskAsync<TRLWELvl1, cufhe::cuFHETRLWElvl1, TFHEppWorkerInfo>>(
             this));
     }
 };
-CEREAL_REGISTER_TYPE(TaskTFHEpp2CUFHETRLWElvl1);
+CEREAL_REGISTER_TYPE(TaskTFHEpp2CUFHETRLWELvl1);
 
 class TaskCUFHERAMUX
-    : public TaskAsync<TRGSWFFTlvl1Pair, TRLWElvl1, TFHEppWorkerInfo> {
+    : public TaskAsync<TRGSWLvl1FFTPair, TRLWELvl1, TFHEppWorkerInfo> {
 private:
     std::vector<std::shared_ptr<cufhe::cuFHETRLWElvl1>> data_;
-    std::vector<TRLWElvl1> temp_;  // temporary workspace for RAMUX()
+    std::vector<TRLWELvl1> temp_;  // temporary workspace for RAMUX()
 
 private:
     void RAMUX()
@@ -481,7 +481,7 @@ private:
         const size_t addrWidth = getAddressWidth();
         const uint32_t num_trlwe = 1 << addrWidth;
         temp_.resize(num_trlwe / 2);
-        auto addr = [this](size_t i) -> const TRGSWFFTlvl1& {
+        auto addr = [this](size_t i) -> const TRGSWLvl1FFT& {
             return input(i).inverted;
         };
 
@@ -518,7 +518,7 @@ public:
     }
 
     TaskCUFHERAMUX(size_t addressWidth)
-        : TaskAsync<TRGSWFFTlvl1Pair, TRLWElvl1, TFHEppWorkerInfo>(
+        : TaskAsync<TRGSWLvl1FFTPair, TRLWELvl1, TFHEppWorkerInfo>(
               addressWidth),
           data_(1 << addressWidth)
     {
@@ -546,7 +546,7 @@ public:
         return data_.at(addr);
     }
 
-    void set(size_t addr, TRLWElvl1 val)
+    void set(size_t addr, TRLWELvl1 val)
     {
         data_.at(addr)->trlwehost = std::move(val);
     }
@@ -555,7 +555,7 @@ public:
     void serialize(Archive& ar)
     {
         ar(cereal::base_class<
-               TaskAsync<TRGSWFFTlvl1Pair, TRLWElvl1, TFHEppWorkerInfo>>(this),
+               TaskAsync<TRGSWLvl1FFTPair, TRLWELvl1, TFHEppWorkerInfo>>(this),
            data_);
     }
 };
