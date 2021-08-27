@@ -1573,6 +1573,7 @@ namespace blueprint {
 struct File {
     enum class TYPE {
         IYOKANL1_JSON,
+        YOSYS_JSON,
     } type;
     std::string path, name;
 
@@ -1703,17 +1704,22 @@ public:
             const auto srcFiles =
                 toml::find_or<std::vector<toml::value>>(src, "file", {});
             for (const auto &srcFile : srcFiles) {
-                std::string type = toml::find<std::string>(srcFile, "type");
+                std::string typeStr = toml::find<std::string>(srcFile, "type");
                 fs::path path = toml::find<std::string>(srcFile, "path");
                 std::string name = toml::find<std::string>(srcFile, "name");
 
-                assert(type == "iyokanl1-json");
+                blueprint::File::TYPE type;
+                if (typeStr == "iyokanl1-json")
+                    type = blueprint::File::TYPE::IYOKANL1_JSON;
+                else if (typeStr == "yosys-json")
+                    type = blueprint::File::TYPE::YOSYS_JSON;
+                else
+                    error::die("Invalid file type: {}", typeStr);
 
                 if (path.is_relative())
                     path = wd / path;  // Make path absolute
 
-                files_.push_back(blueprint::File{
-                    blueprint::File::TYPE::IYOKANL1_JSON, path.string(), name});
+                files_.push_back(blueprint::File{type, path.string(), name});
             }
         }
 
@@ -1991,6 +1997,243 @@ public:
 };
 
 template <class NetworkBuilder>
+class YosysJSONReader {
+private:
+    enum class PORT {
+        IN,
+        OUT,
+    };
+
+    struct Port {
+        PORT type;
+        int id, bit;
+
+        Port(PORT type, int id, int bit) : type(type), id(id), bit(bit)
+        {
+        }
+    };
+
+    enum class CELL {
+        NOT,
+        AND,
+        ANDNOT,
+        NAND,
+        OR,
+        XOR,
+        XNOR,
+        NOR,
+        ORNOT,
+        DFFP,
+        MUX,
+    };
+
+    struct Cell {
+        CELL type;
+        int id, bit0, bit1, bit2;
+
+        Cell(CELL type, int id, int bit0)
+            : type(type), id(id), bit0(bit0), bit1(-1), bit2(-1)
+        {
+        }
+        Cell(CELL type, int id, int bit0, int bit1)
+            : type(type), id(id), bit0(bit0), bit1(bit1), bit2(-1)
+        {
+        }
+        Cell(CELL type, int id, int bit0, int bit1, int bit2)
+            : type(type), id(id), bit0(bit0), bit1(bit1), bit2(bit2)
+        {
+        }
+    };
+
+private:
+    NetworkBuilder &builder_;
+
+private:
+    void connect(int from, int to)
+    {
+        builder_.connect(from, to);
+    }
+
+    int getConnBit(const picojson::object &conn, const std::string &key)
+    {
+        using namespace picojson;
+        const auto &bits = conn.at(key).get<array>();
+        if (bits.size() != 1)
+            error::die("Invalid JSON: wrong conn size: expected 1, got {}",
+                       bits.size());
+        return bits.at(0).get<double>();
+    }
+
+public:
+    YosysJSONReader(NetworkBuilder &builder) : builder_(builder)
+    {
+    }
+
+    void read(std::istream &is)
+    {
+        // Convert Yosys JSON to gates. Thanks to:
+        // https://github.com/virtualsecureplatform/Iyokan-L1/blob/ef7c9a993ddbfd54ef58e66b116b681e59d90a3c/Converter/YosysConverter.cs
+        using namespace picojson;
+
+        value v;
+        const std::string err = parse(v, is);
+        if (!err.empty())
+            error::die("Invalid JSON of network: ", err);
+
+        object &root = v.get<object>();
+        object &modules = root.at("modules").get<object>();
+        if (modules.size() != 1)
+            error::die(".modules should be an object of size 1");
+        object &modul = modules.begin()->second.get<object>();
+        object &ports = modul.at("ports").get<object>();
+        object &cells = modul.at("cells").get<object>();
+
+        std::unordered_map<int, int> bit2id;
+
+        // Create INPUT/OUTPUT and extract port connection info
+        std::vector<Port> portvec;
+        for (auto &&[key, valAny] : ports) {
+            object &val = valAny.template get<object>();
+            std::string &direction = val["direction"].get<std::string>();
+            array &bits = val["bits"].get<array>();
+
+            if (key == "clock")
+                continue;
+            if (key == "reset" && bits.size() == 0)
+                continue;
+            if (direction != "input" && direction != "output")
+                error::die("Invalid direction token: {}", direction);
+
+            const bool isDirInput = direction == "input";
+            const std::string &portName = key;
+            for (size_t i = 0; i < bits.size(); i++) {
+                const int portBit = i;
+                const int bit = bits.at(i).get<double>();
+
+                int id = isDirInput ? builder_.INPUT(portName, portBit)
+                                    : builder_.OUTPUT(portName, portBit);
+                portvec.emplace_back(isDirInput ? PORT::IN : PORT::OUT, id,
+                                     bit);
+                if (isDirInput)
+                    bit2id.emplace(bit, id);
+            }
+        }
+
+        // Create gates and extract gate connection info
+        const std::unordered_map<std::string, CELL> mapCell = {
+            {"$_NOT_", CELL::NOT},       {"$_AND_", CELL::AND},
+            {"$_ANDNOT_", CELL::ANDNOT}, {"$_NAND_", CELL::NAND},
+            {"$_OR_", CELL::OR},         {"$_XOR_", CELL::XOR},
+            {"$_XNOR_", CELL::XNOR},     {"$_NOR_", CELL::NOR},
+            {"$_ORNOT_", CELL::ORNOT},   {"$_DFF_P_", CELL::DFFP},
+            {"$_MUX_", CELL::MUX},
+        };
+        std::vector<Cell> cellvec;
+        for (auto &&[_key, valAny] : cells) {
+            object &val = valAny.template get<object>();
+            const std::string &type = val.at("type").get<std::string>();
+            object &conn = val.at("connections").get<object>();
+            auto get = [&](const char *key) -> int {
+                return getConnBit(conn, key);
+            };
+
+            int bit = -1, id = -1;
+            switch (mapCell.at(type)) {
+            case CELL::AND:
+                id = builder_.AND();
+                cellvec.emplace_back(CELL::AND, id, get("A"), get("B"));
+                bit = get("Y");
+                break;
+            case CELL::NAND:
+                id = builder_.NAND();
+                cellvec.emplace_back(CELL::NAND, id, get("A"), get("B"));
+                bit = get("Y");
+                break;
+            case CELL::XOR:
+                id = builder_.XOR();
+                cellvec.emplace_back(CELL::XOR, id, get("A"), get("B"));
+                bit = get("Y");
+                break;
+            case CELL::XNOR:
+                id = builder_.XNOR();
+                cellvec.emplace_back(CELL::XNOR, id, get("A"), get("B"));
+                bit = get("Y");
+                break;
+            case CELL::NOR:
+                id = builder_.NOR();
+                cellvec.emplace_back(CELL::NOR, id, get("A"), get("B"));
+                bit = get("Y");
+                break;
+            case CELL::ANDNOT:
+                id = builder_.ANDNOT();
+                cellvec.emplace_back(CELL::ANDNOT, id, get("A"), get("B"));
+                bit = get("Y");
+                break;
+            case CELL::OR:
+                id = builder_.OR();
+                cellvec.emplace_back(CELL::OR, id, get("A"), get("B"));
+                bit = get("Y");
+                break;
+            case CELL::ORNOT:
+                id = builder_.ORNOT();
+                cellvec.emplace_back(CELL::ORNOT, id, get("A"), get("B"));
+                bit = get("Y");
+                break;
+            case CELL::DFFP:
+                id = builder_.DFF();
+                cellvec.emplace_back(CELL::DFFP, id, get("D"));
+                bit = get("Q");
+                break;
+            case CELL::NOT:
+                id = builder_.NOT();
+                cellvec.emplace_back(CELL::NOT, id, get("A"));
+                bit = get("Y");
+                break;
+            case CELL::MUX:
+                id = builder_.MUX();
+                cellvec.emplace_back(CELL::MUX, id, get("A"), get("B"),
+                                     get("S"));
+                bit = get("Y");
+                break;
+            }
+            bit2id.emplace(bit, id);
+        }
+
+        for (auto &&port : portvec) {
+            if (port.type == PORT::IN)
+                // Actually nothing to do!
+                continue;
+            connect(bit2id.at(port.bit), port.id);
+        }
+
+        for (auto &&cell : cellvec) {
+            switch (cell.type) {
+            case CELL::AND:
+            case CELL::NAND:
+            case CELL::XOR:
+            case CELL::XNOR:
+            case CELL::NOR:
+            case CELL::ANDNOT:
+            case CELL::OR:
+            case CELL::ORNOT:
+                connect(bit2id.at(cell.bit0), cell.id);
+                connect(bit2id.at(cell.bit1), cell.id);
+                break;
+            case CELL::DFFP:
+            case CELL::NOT:
+                connect(bit2id.at(cell.bit0), cell.id);
+                break;
+            case CELL::MUX:
+                connect(bit2id.at(cell.bit0), cell.id);
+                connect(bit2id.at(cell.bit1), cell.id);
+                connect(bit2id.at(cell.bit2), cell.id);
+                break;
+            }
+        }
+    }
+};
+
+template <class NetworkBuilder>
 typename NetworkBuilder::NetworkType readNetworkFromJSON(std::istream &is)
 {
     NetworkBuilder builder;
@@ -2133,8 +2376,21 @@ std::shared_ptr<typename NetworkBuilder::NetworkType> readNetwork(
     std::ifstream ifs{file.path, std::ios::binary};
     if (!ifs)
         error::die("Invalid [[file]] path: ", file.path);
-    auto net = std::make_shared<typename NetworkBuilder::NetworkType>(
-        readNetworkFromJSON<NetworkBuilder>(ifs));
+
+    std::shared_ptr<typename NetworkBuilder::NetworkType> net;
+    switch (file.type) {
+    case blueprint::File::TYPE::IYOKANL1_JSON:
+        net = std::make_shared<typename NetworkBuilder::NetworkType>(
+            readNetworkFromJSON<NetworkBuilder>(ifs));
+        break;
+    case blueprint::File::TYPE::YOSYS_JSON: {
+        NetworkBuilder builder;
+        YosysJSONReader<NetworkBuilder>{builder}.read(ifs);
+        net = std::make_shared<typename NetworkBuilder::NetworkType>(
+            std::move(builder));
+        break;
+    }
+    }
 
     error::Stack err;
     net->checkValid(err);
