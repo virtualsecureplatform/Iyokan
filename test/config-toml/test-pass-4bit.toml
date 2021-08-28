@@ -1,6 +1,6 @@
 [[file]]
 type = "iyokanl1-json"
-path = "test-pass-4bit.json"
+path = "../iyokanl1-json/test-pass-4bit.json"
 name = "pass"
 
 [connect]

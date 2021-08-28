@@ -1,6 +1,6 @@
 [[file]]
 type = "iyokanl1-json"
-path = "emerald-core-wo-ram-rom.json"
+path = "../iyokanl1-json/emerald-core-wo-ram-rom.json"
 name = "core"
 
 [[builtin]]

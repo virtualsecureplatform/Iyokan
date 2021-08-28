@@ -1,6 +1,6 @@
 [[file]]
 type = "iyokanl1-json"
-path = "cahp-pearl-core.json"
+path = "../iyokanl1-json/cahp-pearl-core.json"
 name = "core"
 
 [[builtin]]

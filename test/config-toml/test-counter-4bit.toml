@@ -1,6 +1,6 @@
 [[file]]
 type = "iyokanl1-json"
-path = "test-counter-4bit.json"
+path = "../iyokanl1-json/test-counter-4bit.json"
 name = "counter"
 
 [connect]

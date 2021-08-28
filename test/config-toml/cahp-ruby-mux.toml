@@ -1,6 +1,6 @@
 [[file]]
 type = "iyokanl1-json"
-path = "cahp-ruby-core.json"
+path = "../iyokanl1-json/cahp-ruby-core.json"
 name = "core"
 
 [[builtin]]

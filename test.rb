@@ -129,7 +129,7 @@ if $SKIP_PREFACE
   $logger.info "Skip test of method toml2packet."
 else
   $logger.info "Testing toml2packet..."
-  test_method_toml2packet "test/test03.in", {
+  test_method_toml2packet "test/in/test03.in", {
                             cycles: -1,
                             ram: {},
                             rom: {},
@@ -160,9 +160,9 @@ if $SKIP_PREFACE
   $logger.info "Skip test of iyokan_packet toml2packet."
 else
   $logger.info "Testing toml2packet running..."
-  test_iyokan_packet_e2e "test/test00.in"
-  test_iyokan_packet_e2e "test/test00-diamond.out"
-  test_iyokan_packet_e2e "test/test03.in"
+  test_iyokan_packet_e2e "test/in/test00.in"
+  test_iyokan_packet_e2e "test/out/test00-diamond.out"
+  test_iyokan_packet_e2e "test/in/test03.in"
   $logger.info "Testing toml2packet done."
 end
 
@@ -328,72 +328,72 @@ end
 
 reg = TestRegisterer.new
 
-reg.add_in_out "cahp-diamond-00", "test/cahp-diamond.toml",
-               "test/test00.in", "test/test00-diamond.out", ncycles: 8
-reg.add_in_out "cahp-emerald-00", "test/cahp-emerald.toml",
-               "test/test00.in", "test/test00-emerald.out", ncycles: 6
-reg.add_in_out "cahp-ruby-09", "test/cahp-ruby.toml",
-               "test/test09.in", "test/test09-ruby.out", ncycles: 7
-reg.add_in_out "cahp-pearl-09", "test/cahp-pearl.toml",
-               "test/test09.in", "test/test09-pearl.out", ncycles: 3, cufhe_tags: [:fast]
+reg.add_in_out "cahp-diamond-00", "test/config-toml/cahp-diamond.toml",
+               "test/in/test00.in", "test/out/test00-diamond.out", ncycles: 8
+reg.add_in_out "cahp-emerald-00", "test/config-toml/cahp-emerald.toml",
+               "test/in/test00.in", "test/out/test00-emerald.out", ncycles: 6
+reg.add_in_out "cahp-ruby-09", "test/config-toml/cahp-ruby.toml",
+               "test/in/test09.in", "test/out/test09-ruby.out", ncycles: 7
+reg.add_in_out "cahp-pearl-09", "test/config-toml/cahp-pearl.toml",
+               "test/in/test09.in", "test/out/test09-pearl.out", ncycles: 3, cufhe_tags: [:fast]
 
-reg.add_in_out "cahp-diamond-mux-00", "test/cahp-diamond-mux.toml",
-               "test/test00.in", "test/test00-diamond.out", ncycles: 8
-reg.add_in_out "cahp-emerald-mux-00", "test/cahp-emerald-mux.toml",
-               "test/test00.in", "test/test00-emerald.out", ncycles: 6
-reg.add_in_out "cahp-ruby-mux-09", "test/cahp-ruby-mux.toml",
-               "test/test09.in", "test/test09-ruby.out", ncycles: 7
-reg.add_in_out "cahp-pearl-mux-09", "test/cahp-pearl-mux.toml",
-               "test/test09.in", "test/test09-pearl.out", ncycles: 3
+reg.add_in_out "cahp-diamond-mux-00", "test/config-toml/cahp-diamond-mux.toml",
+               "test/in/test00.in", "test/out/test00-diamond.out", ncycles: 8
+reg.add_in_out "cahp-emerald-mux-00", "test/config-toml/cahp-emerald-mux.toml",
+               "test/in/test00.in", "test/out/test00-emerald.out", ncycles: 6
+reg.add_in_out "cahp-ruby-mux-09", "test/config-toml/cahp-ruby-mux.toml",
+               "test/in/test09.in", "test/out/test09-ruby.out", ncycles: 7
+reg.add_in_out "cahp-pearl-mux-09", "test/config-toml/cahp-pearl-mux.toml",
+               "test/in/test09.in", "test/out/test09-pearl.out", ncycles: 3
 
-reg.add_in_out "cahp-diamond-01", "test/cahp-diamond.toml",
-               "test/test01.in", "test/test01-diamond.out", ncycles: 346, tfhe_tags: nil
-reg.add_in_out "cahp-emerald-01", "test/cahp-emerald.toml",
-               "test/test01.in", "test/test01-emerald.out", ncycles: 261, tfhe_tags: nil
-reg.add_in_out "cahp-ruby-10", "test/cahp-ruby.toml",
-               "test/test10.in", "test/test10-ruby.out", ncycles: 362, tfhe_tags: nil
-reg.add_in_out "cahp-pearl-10", "test/cahp-pearl.toml",
-               "test/test10.in", "test/test10-pearl.out", ncycles: 264, tfhe_tags: nil
+reg.add_in_out "cahp-diamond-01", "test/config-toml/cahp-diamond.toml",
+               "test/in/test01.in", "test/out/test01-diamond.out", ncycles: 346, tfhe_tags: nil
+reg.add_in_out "cahp-emerald-01", "test/config-toml/cahp-emerald.toml",
+               "test/in/test01.in", "test/out/test01-emerald.out", ncycles: 261, tfhe_tags: nil
+reg.add_in_out "cahp-ruby-10", "test/config-toml/cahp-ruby.toml",
+               "test/in/test10.in", "test/out/test10-ruby.out", ncycles: 362, tfhe_tags: nil
+reg.add_in_out "cahp-pearl-10", "test/config-toml/cahp-pearl.toml",
+               "test/in/test10.in", "test/out/test10-pearl.out", ncycles: 264, tfhe_tags: nil
 
-reg.add_in_out "cahp-diamond-mux-01", "test/cahp-diamond-mux.toml",
-               "test/test01.in", "test/test01-diamond.out", ncycles: 346, tfhe_tags: nil
-reg.add_in_out "cahp-emerald-mux-01", "test/cahp-emerald-mux.toml",
-               "test/test01.in", "test/test01-emerald.out", ncycles: 261, tfhe_tags: nil
-reg.add_in_out "cahp-ruby-mux-10", "test/cahp-ruby-mux.toml",
-               "test/test10.in", "test/test10-ruby.out", ncycles: 362, tfhe_tags: nil
-reg.add_in_out "cahp-pearl-mux-10", "test/cahp-pearl-mux.toml",
-               "test/test10.in", "test/test10-pearl.out", ncycles: 264, tfhe_tags: nil
+reg.add_in_out "cahp-diamond-mux-01", "test/config-toml/cahp-diamond-mux.toml",
+               "test/in/test01.in", "test/out/test01-diamond.out", ncycles: 346, tfhe_tags: nil
+reg.add_in_out "cahp-emerald-mux-01", "test/config-toml/cahp-emerald-mux.toml",
+               "test/in/test01.in", "test/out/test01-emerald.out", ncycles: 261, tfhe_tags: nil
+reg.add_in_out "cahp-ruby-mux-10", "test/config-toml/cahp-ruby-mux.toml",
+               "test/in/test10.in", "test/out/test10-ruby.out", ncycles: 362, tfhe_tags: nil
+reg.add_in_out "cahp-pearl-mux-10", "test/config-toml/cahp-pearl-mux.toml",
+               "test/in/test10.in", "test/out/test10-pearl.out", ncycles: 264, tfhe_tags: nil
 
-reg.add_in_out "cahp-ruby-mux-1KiB-11", "test/cahp-ruby-mux-1KiB.toml",
-               "test/test11.in", "test/test11.out", ncycles: 7
+reg.add_in_out "cahp-ruby-mux-1KiB-11", "test/config-toml/cahp-ruby-mux-1KiB.toml",
+               "test/in/test11.in", "test/out/test11.out", ncycles: 7
 
-reg.add_in_out "addr-4bit-04", "test/test-addr-4bit.toml",
-               "test/test04.in", "test/test04.out", ncycles: 1, set_plain_ncycles: true
-reg.add_in_out "div-8bit-05", "test/test-div-8bit.toml",
-               "test/test05.in", "test/test05.out", ncycles: 1, set_plain_ncycles: true
-reg.add_in_out "ram-addr8bit-06", "test/test-ram-addr8bit.toml",
-               "test/test06.in", "test/test06.out", ncycles: 16, set_plain_ncycles: true
-reg.add_in_out "ram-addr9bit-07", "test/test-ram-addr9bit.toml",
-               "test/test07.in", "test/test07.out", ncycles: 16, set_plain_ncycles: true
-reg.add_in_out "mux-ram-addr8bit-06", "test/test-mux-ram-addr8bit.toml",
-               "test/test06.in", "test/test06.out", ncycles: 16, set_plain_ncycles: true
-reg.add_in_out "mux-ram-addr9bit-07", "test/test-mux-ram-addr9bit.toml",
-               "test/test07.in", "test/test07.out", ncycles: 16, set_plain_ncycles: true
-reg.add_in_out "ram-8-16-16-08", "test/test-ram-8-16-16.toml",
-               "test/test08.in", "test/test08.out", ncycles: 8, set_plain_ncycles: true
-reg.add_in_out "mux-ram-8-16-16-08", "test/test-mux-ram-8-16-16.toml",
-               "test/test08.in", "test/test08.out", ncycles: 8, set_plain_ncycles: true
-reg.add_in_out "rom-7-32-12", "test/test-rom-7-32.toml",
-               "test/test12.in", "test/test12.out", ncycles: 1, set_plain_ncycles: true
-reg.add_in_out "rom-4-8-15", "test/test-rom-4-8.toml",
-               "test/test15.in", "test/test15.out", ncycles: 1, set_plain_ncycles: true
-reg.add_in_out "counter-4bit-13", "test/test-counter-4bit.toml",
-               "test/test13.in", "test/test13.out", ncycles: 3, set_plain_ncycles: true
-reg.add_in_out "cahp-ruby-14", "test/cahp-ruby.toml",
-               "test/test14.in", "test/test14.out", ncycles: 20, set_plain_ncycles: true, tfhe_tags: nil, cufhe_tags: nil
+reg.add_in_out "addr-4bit-04", "test/config-toml/test-addr-4bit.toml",
+               "test/in/test04.in", "test/out/test04.out", ncycles: 1, set_plain_ncycles: true
+reg.add_in_out "div-8bit-05", "test/config-toml/test-div-8bit.toml",
+               "test/in/test05.in", "test/out/test05.out", ncycles: 1, set_plain_ncycles: true
+reg.add_in_out "ram-addr8bit-06", "test/config-toml/test-ram-addr8bit.toml",
+               "test/in/test06.in", "test/out/test06.out", ncycles: 16, set_plain_ncycles: true
+reg.add_in_out "ram-addr9bit-07", "test/config-toml/test-ram-addr9bit.toml",
+               "test/in/test07.in", "test/out/test07.out", ncycles: 16, set_plain_ncycles: true
+reg.add_in_out "mux-ram-addr8bit-06", "test/config-toml/test-mux-ram-addr8bit.toml",
+               "test/in/test06.in", "test/out/test06.out", ncycles: 16, set_plain_ncycles: true
+reg.add_in_out "mux-ram-addr9bit-07", "test/config-toml/test-mux-ram-addr9bit.toml",
+               "test/in/test07.in", "test/out/test07.out", ncycles: 16, set_plain_ncycles: true
+reg.add_in_out "ram-8-16-16-08", "test/config-toml/test-ram-8-16-16.toml",
+               "test/in/test08.in", "test/out/test08.out", ncycles: 8, set_plain_ncycles: true
+reg.add_in_out "mux-ram-8-16-16-08", "test/config-toml/test-mux-ram-8-16-16.toml",
+               "test/in/test08.in", "test/out/test08.out", ncycles: 8, set_plain_ncycles: true
+reg.add_in_out "rom-7-32-12", "test/config-toml/test-rom-7-32.toml",
+               "test/in/test12.in", "test/out/test12.out", ncycles: 1, set_plain_ncycles: true
+reg.add_in_out "rom-4-8-15", "test/config-toml/test-rom-4-8.toml",
+               "test/in/test15.in", "test/out/test15.out", ncycles: 1, set_plain_ncycles: true
+reg.add_in_out "counter-4bit-13", "test/config-toml/test-counter-4bit.toml",
+               "test/in/test13.in", "test/out/test13.out", ncycles: 3, set_plain_ncycles: true
+reg.add_in_out "cahp-ruby-14", "test/config-toml/cahp-ruby.toml",
+               "test/in/test14.in", "test/out/test14.out", ncycles: 20, set_plain_ncycles: true, tfhe_tags: nil, cufhe_tags: nil
 
-reg.add_in_out("cahp-diamond-dump-prefix-00", "test/cahp-diamond.toml",
-               "test/test00.in", "test/test00-diamond.out",
+reg.add_in_out("cahp-diamond-dump-prefix-00", "test/config-toml/cahp-diamond.toml",
+               "test/in/test00.in", "test/out/test00-diamond.out",
                ncycles: 8,
                plain_iyokan_args: ["--dump-prefix", "_test_dump"],
                tfhe_iyokan_args: ["--dump-prefix", "_test_dump", "--secret-key", "_test_sk"],

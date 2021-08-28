@@ -1,16 +1,16 @@
 [[file]]
 type = "iyokanl1-json"
-path = "cahp-ruby-core.json"
+path = "../iyokanl1-json/cahp-pearl-core.json"
 name = "core"
 
 [[builtin]]
-type = "rom"
+type = "mux-rom"
 name = "rom"
 in_addr_width = 7
 out_rdata_width = 32
 
 [[builtin]]
-type = "ram"
+type = "mux-ram"
 name = "ram"
 in_addr_width = 8
 in_wdata_width = 16
