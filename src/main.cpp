@@ -14,7 +14,7 @@ int main(int argc, char **argv)
     error::initialize("iyokan");
 
     // Show build config
-    spdlog::info("Build config:");
+    spdlog::info("Build config");
 #if defined(IYOKAN_GIT_REVISION)
     spdlog::info("\tGit revision: " IYOKAN_GIT_REVISION);
 #else
