@@ -1,4 +1,5 @@
 import chisel3._
+import chisel3.util.Cat
 
 class And4_2bit extends Module {
     val io = IO(new Bundle {

@@ -11,7 +11,3 @@ class Divider8bit extends Module {
 
   io.out := io.in_a / io.in_b
 }
-
-object Elaborate extends App {
-  chisel3.Driver.execute(args, () => new Divider8bit())
-}
