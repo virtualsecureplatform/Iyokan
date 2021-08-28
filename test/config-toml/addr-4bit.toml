@@ -1,6 +1,6 @@
 [[file]]
-type = "iyokanl1-json"
-path = "../iyokanl1-json/test-addr-4bit.json"
+type = "yosys-json"
+path = "../yosys-json/addr-4bit-yosys.json"
 name = "addr"
 
 [connect]

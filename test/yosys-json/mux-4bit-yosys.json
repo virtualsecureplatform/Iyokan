@@ -1,0 +1,163 @@
+{
+  "creator": "Yosys 0.9 (git sha1 1979e0b)",
+  "modules": {
+    "Mux4bit": {
+      "attributes": {
+        "top": 1,
+        "src": "Mux4bit.v:14"
+      },
+      "ports": {
+        "clock": {
+          "direction": "input",
+          "bits": [ 2 ]
+        },
+        "reset": {
+          "direction": "input",
+          "bits": [ 3 ]
+        },
+        "io_inA": {
+          "direction": "input",
+          "bits": [ 4, 5, 6, 7 ]
+        },
+        "io_inB": {
+          "direction": "input",
+          "bits": [ 8, 9, 10, 11 ]
+        },
+        "io_sel": {
+          "direction": "input",
+          "bits": [ 12 ]
+        },
+        "io_out": {
+          "direction": "output",
+          "bits": [ 13, 14, 15, 16 ]
+        }
+      },
+      "cells": {
+        "$abc$50$auto$blifparse.cc:371:parse_blif$51": {
+          "hide_name": 1,
+          "type": "$_MUX_",
+          "parameters": {
+          },
+          "attributes": {
+          },
+          "port_directions": {
+            "A": "input",
+            "B": "input",
+            "S": "input",
+            "Y": "output"
+          },
+          "connections": {
+            "A": [ 4 ],
+            "B": [ 8 ],
+            "S": [ 12 ],
+            "Y": [ 13 ]
+          }
+        },
+        "$abc$50$auto$blifparse.cc:371:parse_blif$52": {
+          "hide_name": 1,
+          "type": "$_MUX_",
+          "parameters": {
+          },
+          "attributes": {
+          },
+          "port_directions": {
+            "A": "input",
+            "B": "input",
+            "S": "input",
+            "Y": "output"
+          },
+          "connections": {
+            "A": [ 5 ],
+            "B": [ 9 ],
+            "S": [ 12 ],
+            "Y": [ 14 ]
+          }
+        },
+        "$abc$50$auto$blifparse.cc:371:parse_blif$53": {
+          "hide_name": 1,
+          "type": "$_MUX_",
+          "parameters": {
+          },
+          "attributes": {
+          },
+          "port_directions": {
+            "A": "input",
+            "B": "input",
+            "S": "input",
+            "Y": "output"
+          },
+          "connections": {
+            "A": [ 6 ],
+            "B": [ 10 ],
+            "S": [ 12 ],
+            "Y": [ 15 ]
+          }
+        },
+        "$abc$50$auto$blifparse.cc:371:parse_blif$54": {
+          "hide_name": 1,
+          "type": "$_MUX_",
+          "parameters": {
+          },
+          "attributes": {
+          },
+          "port_directions": {
+            "A": "input",
+            "B": "input",
+            "S": "input",
+            "Y": "output"
+          },
+          "connections": {
+            "A": [ 7 ],
+            "B": [ 11 ],
+            "S": [ 12 ],
+            "Y": [ 16 ]
+          }
+        }
+      },
+      "netnames": {
+        "clock": {
+          "hide_name": 0,
+          "bits": [ 2 ],
+          "attributes": {
+            "src": "Mux4bit.v:15"
+          }
+        },
+        "io_inA": {
+          "hide_name": 0,
+          "bits": [ 4, 5, 6, 7 ],
+          "attributes": {
+            "src": "Mux4bit.v:17"
+          }
+        },
+        "io_inB": {
+          "hide_name": 0,
+          "bits": [ 8, 9, 10, 11 ],
+          "attributes": {
+            "src": "Mux4bit.v:18"
+          }
+        },
+        "io_out": {
+          "hide_name": 0,
+          "bits": [ 13, 14, 15, 16 ],
+          "attributes": {
+            "src": "Mux4bit.v:20"
+          }
+        },
+        "io_sel": {
+          "hide_name": 0,
+          "bits": [ 12 ],
+          "attributes": {
+            "src": "Mux4bit.v:19"
+          }
+        },
+        "reset": {
+          "hide_name": 0,
+          "bits": [ 3 ],
+          "attributes": {
+            "src": "Mux4bit.v:16"
+          }
+        }
+      }
+    }
+  }
+}

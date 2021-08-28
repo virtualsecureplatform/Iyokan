@@ -1,6 +1,6 @@
 [[file]]
-type = "iyokanl1-json"
-path = "../iyokanl1-json/diamond-core-wo-ram-rom.json"
+type = "yosys-json"
+path = "../yosys-json/cahp-diamond-core-yosys.json"
 name = "core"
 
 [[builtin]]

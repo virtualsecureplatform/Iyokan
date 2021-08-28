@@ -391,6 +391,8 @@ reg.add_in_out "counter-4bit-13", "test/config-toml/counter-4bit.toml",
                "test/in/test13.in", "test/out/test13.out", ncycles: 3, set_plain_ncycles: true
 reg.add_in_out "cahp-ruby-14", "test/config-toml/cahp-ruby.toml",
                "test/in/test14.in", "test/out/test14.out", ncycles: 20, set_plain_ncycles: true, tfhe_tags: nil, cufhe_tags: nil
+reg.add_in_out "cahp-ruby-iyokanl1-09", "test/config-toml/cahp-ruby-iyokanl1.toml",
+               "test/in/test09.in", "test/out/test09-ruby.out", ncycles: -1, tfhe_tags: nil, cufhe_tags: nil
 
 reg.add_in_out("cahp-diamond-dump-prefix-00", "test/config-toml/cahp-diamond.toml",
                "test/in/test00.in", "test/out/test00-diamond.out",

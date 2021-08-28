@@ -148,7 +148,7 @@ void testBinopGates()
 template <class NetworkBuilder>
 void testFromJSONtest_pass_4bit()
 {
-    const std::string fileName = "test/iyokanl1-json/test-pass-4bit.json";
+    const std::string fileName = "test/iyokanl1-json/pass-4bit-iyokanl1.json";
     std::ifstream ifs{fileName};
     assert(ifs);
 
@@ -171,7 +171,7 @@ void testFromJSONtest_pass_4bit()
 template <class NetworkBuilder>
 void testFromJSONtest_and_4bit()
 {
-    const std::string fileName = "test/iyokanl1-json/test-and-4bit.json";
+    const std::string fileName = "test/iyokanl1-json/and-4bit-iyokanl1.json";
     std::ifstream ifs{fileName};
     assert(ifs);
 
@@ -198,7 +198,7 @@ void testFromJSONtest_and_4bit()
 template <class NetworkBuilder>
 void testFromJSONtest_and_4_2bit()
 {
-    const std::string fileName = "test/iyokanl1-json/test-and-4_2bit.json";
+    const std::string fileName = "test/iyokanl1-json/and-4_2bit-iyokanl1.json";
     std::ifstream ifs{fileName};
     assert(ifs);
 
@@ -223,7 +223,7 @@ void testFromJSONtest_and_4_2bit()
 template <class NetworkBuilder>
 void testFromJSONtest_mux_4bit()
 {
-    const std::string fileName = "test/iyokanl1-json/test-mux-4bit.json";
+    const std::string fileName = "test/iyokanl1-json/mux-4bit-iyokanl1.json";
     std::ifstream ifs{fileName};
     assert(ifs);
 
@@ -258,7 +258,7 @@ void testFromJSONtest_mux_4bit()
 template <class NetworkBuilder>
 void testFromJSONtest_addr_4bit()
 {
-    const std::string fileName = "test/iyokanl1-json/test-addr-4bit.json";
+    const std::string fileName = "test/iyokanl1-json/addr-4bit-iyokanl1.json";
     std::ifstream ifs{fileName};
     assert(ifs);
 
@@ -285,7 +285,8 @@ void testFromJSONtest_addr_4bit()
 template <class NetworkBuilder>
 void testFromJSONtest_register_4bit()
 {
-    const std::string fileName = "test/iyokanl1-json/test-register-4bit.json";
+    const std::string fileName =
+        "test/iyokanl1-json/register-4bit-iyokanl1.json";
     std::ifstream ifs{fileName};
     assert(ifs);
 
@@ -382,7 +383,8 @@ void testSequentialCircuit()
 template <class NetworkBuilder>
 void testFromJSONtest_counter_4bit()
 {
-    const std::string fileName = "test/iyokanl1-json/test-counter-4bit.json";
+    const std::string fileName =
+        "test/iyokanl1-json/counter-4bit-iyokanl1.json";
     std::ifstream ifs{fileName};
     assert(ifs);
 
@@ -757,11 +759,11 @@ void testBlueprint()
     {
         const auto& files = blueprint.files();
         assert(files.size() == 1);
-        assert(files[0].type == File::TYPE::IYOKANL1_JSON);
+        assert(files[0].type == File::TYPE::YOSYS_JSON);
         spdlog::info("{}", files[0].path);
         assert(std::filesystem::canonical(files[0].path) ==
                std::filesystem::canonical(
-                   "test/iyokanl1-json/diamond-core-wo-ram-rom.json"));
+                   "test/yosys-json/cahp-diamond-core-yosys.json"));
         assert(files[0].name == "core");
     }
 

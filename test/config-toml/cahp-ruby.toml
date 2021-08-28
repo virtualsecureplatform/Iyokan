@@ -1,6 +1,6 @@
 [[file]]
-type = "iyokanl1-json"
-path = "../iyokanl1-json/cahp-ruby-core.json"
+type = "yosys-json"
+path = "../yosys-json/cahp-ruby-core-yosys.json"
 name = "core"
 
 [[builtin]]

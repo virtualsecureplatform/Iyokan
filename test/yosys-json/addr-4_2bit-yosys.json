@@ -1,0 +1,218 @@
+{
+  "creator": "Yosys 0.9 (git sha1 1979e0b)",
+  "modules": {
+    "And4_2bit": {
+      "attributes": {
+        "top": 1,
+        "src": "And4_2bit.v:14"
+      },
+      "ports": {
+        "clock": {
+          "direction": "input",
+          "bits": [ 2 ]
+        },
+        "reset": {
+          "direction": "input",
+          "bits": [ 3 ]
+        },
+        "io_inA": {
+          "direction": "input",
+          "bits": [ 4, 5, 6, 7 ]
+        },
+        "io_inB": {
+          "direction": "input",
+          "bits": [ 8, 9, 10, 11 ]
+        },
+        "io_out": {
+          "direction": "output",
+          "bits": [ 12, 13 ]
+        }
+      },
+      "cells": {
+        "$abc$54$auto$blifparse.cc:371:parse_blif$55": {
+          "hide_name": 1,
+          "type": "$_AND_",
+          "parameters": {
+          },
+          "attributes": {
+          },
+          "port_directions": {
+            "A": "input",
+            "B": "input",
+            "Y": "output"
+          },
+          "connections": {
+            "A": [ 6 ],
+            "B": [ 10 ],
+            "Y": [ 14 ]
+          }
+        },
+        "$abc$54$auto$blifparse.cc:371:parse_blif$56": {
+          "hide_name": 1,
+          "type": "$_AND_",
+          "parameters": {
+          },
+          "attributes": {
+          },
+          "port_directions": {
+            "A": "input",
+            "B": "input",
+            "Y": "output"
+          },
+          "connections": {
+            "A": [ 7 ],
+            "B": [ 11 ],
+            "Y": [ 15 ]
+          }
+        },
+        "$abc$54$auto$blifparse.cc:371:parse_blif$57": {
+          "hide_name": 1,
+          "type": "$_AND_",
+          "parameters": {
+          },
+          "attributes": {
+          },
+          "port_directions": {
+            "A": "input",
+            "B": "input",
+            "Y": "output"
+          },
+          "connections": {
+            "A": [ 14 ],
+            "B": [ 15 ],
+            "Y": [ 13 ]
+          }
+        },
+        "$abc$54$auto$blifparse.cc:371:parse_blif$58": {
+          "hide_name": 1,
+          "type": "$_AND_",
+          "parameters": {
+          },
+          "attributes": {
+          },
+          "port_directions": {
+            "A": "input",
+            "B": "input",
+            "Y": "output"
+          },
+          "connections": {
+            "A": [ 4 ],
+            "B": [ 8 ],
+            "Y": [ 16 ]
+          }
+        },
+        "$abc$54$auto$blifparse.cc:371:parse_blif$59": {
+          "hide_name": 1,
+          "type": "$_AND_",
+          "parameters": {
+          },
+          "attributes": {
+          },
+          "port_directions": {
+            "A": "input",
+            "B": "input",
+            "Y": "output"
+          },
+          "connections": {
+            "A": [ 5 ],
+            "B": [ 9 ],
+            "Y": [ 17 ]
+          }
+        },
+        "$abc$54$auto$blifparse.cc:371:parse_blif$60": {
+          "hide_name": 1,
+          "type": "$_AND_",
+          "parameters": {
+          },
+          "attributes": {
+          },
+          "port_directions": {
+            "A": "input",
+            "B": "input",
+            "Y": "output"
+          },
+          "connections": {
+            "A": [ 16 ],
+            "B": [ 17 ],
+            "Y": [ 12 ]
+          }
+        }
+      },
+      "netnames": {
+        "$abc$54$new_n11_": {
+          "hide_name": 1,
+          "bits": [ 14 ],
+          "attributes": {
+          }
+        },
+        "$abc$54$new_n12_": {
+          "hide_name": 1,
+          "bits": [ 15 ],
+          "attributes": {
+          }
+        },
+        "$abc$54$new_n14_": {
+          "hide_name": 1,
+          "bits": [ 16 ],
+          "attributes": {
+          }
+        },
+        "$abc$54$new_n15_": {
+          "hide_name": 1,
+          "bits": [ 17 ],
+          "attributes": {
+          }
+        },
+        "_T_12": {
+          "hide_name": 0,
+          "bits": [ 12 ],
+          "attributes": {
+            "src": "And4_2bit.v:27"
+          }
+        },
+        "_T_9": {
+          "hide_name": 0,
+          "bits": [ 13 ],
+          "attributes": {
+            "src": "And4_2bit.v:24"
+          }
+        },
+        "clock": {
+          "hide_name": 0,
+          "bits": [ 2 ],
+          "attributes": {
+            "src": "And4_2bit.v:15"
+          }
+        },
+        "io_inA": {
+          "hide_name": 0,
+          "bits": [ 4, 5, 6, 7 ],
+          "attributes": {
+            "src": "And4_2bit.v:17"
+          }
+        },
+        "io_inB": {
+          "hide_name": 0,
+          "bits": [ 8, 9, 10, 11 ],
+          "attributes": {
+            "src": "And4_2bit.v:18"
+          }
+        },
+        "io_out": {
+          "hide_name": 0,
+          "bits": [ 12, 13 ],
+          "attributes": {
+            "src": "And4_2bit.v:19"
+          }
+        },
+        "reset": {
+          "hide_name": 0,
+          "bits": [ 3 ],
+          "attributes": {
+            "src": "And4_2bit.v:16"
+          }
+        }
+      }
+    }
+  }
+}

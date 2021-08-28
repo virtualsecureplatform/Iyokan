@@ -1,0 +1,3613 @@
+{
+  "cells": [
+    {
+      "input": {
+        "A": 15,
+        "B": 16
+      },
+      "output": {
+        "Y": [
+          26,
+          136
+        ]
+      },
+      "id": 25,
+      "type": "NOR",
+      "priority": 1
+    },
+    {
+      "input": {
+        "A": 25,
+        "B": 14
+      },
+      "output": {
+        "Y": [
+          27,
+          100
+        ]
+      },
+      "id": 26,
+      "type": "ANDNOT",
+      "priority": 2
+    },
+    {
+      "input": {
+        "A": 26,
+        "B": 13
+      },
+      "output": {
+        "Y": [
+          28,
+          73,
+          101
+        ]
+      },
+      "id": 27,
+      "type": "ANDNOT",
+      "priority": 3
+    },
+    {
+      "input": {
+        "A": 27,
+        "B": 12
+      },
+      "output": {
+        "Y": [
+          29,
+          53
+        ]
+      },
+      "id": 28,
+      "type": "ANDNOT",
+      "priority": 4
+    },
+    {
+      "input": {
+        "A": 28,
+        "B": 11
+      },
+      "output": {
+        "Y": [
+          32,
+          38
+        ]
+      },
+      "id": 29,
+      "type": "ANDNOT",
+      "priority": 5
+    },
+    {
+      "input": {
+        "A": 9,
+        "B": 8
+      },
+      "output": {
+        "Y": [
+          31
+        ]
+      },
+      "id": 30,
+      "type": "ANDNOT",
+      "priority": 1
+    },
+    {
+      "input": {
+        "A": 10,
+        "B": 30
+      },
+      "output": {
+        "Y": [
+          32,
+          39
+        ]
+      },
+      "id": 31,
+      "type": "NOR",
+      "priority": 2
+    },
+    {
+      "input": {
+        "A": 29,
+        "B": 31
+      },
+      "output": {
+        "Y": [
+          24,
+          34,
+          40
+        ]
+      },
+      "id": 32,
+      "type": "AND",
+      "priority": 6
+    },
+    {
+      "input": {
+        "A": 8,
+        "B": 9
+      },
+      "output": {
+        "Y": [
+          34,
+          41
+        ]
+      },
+      "id": 33,
+      "type": "ANDNOT",
+      "priority": 1
+    },
+    {
+      "input": {
+        "A": 32,
+        "B": 33
+      },
+      "output": {
+        "Y": [
+          68,
+          76,
+          104,
+          138,
+          178
+        ]
+      },
+      "id": 34,
+      "type": "NAND",
+      "priority": 7
+    },
+    {
+      "input": {
+        "A": 7,
+        "B": 9
+      },
+      "output": {
+        "Y": [
+          36,
+          223
+        ]
+      },
+      "id": 35,
+      "type": "ORNOT",
+      "priority": 1
+    },
+    {
+      "input": {
+        "A": 8,
+        "B": 35
+      },
+      "output": {
+        "Y": [
+          37
+        ]
+      },
+      "id": 36,
+      "type": "NAND",
+      "priority": 2
+    },
+    {
+      "input": {
+        "A": 10,
+        "B": 36
+      },
+      "output": {
+        "Y": [
+          38
+        ]
+      },
+      "id": 37,
+      "type": "NAND",
+      "priority": 3
+    },
+    {
+      "input": {
+        "A": 29,
+        "B": 37
+      },
+      "output": {
+        "Y": [
+          39,
+          43,
+          224
+        ]
+      },
+      "id": 38,
+      "type": "AND",
+      "priority": 6
+    },
+    {
+      "input": {
+        "A": 31,
+        "B": 38
+      },
+      "output": {
+        "Y": [
+          42
+        ]
+      },
+      "id": 39,
+      "type": "ORNOT",
+      "priority": 7
+    },
+    {
+      "input": {
+        "A": 32,
+        "B": 8
+      },
+      "output": {
+        "Y": [
+          41,
+          223
+        ]
+      },
+      "id": 40,
+      "type": "ORNOT",
+      "priority": 7
+    },
+    {
+      "input": {
+        "A": 33,
+        "B": 40
+      },
+      "output": {
+        "Y": [
+          42
+        ]
+      },
+      "id": 41,
+      "type": "ORNOT",
+      "priority": 8
+    },
+    {
+      "input": {
+        "A": 39,
+        "B": 41
+      },
+      "output": {
+        "Y": [
+          49,
+          55
+        ]
+      },
+      "id": 42,
+      "type": "AND",
+      "priority": 9
+    },
+    {
+      "input": {
+        "A": 9,
+        "B": 38
+      },
+      "output": {
+        "Y": [
+          44
+        ]
+      },
+      "id": 43,
+      "type": "NAND",
+      "priority": 7
+    },
+    {
+      "input": {
+        "A": 7,
+        "B": 43
+      },
+      "output": {
+        "Y": [
+          45,
+          46,
+          57
+        ]
+      },
+      "id": 44,
+      "type": "AND",
+      "priority": 8
+    },
+    {
+      "input": {
+        "A": 10,
+        "B": 44
+      },
+      "output": {
+        "Y": [
+          50
+        ]
+      },
+      "id": 45,
+      "type": "ORNOT",
+      "priority": 9
+    },
+    {
+      "input": {
+        "A": 10,
+        "B": 44
+      },
+      "output": {
+        "Y": [
+          48,
+          56
+        ]
+      },
+      "id": 46,
+      "type": "XNOR",
+      "priority": 9
+    },
+    {
+      "input": {
+        "A": 6,
+        "B": 9
+      },
+      "output": {
+        "Y": [
+          48,
+          56
+        ]
+      },
+      "id": 47,
+      "type": "ORNOT",
+      "priority": 1
+    },
+    {
+      "input": {
+        "A": 46,
+        "B": 47
+      },
+      "output": {
+        "Y": [
+          51
+        ]
+      },
+      "id": 48,
+      "type": "NAND",
+      "priority": 10
+    },
+    {
+      "input": {
+        "A": 11,
+        "B": 42
+      },
+      "output": {
+        "Y": [
+          50
+        ]
+      },
+      "id": 49,
+      "type": "ORNOT",
+      "priority": 10
+    },
+    {
+      "input": {
+        "A": 45,
+        "B": 49
+      },
+      "output": {
+        "Y": [
+          51
+        ]
+      },
+      "id": 50,
+      "type": "AND",
+      "priority": 11
+    },
+    {
+      "input": {
+        "A": 48,
+        "B": 50
+      },
+      "output": {
+        "Y": [
+          54
+        ]
+      },
+      "id": 51,
+      "type": "NAND",
+      "priority": 12
+    },
+    {
+      "input": {
+        "A": 8,
+        "B": 11
+      },
+      "output": {
+        "Y": [
+          53
+        ]
+      },
+      "id": 52,
+      "type": "ORNOT",
+      "priority": 1
+    },
+    {
+      "input": {
+        "A": 28,
+        "B": 52
+      },
+      "output": {
+        "Y": [
+          54
+        ]
+      },
+      "id": 53,
+      "type": "AND",
+      "priority": 5
+    },
+    {
+      "input": {
+        "A": 51,
+        "B": 53
+      },
+      "output": {
+        "Y": [
+          22,
+          55,
+          57,
+          60
+        ]
+      },
+      "id": 54,
+      "type": "AND",
+      "priority": 13
+    },
+    {
+      "input": {
+        "A": 42,
+        "B": 54
+      },
+      "output": {
+        "Y": [
+          68,
+          75
+        ]
+      },
+      "id": 55,
+      "type": "ANDNOT",
+      "priority": 14
+    },
+    {
+      "input": {
+        "A": 46,
+        "B": 47
+      },
+      "output": {
+        "Y": [
+          57
+        ]
+      },
+      "id": 56,
+      "type": "XOR",
+      "priority": 10
+    },
+    {
+      "input": {
+        "A": 44,
+        "B": 56,
+        "S": 54
+      },
+      "output": {
+        "Y": [
+          58,
+          59,
+          78
+        ]
+      },
+      "id": 57,
+      "type": "MUX",
+      "priority": 14
+    },
+    {
+      "input": {
+        "A": 11,
+        "B": 57
+      },
+      "output": {
+        "Y": [
+          70
+        ]
+      },
+      "id": 58,
+      "type": "ORNOT",
+      "priority": 15
+    },
+    {
+      "input": {
+        "A": 11,
+        "B": 57
+      },
+      "output": {
+        "Y": [
+          67,
+          77
+        ]
+      },
+      "id": 59,
+      "type": "XNOR",
+      "priority": 15
+    },
+    {
+      "input": {
+        "A": 9,
+        "B": 54
+      },
+      "output": {
+        "Y": [
+          61
+        ]
+      },
+      "id": 60,
+      "type": "AND",
+      "priority": 14
+    },
+    {
+      "input": {
+        "A": 6,
+        "B": 60
+      },
+      "output": {
+        "Y": [
+          62,
+          63,
+          84
+        ]
+      },
+      "id": 61,
+      "type": "XNOR",
+      "priority": 15
+    },
+    {
+      "input": {
+        "A": 10,
+        "B": 61
+      },
+      "output": {
+        "Y": [
+          66,
+          82
+        ]
+      },
+      "id": 62,
+      "type": "OR",
+      "priority": 16
+    },
+    {
+      "input": {
+        "A": 10,
+        "B": 61
+      },
+      "output": {
+        "Y": [
+          65,
+          82
+        ]
+      },
+      "id": 63,
+      "type": "NAND",
+      "priority": 16
+    },
+    {
+      "input": {
+        "A": 5,
+        "B": 9
+      },
+      "output": {
+        "Y": [
+          65,
+          83
+        ]
+      },
+      "id": 64,
+      "type": "ORNOT",
+      "priority": 1
+    },
+    {
+      "input": {
+        "A": 63,
+        "B": 64
+      },
+      "output": {
+        "Y": [
+          66
+        ]
+      },
+      "id": 65,
+      "type": "NAND",
+      "priority": 17
+    },
+    {
+      "input": {
+        "A": 62,
+        "B": 65
+      },
+      "output": {
+        "Y": [
+          67,
+          77
+        ]
+      },
+      "id": 66,
+      "type": "NAND",
+      "priority": 18
+    },
+    {
+      "input": {
+        "A": 59,
+        "B": 66
+      },
+      "output": {
+        "Y": [
+          71
+        ]
+      },
+      "id": 67,
+      "type": "NAND",
+      "priority": 19
+    },
+    {
+      "input": {
+        "A": 34,
+        "B": 55
+      },
+      "output": {
+        "Y": [
+          69,
+          72
+        ]
+      },
+      "id": 68,
+      "type": "ANDNOT",
+      "priority": 15
+    },
+    {
+      "input": {
+        "A": 12,
+        "B": 68
+      },
+      "output": {
+        "Y": [
+          70
+        ]
+      },
+      "id": 69,
+      "type": "OR",
+      "priority": 16
+    },
+    {
+      "input": {
+        "A": 58,
+        "B": 69
+      },
+      "output": {
+        "Y": [
+          71
+        ]
+      },
+      "id": 70,
+      "type": "AND",
+      "priority": 17
+    },
+    {
+      "input": {
+        "A": 67,
+        "B": 70
+      },
+      "output": {
+        "Y": [
+          74
+        ]
+      },
+      "id": 71,
+      "type": "NAND",
+      "priority": 20
+    },
+    {
+      "input": {
+        "A": 12,
+        "B": 68
+      },
+      "output": {
+        "Y": [
+          73
+        ]
+      },
+      "id": 72,
+      "type": "NAND",
+      "priority": 16
+    },
+    {
+      "input": {
+        "A": 27,
+        "B": 72
+      },
+      "output": {
+        "Y": [
+          74
+        ]
+      },
+      "id": 73,
+      "type": "AND",
+      "priority": 17
+    },
+    {
+      "input": {
+        "A": 71,
+        "B": 73
+      },
+      "output": {
+        "Y": [
+          21,
+          75,
+          78,
+          84,
+          87
+        ]
+      },
+      "id": 74,
+      "type": "AND",
+      "priority": 21
+    },
+    {
+      "input": {
+        "A": 74,
+        "B": 55
+      },
+      "output": {
+        "Y": [
+          76,
+          103
+        ]
+      },
+      "id": 75,
+      "type": "ORNOT",
+      "priority": 22
+    },
+    {
+      "input": {
+        "A": 34,
+        "B": 75
+      },
+      "output": {
+        "Y": [
+          97,
+          100
+        ]
+      },
+      "id": 76,
+      "type": "AND",
+      "priority": 23
+    },
+    {
+      "input": {
+        "A": 59,
+        "B": 66
+      },
+      "output": {
+        "Y": [
+          78
+        ]
+      },
+      "id": 77,
+      "type": "XOR",
+      "priority": 19
+    },
+    {
+      "input": {
+        "A": 57,
+        "B": 77,
+        "S": 74
+      },
+      "output": {
+        "Y": [
+          79,
+          80,
+          81
+        ]
+      },
+      "id": 78,
+      "type": "MUX",
+      "priority": 22
+    },
+    {
+      "input": {
+        "A": 78
+      },
+      "output": {
+        "Y": [
+          106
+        ]
+      },
+      "id": 79,
+      "type": "NOT",
+      "priority": 23
+    },
+    {
+      "input": {
+        "A": 12,
+        "B": 78
+      },
+      "output": {
+        "Y": [
+          98
+        ]
+      },
+      "id": 80,
+      "type": "ORNOT",
+      "priority": 23
+    },
+    {
+      "input": {
+        "A": 12,
+        "B": 78
+      },
+      "output": {
+        "Y": [
+          96,
+          105
+        ]
+      },
+      "id": 81,
+      "type": "XOR",
+      "priority": 23
+    },
+    {
+      "input": {
+        "A": 62,
+        "B": 63
+      },
+      "output": {
+        "Y": [
+          83
+        ]
+      },
+      "id": 82,
+      "type": "NAND",
+      "priority": 17
+    },
+    {
+      "input": {
+        "A": 64,
+        "B": 82
+      },
+      "output": {
+        "Y": [
+          84
+        ]
+      },
+      "id": 83,
+      "type": "XOR",
+      "priority": 18
+    },
+    {
+      "input": {
+        "A": 61,
+        "B": 83,
+        "S": 74
+      },
+      "output": {
+        "Y": [
+          85,
+          86,
+          111
+        ]
+      },
+      "id": 84,
+      "type": "MUX",
+      "priority": 22
+    },
+    {
+      "input": {
+        "A": 11,
+        "B": 84
+      },
+      "output": {
+        "Y": [
+          95,
+          109
+        ]
+      },
+      "id": 85,
+      "type": "OR",
+      "priority": 23
+    },
+    {
+      "input": {
+        "A": 11,
+        "B": 84
+      },
+      "output": {
+        "Y": [
+          94,
+          109
+        ]
+      },
+      "id": 86,
+      "type": "NAND",
+      "priority": 23
+    },
+    {
+      "input": {
+        "A": 9,
+        "B": 74
+      },
+      "output": {
+        "Y": [
+          88
+        ]
+      },
+      "id": 87,
+      "type": "AND",
+      "priority": 22
+    },
+    {
+      "input": {
+        "A": 5,
+        "B": 87
+      },
+      "output": {
+        "Y": [
+          89,
+          91,
+          115
+        ]
+      },
+      "id": 88,
+      "type": "XNOR",
+      "priority": 23
+    },
+    {
+      "input": {
+        "A": 10,
+        "B": 88
+      },
+      "output": {
+        "Y": [
+          93
+        ]
+      },
+      "id": 89,
+      "type": "OR",
+      "priority": 24
+    },
+    {
+      "input": {
+        "A": 9,
+        "B": 4
+      },
+      "output": {
+        "Y": [
+          92,
+          114,
+          120
+        ]
+      },
+      "id": 90,
+      "type": "ANDNOT",
+      "priority": 1
+    },
+    {
+      "input": {
+        "A": 10,
+        "B": 88
+      },
+      "output": {
+        "Y": [
+          92,
+          114
+        ]
+      },
+      "id": 91,
+      "type": "XNOR",
+      "priority": 24
+    },
+    {
+      "input": {
+        "A": 90,
+        "B": 91
+      },
+      "output": {
+        "Y": [
+          93
+        ]
+      },
+      "id": 92,
+      "type": "OR",
+      "priority": 25
+    },
+    {
+      "input": {
+        "A": 89,
+        "B": 92
+      },
+      "output": {
+        "Y": [
+          94,
+          110
+        ]
+      },
+      "id": 93,
+      "type": "NAND",
+      "priority": 26
+    },
+    {
+      "input": {
+        "A": 86,
+        "B": 93
+      },
+      "output": {
+        "Y": [
+          95
+        ]
+      },
+      "id": 94,
+      "type": "NAND",
+      "priority": 27
+    },
+    {
+      "input": {
+        "A": 85,
+        "B": 94
+      },
+      "output": {
+        "Y": [
+          96,
+          105
+        ]
+      },
+      "id": 95,
+      "type": "AND",
+      "priority": 28
+    },
+    {
+      "input": {
+        "A": 81,
+        "B": 95
+      },
+      "output": {
+        "Y": [
+          99
+        ]
+      },
+      "id": 96,
+      "type": "OR",
+      "priority": 29
+    },
+    {
+      "input": {
+        "A": 13,
+        "B": 76
+      },
+      "output": {
+        "Y": [
+          98
+        ]
+      },
+      "id": 97,
+      "type": "OR",
+      "priority": 24
+    },
+    {
+      "input": {
+        "A": 80,
+        "B": 97
+      },
+      "output": {
+        "Y": [
+          99
+        ]
+      },
+      "id": 98,
+      "type": "AND",
+      "priority": 25
+    },
+    {
+      "input": {
+        "A": 96,
+        "B": 98
+      },
+      "output": {
+        "Y": [
+          102
+        ]
+      },
+      "id": 99,
+      "type": "NAND",
+      "priority": 30
+    },
+    {
+      "input": {
+        "A": 26,
+        "B": 76
+      },
+      "output": {
+        "Y": [
+          101
+        ]
+      },
+      "id": 100,
+      "type": "ANDNOT",
+      "priority": 24
+    },
+    {
+      "input": {
+        "A": 27,
+        "B": 100
+      },
+      "output": {
+        "Y": [
+          102
+        ]
+      },
+      "id": 101,
+      "type": "OR",
+      "priority": 25
+    },
+    {
+      "input": {
+        "A": 99,
+        "B": 101
+      },
+      "output": {
+        "Y": [
+          20,
+          103,
+          106,
+          111,
+          115,
+          118,
+          120
+        ]
+      },
+      "id": 102,
+      "type": "AND",
+      "priority": 31
+    },
+    {
+      "input": {
+        "A": 75,
+        "B": 102
+      },
+      "output": {
+        "Y": [
+          104
+        ]
+      },
+      "id": 103,
+      "type": "OR",
+      "priority": 32
+    },
+    {
+      "input": {
+        "A": 34,
+        "B": 103
+      },
+      "output": {
+        "Y": [
+          132,
+          135,
+          139
+        ]
+      },
+      "id": 104,
+      "type": "AND",
+      "priority": 33
+    },
+    {
+      "input": {
+        "A": 81,
+        "B": 95
+      },
+      "output": {
+        "Y": [
+          106
+        ]
+      },
+      "id": 105,
+      "type": "XNOR",
+      "priority": 29
+    },
+    {
+      "input": {
+        "A": 79,
+        "B": 105,
+        "S": 102
+      },
+      "output": {
+        "Y": [
+          107,
+          108,
+          141
+        ]
+      },
+      "id": 106,
+      "type": "MUX",
+      "priority": 32
+    },
+    {
+      "input": {
+        "A": 13,
+        "B": 106
+      },
+      "output": {
+        "Y": [
+          133
+        ]
+      },
+      "id": 107,
+      "type": "OR",
+      "priority": 33
+    },
+    {
+      "input": {
+        "A": 13,
+        "B": 106
+      },
+      "output": {
+        "Y": [
+          131,
+          140
+        ]
+      },
+      "id": 108,
+      "type": "XNOR",
+      "priority": 33
+    },
+    {
+      "input": {
+        "A": 85,
+        "B": 86
+      },
+      "output": {
+        "Y": [
+          110
+        ]
+      },
+      "id": 109,
+      "type": "AND",
+      "priority": 24
+    },
+    {
+      "input": {
+        "A": 93,
+        "B": 109
+      },
+      "output": {
+        "Y": [
+          111
+        ]
+      },
+      "id": 110,
+      "type": "XNOR",
+      "priority": 27
+    },
+    {
+      "input": {
+        "A": 84,
+        "B": 110,
+        "S": 102
+      },
+      "output": {
+        "Y": [
+          112,
+          113,
+          146
+        ]
+      },
+      "id": 111,
+      "type": "MUX",
+      "priority": 32
+    },
+    {
+      "input": {
+        "A": 12,
+        "B": 111
+      },
+      "output": {
+        "Y": [
+          130,
+          144
+        ]
+      },
+      "id": 112,
+      "type": "OR",
+      "priority": 33
+    },
+    {
+      "input": {
+        "A": 12,
+        "B": 111
+      },
+      "output": {
+        "Y": [
+          129,
+          144
+        ]
+      },
+      "id": 113,
+      "type": "NAND",
+      "priority": 33
+    },
+    {
+      "input": {
+        "A": 90,
+        "B": 91
+      },
+      "output": {
+        "Y": [
+          115
+        ]
+      },
+      "id": 114,
+      "type": "XNOR",
+      "priority": 25
+    },
+    {
+      "input": {
+        "A": 88,
+        "B": 114,
+        "S": 102
+      },
+      "output": {
+        "Y": [
+          116,
+          117,
+          150
+        ]
+      },
+      "id": 115,
+      "type": "MUX",
+      "priority": 32
+    },
+    {
+      "input": {
+        "A": 11,
+        "B": 115
+      },
+      "output": {
+        "Y": [
+          128
+        ]
+      },
+      "id": 116,
+      "type": "OR",
+      "priority": 33
+    },
+    {
+      "input": {
+        "A": 11,
+        "B": 115
+      },
+      "output": {
+        "Y": [
+          127,
+          149
+        ]
+      },
+      "id": 117,
+      "type": "XNOR",
+      "priority": 33
+    },
+    {
+      "input": {
+        "A": 9,
+        "B": 102
+      },
+      "output": {
+        "Y": [
+          119
+        ]
+      },
+      "id": 118,
+      "type": "NAND",
+      "priority": 32
+    },
+    {
+      "input": {
+        "A": 4,
+        "B": 118
+      },
+      "output": {
+        "Y": [
+          121
+        ]
+      },
+      "id": 119,
+      "type": "NAND",
+      "priority": 33
+    },
+    {
+      "input": {
+        "A": 90,
+        "B": 102
+      },
+      "output": {
+        "Y": [
+          121
+        ]
+      },
+      "id": 120,
+      "type": "NAND",
+      "priority": 32
+    },
+    {
+      "input": {
+        "A": 119,
+        "B": 120
+      },
+      "output": {
+        "Y": [
+          122,
+          123,
+          155
+        ]
+      },
+      "id": 121,
+      "type": "AND",
+      "priority": 34
+    },
+    {
+      "input": {
+        "A": 10,
+        "B": 121
+      },
+      "output": {
+        "Y": [
+          126,
+          153
+        ]
+      },
+      "id": 122,
+      "type": "OR",
+      "priority": 35
+    },
+    {
+      "input": {
+        "A": 10,
+        "B": 121
+      },
+      "output": {
+        "Y": [
+          125,
+          153
+        ]
+      },
+      "id": 123,
+      "type": "NAND",
+      "priority": 35
+    },
+    {
+      "input": {
+        "A": 3,
+        "B": 9
+      },
+      "output": {
+        "Y": [
+          125,
+          154
+        ]
+      },
+      "id": 124,
+      "type": "ORNOT",
+      "priority": 1
+    },
+    {
+      "input": {
+        "A": 123,
+        "B": 124
+      },
+      "output": {
+        "Y": [
+          126
+        ]
+      },
+      "id": 125,
+      "type": "NAND",
+      "priority": 36
+    },
+    {
+      "input": {
+        "A": 122,
+        "B": 125
+      },
+      "output": {
+        "Y": [
+          127,
+          149
+        ]
+      },
+      "id": 126,
+      "type": "AND",
+      "priority": 37
+    },
+    {
+      "input": {
+        "A": 117,
+        "B": 126
+      },
+      "output": {
+        "Y": [
+          128
+        ]
+      },
+      "id": 127,
+      "type": "OR",
+      "priority": 38
+    },
+    {
+      "input": {
+        "A": 116,
+        "B": 127
+      },
+      "output": {
+        "Y": [
+          129,
+          145
+        ]
+      },
+      "id": 128,
+      "type": "NAND",
+      "priority": 39
+    },
+    {
+      "input": {
+        "A": 113,
+        "B": 128
+      },
+      "output": {
+        "Y": [
+          130
+        ]
+      },
+      "id": 129,
+      "type": "NAND",
+      "priority": 40
+    },
+    {
+      "input": {
+        "A": 112,
+        "B": 129
+      },
+      "output": {
+        "Y": [
+          131,
+          140
+        ]
+      },
+      "id": 130,
+      "type": "AND",
+      "priority": 41
+    },
+    {
+      "input": {
+        "A": 108,
+        "B": 130
+      },
+      "output": {
+        "Y": [
+          134
+        ]
+      },
+      "id": 131,
+      "type": "OR",
+      "priority": 42
+    },
+    {
+      "input": {
+        "A": 14,
+        "B": 104
+      },
+      "output": {
+        "Y": [
+          133
+        ]
+      },
+      "id": 132,
+      "type": "OR",
+      "priority": 34
+    },
+    {
+      "input": {
+        "A": 107,
+        "B": 132
+      },
+      "output": {
+        "Y": [
+          134
+        ]
+      },
+      "id": 133,
+      "type": "AND",
+      "priority": 35
+    },
+    {
+      "input": {
+        "A": 131,
+        "B": 133
+      },
+      "output": {
+        "Y": [
+          137
+        ]
+      },
+      "id": 134,
+      "type": "NAND",
+      "priority": 43
+    },
+    {
+      "input": {
+        "A": 14,
+        "B": 104
+      },
+      "output": {
+        "Y": [
+          136
+        ]
+      },
+      "id": 135,
+      "type": "NAND",
+      "priority": 34
+    },
+    {
+      "input": {
+        "A": 25,
+        "B": 135
+      },
+      "output": {
+        "Y": [
+          137
+        ]
+      },
+      "id": 136,
+      "type": "AND",
+      "priority": 35
+    },
+    {
+      "input": {
+        "A": 134,
+        "B": 136
+      },
+      "output": {
+        "Y": [
+          19,
+          138,
+          141,
+          146,
+          150,
+          155,
+          158
+        ]
+      },
+      "id": 137,
+      "type": "AND",
+      "priority": 44
+    },
+    {
+      "input": {
+        "A": 34,
+        "B": 137
+      },
+      "output": {
+        "Y": [
+          139
+        ]
+      },
+      "id": 138,
+      "type": "AND",
+      "priority": 45
+    },
+    {
+      "input": {
+        "A": 104,
+        "B": 138
+      },
+      "output": {
+        "Y": [
+          172,
+          175,
+          179
+        ]
+      },
+      "id": 139,
+      "type": "OR",
+      "priority": 46
+    },
+    {
+      "input": {
+        "A": 108,
+        "B": 130
+      },
+      "output": {
+        "Y": [
+          141
+        ]
+      },
+      "id": 140,
+      "type": "XNOR",
+      "priority": 42
+    },
+    {
+      "input": {
+        "A": 106,
+        "B": 140,
+        "S": 137
+      },
+      "output": {
+        "Y": [
+          142,
+          143,
+          183
+        ]
+      },
+      "id": 141,
+      "type": "MUX",
+      "priority": 45
+    },
+    {
+      "input": {
+        "A": 14,
+        "B": 141
+      },
+      "output": {
+        "Y": [
+          173
+        ]
+      },
+      "id": 142,
+      "type": "OR",
+      "priority": 46
+    },
+    {
+      "input": {
+        "A": 14,
+        "B": 141
+      },
+      "output": {
+        "Y": [
+          171,
+          182
+        ]
+      },
+      "id": 143,
+      "type": "XNOR",
+      "priority": 46
+    },
+    {
+      "input": {
+        "A": 112,
+        "B": 113
+      },
+      "output": {
+        "Y": [
+          145
+        ]
+      },
+      "id": 144,
+      "type": "AND",
+      "priority": 34
+    },
+    {
+      "input": {
+        "A": 128,
+        "B": 144
+      },
+      "output": {
+        "Y": [
+          146
+        ]
+      },
+      "id": 145,
+      "type": "XNOR",
+      "priority": 40
+    },
+    {
+      "input": {
+        "A": 111,
+        "B": 145,
+        "S": 137
+      },
+      "output": {
+        "Y": [
+          147,
+          148,
+          188
+        ]
+      },
+      "id": 146,
+      "type": "MUX",
+      "priority": 45
+    },
+    {
+      "input": {
+        "A": 13,
+        "B": 146
+      },
+      "output": {
+        "Y": [
+          170,
+          186
+        ]
+      },
+      "id": 147,
+      "type": "OR",
+      "priority": 46
+    },
+    {
+      "input": {
+        "A": 13,
+        "B": 146
+      },
+      "output": {
+        "Y": [
+          169,
+          186
+        ]
+      },
+      "id": 148,
+      "type": "NAND",
+      "priority": 46
+    },
+    {
+      "input": {
+        "A": 117,
+        "B": 126
+      },
+      "output": {
+        "Y": [
+          150
+        ]
+      },
+      "id": 149,
+      "type": "XNOR",
+      "priority": 38
+    },
+    {
+      "input": {
+        "A": 115,
+        "B": 149,
+        "S": 137
+      },
+      "output": {
+        "Y": [
+          151,
+          152,
+          210
+        ]
+      },
+      "id": 150,
+      "type": "MUX",
+      "priority": 45
+    },
+    {
+      "input": {
+        "A": 12,
+        "B": 150
+      },
+      "output": {
+        "Y": [
+          168
+        ]
+      },
+      "id": 151,
+      "type": "OR",
+      "priority": 46
+    },
+    {
+      "input": {
+        "A": 12,
+        "B": 150
+      },
+      "output": {
+        "Y": [
+          167,
+          209
+        ]
+      },
+      "id": 152,
+      "type": "XNOR",
+      "priority": 46
+    },
+    {
+      "input": {
+        "A": 122,
+        "B": 123
+      },
+      "output": {
+        "Y": [
+          154
+        ]
+      },
+      "id": 153,
+      "type": "NAND",
+      "priority": 36
+    },
+    {
+      "input": {
+        "A": 124,
+        "B": 153
+      },
+      "output": {
+        "Y": [
+          155
+        ]
+      },
+      "id": 154,
+      "type": "XOR",
+      "priority": 37
+    },
+    {
+      "input": {
+        "A": 121,
+        "B": 154,
+        "S": 137
+      },
+      "output": {
+        "Y": [
+          156,
+          157,
+          203
+        ]
+      },
+      "id": 155,
+      "type": "MUX",
+      "priority": 45
+    },
+    {
+      "input": {
+        "A": 11,
+        "B": 155
+      },
+      "output": {
+        "Y": [
+          166,
+          201
+        ]
+      },
+      "id": 156,
+      "type": "OR",
+      "priority": 46
+    },
+    {
+      "input": {
+        "A": 11,
+        "B": 155
+      },
+      "output": {
+        "Y": [
+          165,
+          201
+        ]
+      },
+      "id": 157,
+      "type": "NAND",
+      "priority": 46
+    },
+    {
+      "input": {
+        "A": 9,
+        "B": 137
+      },
+      "output": {
+        "Y": [
+          159
+        ]
+      },
+      "id": 158,
+      "type": "AND",
+      "priority": 45
+    },
+    {
+      "input": {
+        "A": 3,
+        "B": 158
+      },
+      "output": {
+        "Y": [
+          160,
+          162,
+          196
+        ]
+      },
+      "id": 159,
+      "type": "XNOR",
+      "priority": 46
+    },
+    {
+      "input": {
+        "A": 10,
+        "B": 159
+      },
+      "output": {
+        "Y": [
+          164
+        ]
+      },
+      "id": 160,
+      "type": "OR",
+      "priority": 47
+    },
+    {
+      "input": {
+        "A": 9,
+        "B": 2
+      },
+      "output": {
+        "Y": [
+          163,
+          195
+        ]
+      },
+      "id": 161,
+      "type": "ANDNOT",
+      "priority": 1
+    },
+    {
+      "input": {
+        "A": 10,
+        "B": 159
+      },
+      "output": {
+        "Y": [
+          163,
+          195
+        ]
+      },
+      "id": 162,
+      "type": "XNOR",
+      "priority": 47
+    },
+    {
+      "input": {
+        "A": 161,
+        "B": 162
+      },
+      "output": {
+        "Y": [
+          164
+        ]
+      },
+      "id": 163,
+      "type": "OR",
+      "priority": 48
+    },
+    {
+      "input": {
+        "A": 160,
+        "B": 163
+      },
+      "output": {
+        "Y": [
+          165,
+          202
+        ]
+      },
+      "id": 164,
+      "type": "NAND",
+      "priority": 49
+    },
+    {
+      "input": {
+        "A": 157,
+        "B": 164
+      },
+      "output": {
+        "Y": [
+          166
+        ]
+      },
+      "id": 165,
+      "type": "NAND",
+      "priority": 50
+    },
+    {
+      "input": {
+        "A": 156,
+        "B": 165
+      },
+      "output": {
+        "Y": [
+          167,
+          209
+        ]
+      },
+      "id": 166,
+      "type": "AND",
+      "priority": 51
+    },
+    {
+      "input": {
+        "A": 152,
+        "B": 166
+      },
+      "output": {
+        "Y": [
+          168
+        ]
+      },
+      "id": 167,
+      "type": "OR",
+      "priority": 52
+    },
+    {
+      "input": {
+        "A": 151,
+        "B": 167
+      },
+      "output": {
+        "Y": [
+          169,
+          187
+        ]
+      },
+      "id": 168,
+      "type": "NAND",
+      "priority": 53
+    },
+    {
+      "input": {
+        "A": 148,
+        "B": 168
+      },
+      "output": {
+        "Y": [
+          170
+        ]
+      },
+      "id": 169,
+      "type": "NAND",
+      "priority": 54
+    },
+    {
+      "input": {
+        "A": 147,
+        "B": 169
+      },
+      "output": {
+        "Y": [
+          171,
+          182
+        ]
+      },
+      "id": 170,
+      "type": "AND",
+      "priority": 55
+    },
+    {
+      "input": {
+        "A": 143,
+        "B": 170
+      },
+      "output": {
+        "Y": [
+          174
+        ]
+      },
+      "id": 171,
+      "type": "OR",
+      "priority": 56
+    },
+    {
+      "input": {
+        "A": 15,
+        "B": 139
+      },
+      "output": {
+        "Y": [
+          173
+        ]
+      },
+      "id": 172,
+      "type": "OR",
+      "priority": 47
+    },
+    {
+      "input": {
+        "A": 142,
+        "B": 172
+      },
+      "output": {
+        "Y": [
+          174
+        ]
+      },
+      "id": 173,
+      "type": "AND",
+      "priority": 48
+    },
+    {
+      "input": {
+        "A": 171,
+        "B": 173
+      },
+      "output": {
+        "Y": [
+          177
+        ]
+      },
+      "id": 174,
+      "type": "NAND",
+      "priority": 57
+    },
+    {
+      "input": {
+        "A": 15,
+        "B": 139
+      },
+      "output": {
+        "Y": [
+          176
+        ]
+      },
+      "id": 175,
+      "type": "AND",
+      "priority": 47
+    },
+    {
+      "input": {
+        "A": 16,
+        "B": 175
+      },
+      "output": {
+        "Y": [
+          177
+        ]
+      },
+      "id": 176,
+      "type": "NOR",
+      "priority": 48
+    },
+    {
+      "input": {
+        "A": 174,
+        "B": 176
+      },
+      "output": {
+        "Y": [
+          18,
+          178,
+          183,
+          188,
+          192,
+          196,
+          203,
+          210
+        ]
+      },
+      "id": 177,
+      "type": "AND",
+      "priority": 58
+    },
+    {
+      "input": {
+        "A": 34,
+        "B": 177
+      },
+      "output": {
+        "Y": [
+          179
+        ]
+      },
+      "id": 178,
+      "type": "AND",
+      "priority": 59
+    },
+    {
+      "input": {
+        "A": 139,
+        "B": 178
+      },
+      "output": {
+        "Y": [
+          180,
+          181
+        ]
+      },
+      "id": 179,
+      "type": "OR",
+      "priority": 60
+    },
+    {
+      "input": {
+        "A": 16,
+        "B": 179
+      },
+      "output": {
+        "Y": [
+          222
+        ]
+      },
+      "id": 180,
+      "type": "OR",
+      "priority": 61
+    },
+    {
+      "input": {
+        "A": 16,
+        "B": 179
+      },
+      "output": {
+        "Y": [
+          221
+        ]
+      },
+      "id": 181,
+      "type": "NAND",
+      "priority": 61
+    },
+    {
+      "input": {
+        "A": 143,
+        "B": 170
+      },
+      "output": {
+        "Y": [
+          183
+        ]
+      },
+      "id": 182,
+      "type": "XNOR",
+      "priority": 56
+    },
+    {
+      "input": {
+        "A": 141,
+        "B": 182,
+        "S": 177
+      },
+      "output": {
+        "Y": [
+          184,
+          185
+        ]
+      },
+      "id": 183,
+      "type": "MUX",
+      "priority": 59
+    },
+    {
+      "input": {
+        "A": 15,
+        "B": 183
+      },
+      "output": {
+        "Y": [
+          220
+        ]
+      },
+      "id": 184,
+      "type": "OR",
+      "priority": 60
+    },
+    {
+      "input": {
+        "A": 15,
+        "B": 183
+      },
+      "output": {
+        "Y": [
+          219
+        ]
+      },
+      "id": 185,
+      "type": "NAND",
+      "priority": 60
+    },
+    {
+      "input": {
+        "A": 147,
+        "B": 148
+      },
+      "output": {
+        "Y": [
+          187
+        ]
+      },
+      "id": 186,
+      "type": "AND",
+      "priority": 47
+    },
+    {
+      "input": {
+        "A": 168,
+        "B": 186
+      },
+      "output": {
+        "Y": [
+          188
+        ]
+      },
+      "id": 187,
+      "type": "XNOR",
+      "priority": 54
+    },
+    {
+      "input": {
+        "A": 146,
+        "B": 187,
+        "S": 177
+      },
+      "output": {
+        "Y": [
+          189,
+          214
+        ]
+      },
+      "id": 188,
+      "type": "MUX",
+      "priority": 59
+    },
+    {
+      "input": {
+        "A": 14,
+        "B": 188
+      },
+      "output": {
+        "Y": [
+          218
+        ]
+      },
+      "id": 189,
+      "type": "OR",
+      "priority": 60
+    },
+    {
+      "input": {
+        "A": 9,
+        "B": 1
+      },
+      "output": {
+        "Y": [
+          191,
+          198
+        ]
+      },
+      "id": 190,
+      "type": "ANDNOT",
+      "priority": 1
+    },
+    {
+      "input": {
+        "A": 10,
+        "B": 190
+      },
+      "output": {
+        "Y": [
+          194
+        ]
+      },
+      "id": 191,
+      "type": "NAND",
+      "priority": 2
+    },
+    {
+      "input": {
+        "A": 9,
+        "B": 177
+      },
+      "output": {
+        "Y": [
+          193
+        ]
+      },
+      "id": 192,
+      "type": "NAND",
+      "priority": 59
+    },
+    {
+      "input": {
+        "A": 2,
+        "B": 192
+      },
+      "output": {
+        "Y": [
+          194
+        ]
+      },
+      "id": 193,
+      "type": "XNOR",
+      "priority": 60
+    },
+    {
+      "input": {
+        "A": 191,
+        "B": 193
+      },
+      "output": {
+        "Y": [
+          200
+        ]
+      },
+      "id": 194,
+      "type": "NAND",
+      "priority": 61
+    },
+    {
+      "input": {
+        "A": 161,
+        "B": 162
+      },
+      "output": {
+        "Y": [
+          196
+        ]
+      },
+      "id": 195,
+      "type": "XNOR",
+      "priority": 48
+    },
+    {
+      "input": {
+        "A": 159,
+        "B": 195,
+        "S": 177
+      },
+      "output": {
+        "Y": [
+          197,
+          205
+        ]
+      },
+      "id": 196,
+      "type": "MUX",
+      "priority": 59
+    },
+    {
+      "input": {
+        "A": 11,
+        "B": 196
+      },
+      "output": {
+        "Y": [
+          199
+        ]
+      },
+      "id": 197,
+      "type": "OR",
+      "priority": 60
+    },
+    {
+      "input": {
+        "A": 10,
+        "B": 190
+      },
+      "output": {
+        "Y": [
+          199
+        ]
+      },
+      "id": 198,
+      "type": "OR",
+      "priority": 2
+    },
+    {
+      "input": {
+        "A": 197,
+        "B": 198
+      },
+      "output": {
+        "Y": [
+          200
+        ]
+      },
+      "id": 199,
+      "type": "AND",
+      "priority": 61
+    },
+    {
+      "input": {
+        "A": 194,
+        "B": 199
+      },
+      "output": {
+        "Y": [
+          207
+        ]
+      },
+      "id": 200,
+      "type": "NAND",
+      "priority": 62
+    },
+    {
+      "input": {
+        "A": 156,
+        "B": 157
+      },
+      "output": {
+        "Y": [
+          202
+        ]
+      },
+      "id": 201,
+      "type": "AND",
+      "priority": 47
+    },
+    {
+      "input": {
+        "A": 164,
+        "B": 201
+      },
+      "output": {
+        "Y": [
+          203
+        ]
+      },
+      "id": 202,
+      "type": "XNOR",
+      "priority": 50
+    },
+    {
+      "input": {
+        "A": 155,
+        "B": 202,
+        "S": 177
+      },
+      "output": {
+        "Y": [
+          204,
+          208
+        ]
+      },
+      "id": 203,
+      "type": "MUX",
+      "priority": 59
+    },
+    {
+      "input": {
+        "A": 12,
+        "B": 203
+      },
+      "output": {
+        "Y": [
+          206
+        ]
+      },
+      "id": 204,
+      "type": "NAND",
+      "priority": 60
+    },
+    {
+      "input": {
+        "A": 11,
+        "B": 196
+      },
+      "output": {
+        "Y": [
+          206
+        ]
+      },
+      "id": 205,
+      "type": "NAND",
+      "priority": 60
+    },
+    {
+      "input": {
+        "A": 204,
+        "B": 205
+      },
+      "output": {
+        "Y": [
+          207
+        ]
+      },
+      "id": 206,
+      "type": "AND",
+      "priority": 61
+    },
+    {
+      "input": {
+        "A": 200,
+        "B": 206
+      },
+      "output": {
+        "Y": [
+          213
+        ]
+      },
+      "id": 207,
+      "type": "NAND",
+      "priority": 63
+    },
+    {
+      "input": {
+        "A": 12,
+        "B": 203
+      },
+      "output": {
+        "Y": [
+          212
+        ]
+      },
+      "id": 208,
+      "type": "OR",
+      "priority": 60
+    },
+    {
+      "input": {
+        "A": 152,
+        "B": 166
+      },
+      "output": {
+        "Y": [
+          210
+        ]
+      },
+      "id": 209,
+      "type": "XNOR",
+      "priority": 52
+    },
+    {
+      "input": {
+        "A": 150,
+        "B": 209,
+        "S": 177
+      },
+      "output": {
+        "Y": [
+          211,
+          215
+        ]
+      },
+      "id": 210,
+      "type": "MUX",
+      "priority": 59
+    },
+    {
+      "input": {
+        "A": 13,
+        "B": 210
+      },
+      "output": {
+        "Y": [
+          212
+        ]
+      },
+      "id": 211,
+      "type": "OR",
+      "priority": 60
+    },
+    {
+      "input": {
+        "A": 208,
+        "B": 211
+      },
+      "output": {
+        "Y": [
+          213
+        ]
+      },
+      "id": 212,
+      "type": "AND",
+      "priority": 61
+    },
+    {
+      "input": {
+        "A": 207,
+        "B": 212
+      },
+      "output": {
+        "Y": [
+          217
+        ]
+      },
+      "id": 213,
+      "type": "NAND",
+      "priority": 64
+    },
+    {
+      "input": {
+        "A": 14,
+        "B": 188
+      },
+      "output": {
+        "Y": [
+          216
+        ]
+      },
+      "id": 214,
+      "type": "NAND",
+      "priority": 60
+    },
+    {
+      "input": {
+        "A": 13,
+        "B": 210
+      },
+      "output": {
+        "Y": [
+          216
+        ]
+      },
+      "id": 215,
+      "type": "NAND",
+      "priority": 60
+    },
+    {
+      "input": {
+        "A": 214,
+        "B": 215
+      },
+      "output": {
+        "Y": [
+          217
+        ]
+      },
+      "id": 216,
+      "type": "AND",
+      "priority": 61
+    },
+    {
+      "input": {
+        "A": 213,
+        "B": 216
+      },
+      "output": {
+        "Y": [
+          218
+        ]
+      },
+      "id": 217,
+      "type": "NAND",
+      "priority": 65
+    },
+    {
+      "input": {
+        "A": 189,
+        "B": 217
+      },
+      "output": {
+        "Y": [
+          219
+        ]
+      },
+      "id": 218,
+      "type": "NAND",
+      "priority": 66
+    },
+    {
+      "input": {
+        "A": 185,
+        "B": 218
+      },
+      "output": {
+        "Y": [
+          220
+        ]
+      },
+      "id": 219,
+      "type": "NAND",
+      "priority": 67
+    },
+    {
+      "input": {
+        "A": 184,
+        "B": 219
+      },
+      "output": {
+        "Y": [
+          221
+        ]
+      },
+      "id": 220,
+      "type": "NAND",
+      "priority": 68
+    },
+    {
+      "input": {
+        "A": 181,
+        "B": 220
+      },
+      "output": {
+        "Y": [
+          222
+        ]
+      },
+      "id": 221,
+      "type": "NAND",
+      "priority": 69
+    },
+    {
+      "input": {
+        "A": 180,
+        "B": 221
+      },
+      "output": {
+        "Y": [
+          17
+        ]
+      },
+      "id": 222,
+      "type": "NAND",
+      "priority": 70
+    },
+    {
+      "input": {
+        "A": 35,
+        "B": 40
+      },
+      "output": {
+        "Y": [
+          224
+        ]
+      },
+      "id": 223,
+      "type": "ORNOT",
+      "priority": 8
+    },
+    {
+      "input": {
+        "A": 38,
+        "B": 223
+      },
+      "output": {
+        "Y": [
+          23
+        ]
+      },
+      "id": 224,
+      "type": "AND",
+      "priority": 9
+    }
+  ],
+  "ports": [
+    {
+      "bits": [],
+      "portName": "reset",
+      "portBit": 0,
+      "id": 0,
+      "type": "input",
+      "priority": 0
+    },
+    {
+      "bits": [
+        190
+      ],
+      "portName": "io_in_a",
+      "portBit": 0,
+      "id": 1,
+      "type": "input",
+      "priority": 0
+    },
+    {
+      "bits": [
+        161,
+        193
+      ],
+      "portName": "io_in_a",
+      "portBit": 1,
+      "id": 2,
+      "type": "input",
+      "priority": 0
+    },
+    {
+      "bits": [
+        124,
+        159
+      ],
+      "portName": "io_in_a",
+      "portBit": 2,
+      "id": 3,
+      "type": "input",
+      "priority": 0
+    },
+    {
+      "bits": [
+        90,
+        119
+      ],
+      "portName": "io_in_a",
+      "portBit": 3,
+      "id": 4,
+      "type": "input",
+      "priority": 0
+    },
+    {
+      "bits": [
+        64,
+        88
+      ],
+      "portName": "io_in_a",
+      "portBit": 4,
+      "id": 5,
+      "type": "input",
+      "priority": 0
+    },
+    {
+      "bits": [
+        47,
+        61
+      ],
+      "portName": "io_in_a",
+      "portBit": 5,
+      "id": 6,
+      "type": "input",
+      "priority": 0
+    },
+    {
+      "bits": [
+        35,
+        44
+      ],
+      "portName": "io_in_a",
+      "portBit": 6,
+      "id": 7,
+      "type": "input",
+      "priority": 0
+    },
+    {
+      "bits": [
+        30,
+        33,
+        36,
+        40,
+        52
+      ],
+      "portName": "io_in_a",
+      "portBit": 7,
+      "id": 8,
+      "type": "input",
+      "priority": 0
+    },
+    {
+      "bits": [
+        30,
+        33,
+        35,
+        43,
+        47,
+        60,
+        64,
+        87,
+        90,
+        118,
+        124,
+        158,
+        161,
+        190,
+        192
+      ],
+      "portName": "io_in_b",
+      "portBit": 0,
+      "id": 9,
+      "type": "input",
+      "priority": 0
+    },
+    {
+      "bits": [
+        31,
+        37,
+        45,
+        46,
+        62,
+        63,
+        89,
+        91,
+        122,
+        123,
+        160,
+        162,
+        191,
+        198
+      ],
+      "portName": "io_in_b",
+      "portBit": 1,
+      "id": 10,
+      "type": "input",
+      "priority": 0
+    },
+    {
+      "bits": [
+        29,
+        49,
+        52,
+        58,
+        59,
+        85,
+        86,
+        116,
+        117,
+        156,
+        157,
+        197,
+        205
+      ],
+      "portName": "io_in_b",
+      "portBit": 2,
+      "id": 11,
+      "type": "input",
+      "priority": 0
+    },
+    {
+      "bits": [
+        28,
+        69,
+        72,
+        80,
+        81,
+        112,
+        113,
+        151,
+        152,
+        204,
+        208
+      ],
+      "portName": "io_in_b",
+      "portBit": 3,
+      "id": 12,
+      "type": "input",
+      "priority": 0
+    },
+    {
+      "bits": [
+        27,
+        97,
+        107,
+        108,
+        147,
+        148,
+        211,
+        215
+      ],
+      "portName": "io_in_b",
+      "portBit": 4,
+      "id": 13,
+      "type": "input",
+      "priority": 0
+    },
+    {
+      "bits": [
+        26,
+        132,
+        135,
+        142,
+        143,
+        189,
+        214
+      ],
+      "portName": "io_in_b",
+      "portBit": 5,
+      "id": 14,
+      "type": "input",
+      "priority": 0
+    },
+    {
+      "bits": [
+        25,
+        172,
+        175,
+        184,
+        185
+      ],
+      "portName": "io_in_b",
+      "portBit": 6,
+      "id": 15,
+      "type": "input",
+      "priority": 0
+    },
+    {
+      "bits": [
+        25,
+        176,
+        180,
+        181
+      ],
+      "portName": "io_in_b",
+      "portBit": 7,
+      "id": 16,
+      "type": "input",
+      "priority": 0
+    },
+    {
+      "bits": [
+        222
+      ],
+      "portName": "io_out",
+      "portBit": 0,
+      "id": 17,
+      "type": "output",
+      "priority": 71
+    },
+    {
+      "bits": [
+        177
+      ],
+      "portName": "io_out",
+      "portBit": 1,
+      "id": 18,
+      "type": "output",
+      "priority": 59
+    },
+    {
+      "bits": [
+        137
+      ],
+      "portName": "io_out",
+      "portBit": 2,
+      "id": 19,
+      "type": "output",
+      "priority": 45
+    },
+    {
+      "bits": [
+        102
+      ],
+      "portName": "io_out",
+      "portBit": 3,
+      "id": 20,
+      "type": "output",
+      "priority": 32
+    },
+    {
+      "bits": [
+        74
+      ],
+      "portName": "io_out",
+      "portBit": 4,
+      "id": 21,
+      "type": "output",
+      "priority": 22
+    },
+    {
+      "bits": [
+        54
+      ],
+      "portName": "io_out",
+      "portBit": 5,
+      "id": 22,
+      "type": "output",
+      "priority": 14
+    },
+    {
+      "bits": [
+        224
+      ],
+      "portName": "io_out",
+      "portBit": 6,
+      "id": 23,
+      "type": "output",
+      "priority": 10
+    },
+    {
+      "bits": [
+        32
+      ],
+      "portName": "io_out",
+      "portBit": 7,
+      "id": 24,
+      "type": "output",
+      "priority": 7
+    }
+  ],
+  "inputs": {
+    "reset": {
+      "0": {
+        "bits": [],
+        "portName": "reset",
+        "portBit": 0,
+        "id": 0,
+        "type": "input",
+        "priority": 0
+      }
+    },
+    "io_in_a": {
+      "0": {
+        "bits": [
+          190
+        ],
+        "portName": "io_in_a",
+        "portBit": 0,
+        "id": 1,
+        "type": "input",
+        "priority": 0
+      },
+      "1": {
+        "bits": [
+          161,
+          193
+        ],
+        "portName": "io_in_a",
+        "portBit": 1,
+        "id": 2,
+        "type": "input",
+        "priority": 0
+      },
+      "2": {
+        "bits": [
+          124,
+          159
+        ],
+        "portName": "io_in_a",
+        "portBit": 2,
+        "id": 3,
+        "type": "input",
+        "priority": 0
+      },
+      "3": {
+        "bits": [
+          90,
+          119
+        ],
+        "portName": "io_in_a",
+        "portBit": 3,
+        "id": 4,
+        "type": "input",
+        "priority": 0
+      },
+      "4": {
+        "bits": [
+          64,
+          88
+        ],
+        "portName": "io_in_a",
+        "portBit": 4,
+        "id": 5,
+        "type": "input",
+        "priority": 0
+      },
+      "5": {
+        "bits": [
+          47,
+          61
+        ],
+        "portName": "io_in_a",
+        "portBit": 5,
+        "id": 6,
+        "type": "input",
+        "priority": 0
+      },
+      "6": {
+        "bits": [
+          35,
+          44
+        ],
+        "portName": "io_in_a",
+        "portBit": 6,
+        "id": 7,
+        "type": "input",
+        "priority": 0
+      },
+      "7": {
+        "bits": [
+          30,
+          33,
+          36,
+          40,
+          52
+        ],
+        "portName": "io_in_a",
+        "portBit": 7,
+        "id": 8,
+        "type": "input",
+        "priority": 0
+      }
+    },
+    "io_in_b": {
+      "0": {
+        "bits": [
+          30,
+          33,
+          35,
+          43,
+          47,
+          60,
+          64,
+          87,
+          90,
+          118,
+          124,
+          158,
+          161,
+          190,
+          192
+        ],
+        "portName": "io_in_b",
+        "portBit": 0,
+        "id": 9,
+        "type": "input",
+        "priority": 0
+      },
+      "1": {
+        "bits": [
+          31,
+          37,
+          45,
+          46,
+          62,
+          63,
+          89,
+          91,
+          122,
+          123,
+          160,
+          162,
+          191,
+          198
+        ],
+        "portName": "io_in_b",
+        "portBit": 1,
+        "id": 10,
+        "type": "input",
+        "priority": 0
+      },
+      "2": {
+        "bits": [
+          29,
+          49,
+          52,
+          58,
+          59,
+          85,
+          86,
+          116,
+          117,
+          156,
+          157,
+          197,
+          205
+        ],
+        "portName": "io_in_b",
+        "portBit": 2,
+        "id": 11,
+        "type": "input",
+        "priority": 0
+      },
+      "3": {
+        "bits": [
+          28,
+          69,
+          72,
+          80,
+          81,
+          112,
+          113,
+          151,
+          152,
+          204,
+          208
+        ],
+        "portName": "io_in_b",
+        "portBit": 3,
+        "id": 12,
+        "type": "input",
+        "priority": 0
+      },
+      "4": {
+        "bits": [
+          27,
+          97,
+          107,
+          108,
+          147,
+          148,
+          211,
+          215
+        ],
+        "portName": "io_in_b",
+        "portBit": 4,
+        "id": 13,
+        "type": "input",
+        "priority": 0
+      },
+      "5": {
+        "bits": [
+          26,
+          132,
+          135,
+          142,
+          143,
+          189,
+          214
+        ],
+        "portName": "io_in_b",
+        "portBit": 5,
+        "id": 14,
+        "type": "input",
+        "priority": 0
+      },
+      "6": {
+        "bits": [
+          25,
+          172,
+          175,
+          184,
+          185
+        ],
+        "portName": "io_in_b",
+        "portBit": 6,
+        "id": 15,
+        "type": "input",
+        "priority": 0
+      },
+      "7": {
+        "bits": [
+          25,
+          176,
+          180,
+          181
+        ],
+        "portName": "io_in_b",
+        "portBit": 7,
+        "id": 16,
+        "type": "input",
+        "priority": 0
+      }
+    }
+  },
+  "outputs": {
+    "io_out": {
+      "0": {
+        "bits": [
+          222
+        ],
+        "portName": "io_out",
+        "portBit": 0,
+        "id": 17,
+        "type": "output",
+        "priority": 71
+      },
+      "1": {
+        "bits": [
+          177
+        ],
+        "portName": "io_out",
+        "portBit": 1,
+        "id": 18,
+        "type": "output",
+        "priority": 59
+      },
+      "2": {
+        "bits": [
+          137
+        ],
+        "portName": "io_out",
+        "portBit": 2,
+        "id": 19,
+        "type": "output",
+        "priority": 45
+      },
+      "3": {
+        "bits": [
+          102
+        ],
+        "portName": "io_out",
+        "portBit": 3,
+        "id": 20,
+        "type": "output",
+        "priority": 32
+      },
+      "4": {
+        "bits": [
+          74
+        ],
+        "portName": "io_out",
+        "portBit": 4,
+        "id": 21,
+        "type": "output",
+        "priority": 22
+      },
+      "5": {
+        "bits": [
+          54
+        ],
+        "portName": "io_out",
+        "portBit": 5,
+        "id": 22,
+        "type": "output",
+        "priority": 14
+      },
+      "6": {
+        "bits": [
+          224
+        ],
+        "portName": "io_out",
+        "portBit": 6,
+        "id": 23,
+        "type": "output",
+        "priority": 10
+      },
+      "7": {
+        "bits": [
+          32
+        ],
+        "portName": "io_out",
+        "portBit": 7,
+        "id": 24,
+        "type": "output",
+        "priority": 7
+      }
+    }
+  }
+}

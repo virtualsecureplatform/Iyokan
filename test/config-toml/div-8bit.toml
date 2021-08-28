@@ -1,6 +1,6 @@
 [[file]]
-type = "iyokanl1-json"
-path = "../iyokanl1-json/test-div-8bit.json"
+type = "yosys-json"
+path = "../yosys-json/div-8bit-yosys.json"
 name = "core"
 
 [connect]
