@@ -367,27 +367,27 @@ reg.add_in_out "cahp-pearl-mux-10", "test/config-toml/cahp-pearl-mux.toml",
 reg.add_in_out "cahp-ruby-mux-1KiB-11", "test/config-toml/cahp-ruby-mux-1KiB.toml",
                "test/in/test11.in", "test/out/test11.out", ncycles: 7
 
-reg.add_in_out "addr-4bit-04", "test/config-toml/test-addr-4bit.toml",
+reg.add_in_out "addr-4bit-04", "test/config-toml/addr-4bit.toml",
                "test/in/test04.in", "test/out/test04.out", ncycles: 1, set_plain_ncycles: true
-reg.add_in_out "div-8bit-05", "test/config-toml/test-div-8bit.toml",
+reg.add_in_out "div-8bit-05", "test/config-toml/div-8bit.toml",
                "test/in/test05.in", "test/out/test05.out", ncycles: 1, set_plain_ncycles: true
-reg.add_in_out "ram-addr8bit-06", "test/config-toml/test-ram-addr8bit.toml",
+reg.add_in_out "ram-addr8bit-06", "test/config-toml/ram-addr8bit.toml",
                "test/in/test06.in", "test/out/test06.out", ncycles: 16, set_plain_ncycles: true
-reg.add_in_out "ram-addr9bit-07", "test/config-toml/test-ram-addr9bit.toml",
+reg.add_in_out "ram-addr9bit-07", "test/config-toml/ram-addr9bit.toml",
                "test/in/test07.in", "test/out/test07.out", ncycles: 16, set_plain_ncycles: true
-reg.add_in_out "mux-ram-addr8bit-06", "test/config-toml/test-mux-ram-addr8bit.toml",
+reg.add_in_out "mux-ram-addr8bit-06", "test/config-toml/mux-ram-addr8bit.toml",
                "test/in/test06.in", "test/out/test06.out", ncycles: 16, set_plain_ncycles: true
-reg.add_in_out "mux-ram-addr9bit-07", "test/config-toml/test-mux-ram-addr9bit.toml",
+reg.add_in_out "mux-ram-addr9bit-07", "test/config-toml/mux-ram-addr9bit.toml",
                "test/in/test07.in", "test/out/test07.out", ncycles: 16, set_plain_ncycles: true
-reg.add_in_out "ram-8-16-16-08", "test/config-toml/test-ram-8-16-16.toml",
+reg.add_in_out "ram-8-16-16-08", "test/config-toml/ram-8-16-16.toml",
                "test/in/test08.in", "test/out/test08.out", ncycles: 8, set_plain_ncycles: true
-reg.add_in_out "mux-ram-8-16-16-08", "test/config-toml/test-mux-ram-8-16-16.toml",
+reg.add_in_out "mux-ram-8-16-16-08", "test/config-toml/mux-ram-8-16-16.toml",
                "test/in/test08.in", "test/out/test08.out", ncycles: 8, set_plain_ncycles: true
-reg.add_in_out "rom-7-32-12", "test/config-toml/test-rom-7-32.toml",
+reg.add_in_out "rom-7-32-12", "test/config-toml/rom-7-32.toml",
                "test/in/test12.in", "test/out/test12.out", ncycles: 1, set_plain_ncycles: true
-reg.add_in_out "rom-4-8-15", "test/config-toml/test-rom-4-8.toml",
+reg.add_in_out "rom-4-8-15", "test/config-toml/rom-4-8.toml",
                "test/in/test15.in", "test/out/test15.out", ncycles: 1, set_plain_ncycles: true
-reg.add_in_out "counter-4bit-13", "test/config-toml/test-counter-4bit.toml",
+reg.add_in_out "counter-4bit-13", "test/config-toml/counter-4bit.toml",
                "test/in/test13.in", "test/out/test13.out", ncycles: 3, set_plain_ncycles: true
 reg.add_in_out "cahp-ruby-14", "test/config-toml/cahp-ruby.toml",
                "test/in/test14.in", "test/out/test14.out", ncycles: 20, set_plain_ncycles: true, tfhe_tags: nil, cufhe_tags: nil
