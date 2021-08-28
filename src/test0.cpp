@@ -24,6 +24,15 @@ auto get(TaskNetwork& net, const std::string& kind, const std::string& portName,
         kind, portName, portBit);
 }
 
+template <class NetworkBuilder>
+typename NetworkBuilder::NetworkType readNetworkFromJSON(std::istream& is)
+{
+    // FIXME: Assume the stream `is` emits Iyokan-L1 JSON
+    NetworkBuilder builder;
+    IyokanL1JSONReader{}.read<NetworkBuilder>(builder, is);
+    return typename NetworkBuilder::NetworkType{std::move(builder)};
+}
+
 // Assume variable names 'NetworkBuilder' and 'net'
 #define ASSERT_OUTPUT_EQ(portName, portBit, expected)                          \
     assert(getOutput(get<NetworkBuilder>(net, "output", portName, portBit)) == \

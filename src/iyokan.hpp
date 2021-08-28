@@ -1996,7 +1996,6 @@ public:
     }
 };
 
-template <class NetworkBuilder>
 class YosysJSONReader {
 private:
     enum class PORT {
@@ -2046,15 +2045,7 @@ private:
     };
 
 private:
-    NetworkBuilder &builder_;
-
-private:
-    void connect(int from, int to)
-    {
-        builder_.connect(from, to);
-    }
-
-    int getConnBit(const picojson::object &conn, const std::string &key)
+    static int getConnBit(const picojson::object &conn, const std::string &key)
     {
         using namespace picojson;
         const auto &bits = conn.at(key).get<array>();
@@ -2065,11 +2056,8 @@ private:
     }
 
 public:
-    YosysJSONReader(NetworkBuilder &builder) : builder_(builder)
-    {
-    }
-
-    void read(std::istream &is)
+    template <class NetworkBuilder>
+    static void read(NetworkBuilder &builder, std::istream &is)
     {
         // Convert Yosys JSON to gates. Thanks to:
         // https://github.com/virtualsecureplatform/Iyokan-L1/blob/ef7c9a993ddbfd54ef58e66b116b681e59d90a3c/Converter/YosysConverter.cs
@@ -2110,8 +2098,8 @@ public:
                 const int portBit = i;
                 const int bit = bits.at(i).get<double>();
 
-                int id = isDirInput ? builder_.INPUT(portName, portBit)
-                                    : builder_.OUTPUT(portName, portBit);
+                int id = isDirInput ? builder.INPUT(portName, portBit)
+                                    : builder.OUTPUT(portName, portBit);
                 portvec.emplace_back(isDirInput ? PORT::IN : PORT::OUT, id,
                                      bit);
                 if (isDirInput)
@@ -2140,57 +2128,57 @@ public:
             int bit = -1, id = -1;
             switch (mapCell.at(type)) {
             case CELL::AND:
-                id = builder_.AND();
+                id = builder.AND();
                 cellvec.emplace_back(CELL::AND, id, get("A"), get("B"));
                 bit = get("Y");
                 break;
             case CELL::NAND:
-                id = builder_.NAND();
+                id = builder.NAND();
                 cellvec.emplace_back(CELL::NAND, id, get("A"), get("B"));
                 bit = get("Y");
                 break;
             case CELL::XOR:
-                id = builder_.XOR();
+                id = builder.XOR();
                 cellvec.emplace_back(CELL::XOR, id, get("A"), get("B"));
                 bit = get("Y");
                 break;
             case CELL::XNOR:
-                id = builder_.XNOR();
+                id = builder.XNOR();
                 cellvec.emplace_back(CELL::XNOR, id, get("A"), get("B"));
                 bit = get("Y");
                 break;
             case CELL::NOR:
-                id = builder_.NOR();
+                id = builder.NOR();
                 cellvec.emplace_back(CELL::NOR, id, get("A"), get("B"));
                 bit = get("Y");
                 break;
             case CELL::ANDNOT:
-                id = builder_.ANDNOT();
+                id = builder.ANDNOT();
                 cellvec.emplace_back(CELL::ANDNOT, id, get("A"), get("B"));
                 bit = get("Y");
                 break;
             case CELL::OR:
-                id = builder_.OR();
+                id = builder.OR();
                 cellvec.emplace_back(CELL::OR, id, get("A"), get("B"));
                 bit = get("Y");
                 break;
             case CELL::ORNOT:
-                id = builder_.ORNOT();
+                id = builder.ORNOT();
                 cellvec.emplace_back(CELL::ORNOT, id, get("A"), get("B"));
                 bit = get("Y");
                 break;
             case CELL::DFFP:
-                id = builder_.DFF();
+                id = builder.DFF();
                 cellvec.emplace_back(CELL::DFFP, id, get("D"));
                 bit = get("Q");
                 break;
             case CELL::NOT:
-                id = builder_.NOT();
+                id = builder.NOT();
                 cellvec.emplace_back(CELL::NOT, id, get("A"));
                 bit = get("Y");
                 break;
             case CELL::MUX:
-                id = builder_.MUX();
+                id = builder.MUX();
                 cellvec.emplace_back(CELL::MUX, id, get("A"), get("B"),
                                      get("S"));
                 bit = get("Y");
@@ -2203,7 +2191,7 @@ public:
             if (port.type == PORT::IN)
                 // Actually nothing to do!
                 continue;
-            connect(bit2id.at(port.bit), port.id);
+            builder.connect(bit2id.at(port.bit), port.id);
         }
 
         for (auto &&cell : cellvec) {
@@ -2216,181 +2204,173 @@ public:
             case CELL::ANDNOT:
             case CELL::OR:
             case CELL::ORNOT:
-                connect(bit2id.at(cell.bit0), cell.id);
-                connect(bit2id.at(cell.bit1), cell.id);
+                builder.connect(bit2id.at(cell.bit0), cell.id);
+                builder.connect(bit2id.at(cell.bit1), cell.id);
                 break;
             case CELL::DFFP:
             case CELL::NOT:
-                connect(bit2id.at(cell.bit0), cell.id);
+                builder.connect(bit2id.at(cell.bit0), cell.id);
                 break;
             case CELL::MUX:
-                connect(bit2id.at(cell.bit0), cell.id);
-                connect(bit2id.at(cell.bit1), cell.id);
-                connect(bit2id.at(cell.bit2), cell.id);
+                builder.connect(bit2id.at(cell.bit0), cell.id);
+                builder.connect(bit2id.at(cell.bit1), cell.id);
+                builder.connect(bit2id.at(cell.bit2), cell.id);
                 break;
             }
         }
     }
 };
 
-template <class NetworkBuilder>
-typename NetworkBuilder::NetworkType readNetworkFromJSON(std::istream &is)
-{
-    NetworkBuilder builder;
-    readNetworkFromJSONImpl(builder, is);
+class IyokanL1JSONReader {
+public:
+    template <class NetworkBuilder>
+    static void read(NetworkBuilder &builder, std::istream &is)
+    {
+        std::unordered_map<int, int> id2taskId;
+        auto addId = [&](int id, int taskId) { id2taskId.emplace(id, taskId); };
+        auto findTaskId = [&](int id) {
+            auto it = id2taskId.find(id);
+            if (it == id2taskId.end())
+                error::die("Invalid JSON");
+            return it->second;
+        };
+        auto connectIds = [&](int from, int to) {
+            builder.connect(findTaskId(from), findTaskId(to));
+        };
 
-    return typename NetworkBuilder::NetworkType{std::move(builder)};
-}
+        picojson::value v;
+        const std::string err = picojson::parse(v, is);
+        if (!err.empty())
+            error::die("Invalid JSON of network: ", err);
 
-template <class NetworkBuilder>
-void readNetworkFromJSONImpl(NetworkBuilder &builder, std::istream &is)
-{
-    std::unordered_map<int, int> id2taskId;
-    auto addId = [&](int id, int taskId) { id2taskId.emplace(id, taskId); };
-    auto findTaskId = [&](int id) {
-        auto it = id2taskId.find(id);
-        if (it == id2taskId.end())
-            error::die("Invalid JSON");
-        return it->second;
-    };
-    auto connectIds = [&](int from, int to) {
-        builder.connect(findTaskId(from), findTaskId(to));
-    };
+        picojson::object &obj = v.get<picojson::object>();
+        picojson::array &cells = obj["cells"].get<picojson::array>();
+        picojson::array &ports = obj["ports"].get<picojson::array>();
+        for (const auto &e : ports) {
+            picojson::object port = e.get<picojson::object>();
+            std::string type = port.at("type").get<std::string>();
+            int id = static_cast<int>(port.at("id").get<double>());
+            std::string portName = port.at("portName").get<std::string>();
+            int portBit = static_cast<int>(port.at("portBit").get<double>());
+            if (type == "input")
+                addId(id, builder.INPUT(portName, portBit));
+            else if (type == "output")
+                addId(id, builder.OUTPUT(portName, portBit));
+        }
+        for (const auto &e : cells) {
+            picojson::object cell = e.get<picojson::object>();
+            std::string type = cell.at("type").get<std::string>();
+            int id = static_cast<int>(cell.at("id").get<double>());
+            if (type == "AND")
+                addId(id, builder.AND());
+            else if (type == "NAND")
+                addId(id, builder.NAND());
+            else if (type == "ANDNOT")
+                addId(id, builder.ANDNOT());
+            else if (type == "XOR")
+                addId(id, builder.XOR());
+            else if (type == "XNOR")
+                addId(id, builder.XNOR());
+            else if (type == "DFFP")
+                addId(id, builder.DFF());
+            else if (type == "NOT")
+                addId(id, builder.NOT());
+            else if (type == "NOR")
+                addId(id, builder.NOR());
+            else if (type == "OR")
+                addId(id, builder.OR());
+            else if (type == "ORNOT")
+                addId(id, builder.ORNOT());
+            else if (type == "MUX")
+                addId(id, builder.MUX());
+            else {
+                bool valid = false;
+                // If builder.RAM() exists
+                if constexpr (detail::hasMethodFuncRAM<NetworkBuilder>) {
+                    if (type == "RAM") {
+                        int addr = cell.at("ramAddress").get<double>(),
+                            bit = cell.at("ramBit").get<double>();
+                        addId(id, builder.RAM(addr, bit));
+                        valid = true;
+                    }
+                }
 
-    picojson::value v;
-    const std::string err = picojson::parse(v, is);
-    if (!err.empty())
-        error::die("Invalid JSON of network: ", err);
-
-    picojson::object &obj = v.get<picojson::object>();
-    picojson::array &cells = obj["cells"].get<picojson::array>();
-    picojson::array &ports = obj["ports"].get<picojson::array>();
-    for (const auto &e : ports) {
-        picojson::object port = e.get<picojson::object>();
-        std::string type = port.at("type").get<std::string>();
-        int id = static_cast<int>(port.at("id").get<double>());
-        std::string portName = port.at("portName").get<std::string>();
-        int portBit = static_cast<int>(port.at("portBit").get<double>());
-        if (type == "input")
-            addId(id, builder.INPUT(portName, portBit));
-        else if (type == "output")
-            addId(id, builder.OUTPUT(portName, portBit));
-    }
-    for (const auto &e : cells) {
-        picojson::object cell = e.get<picojson::object>();
-        std::string type = cell.at("type").get<std::string>();
-        int id = static_cast<int>(cell.at("id").get<double>());
-        if (type == "AND")
-            addId(id, builder.AND());
-        else if (type == "NAND")
-            addId(id, builder.NAND());
-        else if (type == "ANDNOT")
-            addId(id, builder.ANDNOT());
-        else if (type == "XOR")
-            addId(id, builder.XOR());
-        else if (type == "XNOR")
-            addId(id, builder.XNOR());
-        else if (type == "DFFP")
-            addId(id, builder.DFF());
-        else if (type == "NOT")
-            addId(id, builder.NOT());
-        else if (type == "NOR")
-            addId(id, builder.NOR());
-        else if (type == "OR")
-            addId(id, builder.OR());
-        else if (type == "ORNOT")
-            addId(id, builder.ORNOT());
-        else if (type == "MUX")
-            addId(id, builder.MUX());
-        else {
-            bool valid = false;
-            // If builder.RAM() exists
-            if constexpr (detail::hasMethodFuncRAM<NetworkBuilder>) {
-                if (type == "RAM") {
-                    int addr = cell.at("ramAddress").get<double>(),
-                        bit = cell.at("ramBit").get<double>();
-                    addId(id, builder.RAM(addr, bit));
-                    valid = true;
+                if (!valid) {
+                    error::die("Invalid JSON of network. Invalid type: ", type);
                 }
             }
-
-            if (!valid) {
+        }
+        for (const auto &e : ports) {
+            picojson::object port = e.get<picojson::object>();
+            std::string type = port.at("type").get<std::string>();
+            int id = static_cast<int>(port.at("id").get<double>());
+            picojson::array &bits = port.at("bits").get<picojson::array>();
+            if (type == "input") {
+                // nothing to do!
+            }
+            else if (type == "output") {
+                for (const auto &b : bits) {
+                    int logic = static_cast<int>(b.get<double>());
+                    connectIds(logic, id);
+                }
+            }
+        }
+        for (const auto &e : cells) {
+            picojson::object cell = e.get<picojson::object>();
+            std::string type = cell.at("type").get<std::string>();
+            int id = static_cast<int>(cell.at("id").get<double>());
+            picojson::object input = cell.at("input").get<picojson::object>();
+            if (type == "AND" || type == "NAND" || type == "XOR" ||
+                type == "XNOR" || type == "NOR" || type == "ANDNOT" ||
+                type == "OR" || type == "ORNOT") {
+                int A = static_cast<int>(input.at("A").get<double>());
+                int B = static_cast<int>(input.at("B").get<double>());
+                connectIds(A, id);
+                connectIds(B, id);
+            }
+            else if (type == "DFFP" || type == "RAM") {
+                int D = static_cast<int>(input.at("D").get<double>());
+                connectIds(D, id);
+            }
+            else if (type == "NOT") {
+                int A = static_cast<int>(input.at("A").get<double>());
+                connectIds(A, id);
+            }
+            else if (type == "MUX") {
+                int A = static_cast<int>(input.at("A").get<double>());
+                int B = static_cast<int>(input.at("B").get<double>());
+                int S = static_cast<int>(input.at("S").get<double>());
+                connectIds(A, id);
+                connectIds(B, id);
+                connectIds(S, id);
+            }
+            else {
                 error::die("Invalid JSON of network. Invalid type: ", type);
             }
         }
     }
-    for (const auto &e : ports) {
-        picojson::object port = e.get<picojson::object>();
-        std::string type = port.at("type").get<std::string>();
-        int id = static_cast<int>(port.at("id").get<double>());
-        picojson::array &bits = port.at("bits").get<picojson::array>();
-        if (type == "input") {
-            // nothing to do!
-        }
-        else if (type == "output") {
-            for (const auto &b : bits) {
-                int logic = static_cast<int>(b.get<double>());
-                connectIds(logic, id);
-            }
-        }
-    }
-    for (const auto &e : cells) {
-        picojson::object cell = e.get<picojson::object>();
-        std::string type = cell.at("type").get<std::string>();
-        int id = static_cast<int>(cell.at("id").get<double>());
-        picojson::object input = cell.at("input").get<picojson::object>();
-        if (type == "AND" || type == "NAND" || type == "XOR" ||
-            type == "XNOR" || type == "NOR" || type == "ANDNOT" ||
-            type == "OR" || type == "ORNOT") {
-            int A = static_cast<int>(input.at("A").get<double>());
-            int B = static_cast<int>(input.at("B").get<double>());
-            connectIds(A, id);
-            connectIds(B, id);
-        }
-        else if (type == "DFFP" || type == "RAM") {
-            int D = static_cast<int>(input.at("D").get<double>());
-            connectIds(D, id);
-        }
-        else if (type == "NOT") {
-            int A = static_cast<int>(input.at("A").get<double>());
-            connectIds(A, id);
-        }
-        else if (type == "MUX") {
-            int A = static_cast<int>(input.at("A").get<double>());
-            int B = static_cast<int>(input.at("B").get<double>());
-            int S = static_cast<int>(input.at("S").get<double>());
-            connectIds(A, id);
-            connectIds(B, id);
-            connectIds(S, id);
-        }
-        else {
-            error::die("Invalid JSON of network. Invalid type: ", type);
-        }
-    }
-}
+};
 
 template <class NetworkBuilder>
 std::shared_ptr<typename NetworkBuilder::NetworkType> readNetwork(
     const blueprint::File &file)
 {
+    using NT = typename NetworkBuilder::NetworkType;
+
     std::ifstream ifs{file.path, std::ios::binary};
     if (!ifs)
         error::die("Invalid [[file]] path: ", file.path);
 
-    std::shared_ptr<typename NetworkBuilder::NetworkType> net;
+    NetworkBuilder builder;
     switch (file.type) {
     case blueprint::File::TYPE::IYOKANL1_JSON:
-        net = std::make_shared<typename NetworkBuilder::NetworkType>(
-            readNetworkFromJSON<NetworkBuilder>(ifs));
+        IyokanL1JSONReader::read<NetworkBuilder>(builder, ifs);
         break;
-    case blueprint::File::TYPE::YOSYS_JSON: {
-        NetworkBuilder builder;
-        YosysJSONReader<NetworkBuilder>{builder}.read(ifs);
-        net = std::make_shared<typename NetworkBuilder::NetworkType>(
-            std::move(builder));
+    case blueprint::File::TYPE::YOSYS_JSON:
+        YosysJSONReader::read<NetworkBuilder>(builder, ifs);
         break;
     }
-    }
+    auto net = std::make_shared<NT>(std::move(builder));
 
     error::Stack err;
     net->checkValid(err);
@@ -2498,7 +2478,7 @@ std::shared_ptr<typename NetworkBuilder::NetworkType> makeRAMWithMUX(
         std::stringstream ss{std::string{                                  \
             _binary_mux_ram_##addrW##_##dataW##_##dataW##_min_json_start,  \
             _binary_mux_ram_##addrW##_##dataW##_##dataW##_min_json_end}};  \
-        readNetworkFromJSONImpl(b, ss);                                    \
+        IyokanL1JSONReader::read(b, ss);                                   \
         auto net = std::make_shared<typename NetworkBuilder::NetworkType>( \
             std::move(b));                                                 \
                                                                            \
