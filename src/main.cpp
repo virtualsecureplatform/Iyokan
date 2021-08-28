@@ -27,6 +27,11 @@ int main(int argc, char **argv)
 #else
     spdlog::info("\tTFHE security parameter: 128bit");
 #endif
+#ifdef IYOKAN_CUDA_ENABLED
+    spdlog::info("\tGPU support: enabled");
+#else
+    spdlog::info("\tGPU support: disabled");
+#endif
 
     // Parse command-line arguments
     CLI::App app{"Prallel FHE circuit evaluation engine."};
