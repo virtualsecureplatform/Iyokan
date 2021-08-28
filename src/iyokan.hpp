@@ -2364,6 +2364,10 @@ std::shared_ptr<typename NetworkBuilder::NetworkType> readNetwork(
     NetworkBuilder builder;
     switch (file.type) {
     case blueprint::File::TYPE::IYOKANL1_JSON:
+        spdlog::warn(
+            "[[file]] of type 'iyokanl1-json' is deprecated. You don't need to "
+            "use Iyokan-L1. Use Yosys JSON directly by specifying type "
+            "'yosys-json'.");
         IyokanL1JSONReader::read<NetworkBuilder>(builder, ifs);
         break;
     case blueprint::File::TYPE::YOSYS_JSON:
