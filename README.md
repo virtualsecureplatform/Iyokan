@@ -179,15 +179,3 @@ If you want to run slow but detailed tests including ones for CUDA support:
 ```
 $ ruby test.rb build/bin slow cuda
 ```
-
-## How to add synthesized RAM
-
-```
-$ dotnet run -p ../kvsp/Iyokan-L1/ -c Release ../cahp-ruby/ram-1KiB-16bit.json mux-ram-9-16-16.json genRam
-$ cat mux-ram-9-16-16.json             | \
-sed -e 's/io_port_writeEnable/wren/'   \
-    -e 's/io_port_readData/rdata/'     \
-    -e 's/io_port_addr/addr/'          \
-    -e 's/io_port_writeData/wdata/'  | \
-jq -c > mux-ram-9-16-16.min.json
-```
