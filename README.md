@@ -1,5 +1,7 @@
 ![Iyokan logo](https://user-images.githubusercontent.com/33079554/73909483-1af77f80-48f0-11ea-880b-55039781cca2.png)
 
+[[Wiki](https://github.com/virtualsecureplatform/Iyokan/wiki)]
+
 # Iyokan
 
 Iyokan is a generic engine to evaluate logical circuits, such as processor,
