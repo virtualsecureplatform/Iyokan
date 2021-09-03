@@ -4,13 +4,13 @@
 
 # Iyokan
 
-Iyokan is a generic engine to evaluate logical circuits, such as processor,
-on homomorphic encryption like TFHE.
-Currently Iyokan supports [TFHEpp](https://github.com/virtualsecureplatform/TFHEpp)
+Iyokan is a generic engine for evaluating logical circuits, such as processors,
+over fully homomorphic encryption like TFHE.
+Currently, Iyokan supports [TFHEpp](https://github.com/virtualsecureplatform/TFHEpp)
 and [cuFHE](https://github.com/virtualsecureplatform/cuFHE)
 (TFHE implementation for CPU and GPU, respectively).
 
-## To Build
+## Build
 
 ```
 $ mkdir build && cd build
@@ -166,7 +166,7 @@ Done. (0 seconds)
 
 Finally we could get the same consequence as that in plaintext using ciphertext!
 
-## To Test
+## Test
 
 Run Ruby script `test.rb` at Iyokan's root directory like this
 (assume that target binaries are in `build/bin/`):
@@ -181,3 +181,7 @@ If you want to run slow but detailed tests including ones for CUDA support:
 ```
 $ ruby test.rb build/bin slow cuda
 ```
+
+## See Also
+
+See our [wiki](https://github.com/virtualsecureplatform/Iyokan/wiki).
