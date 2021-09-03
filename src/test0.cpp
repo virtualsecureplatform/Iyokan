@@ -769,7 +769,6 @@ void testBlueprint()
         const auto& files = blueprint.files();
         assert(files.size() == 1);
         assert(files[0].type == File::TYPE::YOSYS_JSON);
-        spdlog::info("{}", files[0].path);
         assert(std::filesystem::canonical(files[0].path) ==
                std::filesystem::canonical(
                    "test/yosys-json/cahp-diamond-core-yosys.json"));
