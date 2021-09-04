@@ -1,0 +1,27 @@
+[[file]]
+type = "yosys-json"
+path = "../yosys-json/pass-4bit-yosys.json"
+name = "passA"
+
+[[file]]
+type = "yosys-json"
+path = "../yosys-json/pass-4bit-yosys.json"
+name = "passB"
+
+[[file]]
+type = "yosys-json"
+path = "../yosys-json/pass-4bit-yosys.json"
+name = "passC"
+
+[[file]]
+type = "yosys-json"
+path = "../yosys-json/addr-4bit-yosys.json"
+name = "addr"
+
+[connect]
+"passA/io_in[0:3]" = "@A[0:3]"
+"passB/io_in[0:3]" = "@B[0:3]"
+"addr/io_inA[0:3]" = "passA/io_out[0:3]"
+"addr/io_inB[0:3]" = "passB/io_out[0:3]"
+"passC/io_in[0:3]" = "addr/io_out[0:3]"
+"@out[0:3]" = "passC/io_out[0:3]"
