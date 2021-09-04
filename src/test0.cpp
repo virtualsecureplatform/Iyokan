@@ -851,6 +851,49 @@ void testBlueprint()
     }
 }
 
+#include "iyokan_nt.hpp"
+
+namespace nt {
+void testAllocator()
+{
+    {
+        Allocator alc;
+        {
+            TLWELvl0* zero = alc.make<TLWELvl0>(0);
+            TLWELvl0* one = alc.make<TLWELvl0>(1);
+            *zero = TFHEppTestHelper::instance().zero();
+            *one = TFHEppTestHelper::instance().one();
+        }
+        {
+            TLWELvl0* zero = alc.get<TLWELvl0>(0);
+            TLWELvl0* one = alc.get<TLWELvl0>(1);
+            assert(*zero == TFHEppTestHelper::instance().zero());
+            assert(*one == TFHEppTestHelper::instance().one());
+        }
+    }
+    {
+        Allocator root;
+        {
+            Allocator &sub0 = root.subAllocator("0"),
+                      &sub1 = root.subAllocator("1");
+            TLWELvl0* zero = sub0.make<TLWELvl0>(0);
+            TLWELvl0* one = sub1.make<TLWELvl0>(0);
+            *zero = TFHEppTestHelper::instance().zero();
+            *one = TFHEppTestHelper::instance().one();
+        }
+        {
+            Allocator &sub0 = root.subAllocator("0"),
+                      &sub1 = root.subAllocator("1");
+            TLWELvl0* zero = sub0.get<TLWELvl0>(0);
+            TLWELvl0* one = sub1.get<TLWELvl0>(0);
+            assert(*zero == TFHEppTestHelper::instance().zero());
+            assert(*one == TFHEppTestHelper::instance().one());
+        }
+    }
+}
+
+}  // namespace nt
+
 int main()
 {
     AsyncThread::setNumThreads(std::thread::hardware_concurrency());
@@ -905,4 +948,6 @@ int main()
 
     testProgressGraphMaker();
     testBlueprint();
+
+    nt::testAllocator();
 }
