@@ -261,6 +261,8 @@ private:
             auto it = reqPacket_.bits.find(atPortName);
             if (it == reqPacket_.bits.end())
                 continue;
+            if (atPortName == "reset")
+                error::die("@reset cannot be set by user's input");
             const auto &bits = it->second;  // Found input bit stream
 
             // Calculate the index in the bit stream for the port.
