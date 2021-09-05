@@ -371,6 +371,8 @@ reg.add_in_out "addr-4bit-04", "test/config-toml/addr-4bit.toml",
                "test/in/test04.in", "test/out/test04.out", ncycles: 1, set_plain_ncycles: true
 reg.add_in_out "pass-addr-pass-4bit-04", "test/config-toml/pass-addr-pass-4bit.toml",
                "test/in/test04.in", "test/out/test04.out", ncycles: 1, set_plain_ncycles: true
+reg.add_in_out "addr-register-4bit-16", "test/config-toml/addr-register-4bit.toml",
+               "test/in/test16.in", "test/out/test16.out", ncycles: 3, set_plain_ncycles: true
 reg.add_in_out "div-8bit-05", "test/config-toml/div-8bit.toml",
                "test/in/test05.in", "test/out/test05.out", ncycles: 1, set_plain_ncycles: true
 reg.add_in_out "ram-addr8bit-06", "test/config-toml/ram-addr8bit.toml",

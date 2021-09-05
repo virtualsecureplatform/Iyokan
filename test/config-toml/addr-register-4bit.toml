@@ -1,0 +1,16 @@
+[[file]]
+type = "yosys-json"
+path = "../yosys-json/addr-4bit-yosys.json"
+name = "addr"
+
+[[file]]
+type = "yosys-json"
+path = "../yosys-json/register-4bit-yosys.json"
+name = "reg"
+
+[connect]
+"reg/reset" = "@reset"
+"addr/io_inA[0:3]" = "@A[0:3]"
+"addr/io_inB[0:3]" = "reg/io_out[0:3]"
+"reg/io_in[0:3]" = "addr/io_out[0:3]"
+"@out[0:3]" = "reg/io_out[0:3]"
