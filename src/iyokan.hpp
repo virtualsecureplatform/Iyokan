@@ -1907,7 +1907,8 @@ struct Options {
     std::optional<int> numCPUWorkers, numGPUWorkers, numGPU, numCycles;
     std::optional<std::string> bkeyFile, inputFile, outputFile, secretKey,
         dumpPrefix, snapshotFile, resumeFile;
-    std::optional<std::string> dumpTimeCSVPrefix, dumpGraphJSONPrefix;
+    std::optional<std::string> dumpTimeCSVPrefix, dumpGraphJSONPrefix,
+        dumpGraphDOTPrefix;
     SCHED sched = SCHED::UND;
     bool stdoutCSV = false;
 };

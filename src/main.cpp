@@ -65,6 +65,8 @@ int main(int argc, char **argv)
         plain->add_option("--dump-time-csv-prefix", opt.dumpTimeCSVPrefix, "");
         plain->add_option("--dump-graph-json-prefix", opt.dumpGraphJSONPrefix,
                           "");
+        plain->add_option("--dump-graph-dot-prefix", opt.dumpGraphDOTPrefix,
+                          "");
         plain->add_option("--sched", opt.sched, "")
             ->transform(CLI::CheckedTransformer(mapSched, CLI::ignore_case));
 
@@ -109,6 +111,7 @@ int main(int argc, char **argv)
         tfhe->add_option("--dump-time-csv-prefix", opt.dumpTimeCSVPrefix, "");
         tfhe->add_option("--dump-graph-json-prefix", opt.dumpGraphJSONPrefix,
                          "");
+        tfhe->add_option("--dump-graph-dot-prefix", opt.dumpGraphDOTPrefix, "");
         tfhe->add_option("--sched", opt.sched, "")
             ->transform(CLI::CheckedTransformer(mapSched, CLI::ignore_case));
 
@@ -197,6 +200,8 @@ int main(int argc, char **argv)
     if (opt.dumpGraphJSONPrefix)
         spdlog::info("\t--dump-graph-json-prefix: {}",
                      *opt.dumpGraphJSONPrefix);
+    if (opt.dumpGraphDOTPrefix)
+        spdlog::info("\t--dump-graph-dot-prefix: {}", *opt.dumpGraphDOTPrefix);
     if (opt.sched != SCHED::UND) {
         std::string str;
         switch (opt.sched) {
