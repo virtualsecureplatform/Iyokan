@@ -451,7 +451,8 @@ public:
             error::die("Invalid bootstrapping key");
 
         // Make runner
-        auto graph = opt.dumpTimeCSVPrefix || opt.dumpGraphJSONPrefix
+        auto graph = opt.dumpTimeCSVPrefix || opt.dumpGraphJSONPrefix ||
+                             opt.dumpGraphDOTPrefix
                          ? std::make_shared<ProgressGraphMaker>()
                          : nullptr;
         TFHEppWorkerInfo wi{bkey.gk, bkey.ck};
@@ -508,6 +509,12 @@ public:
                 const std::string filename = fmt::format(
                     "{}-{}.json", *opt.dumpGraphJSONPrefix, currentCycle_);
                 graph->dumpJSON(*utility::openOfstream(filename));
+            }
+            if (opt.dumpGraphDOTPrefix) {
+                assert(graph);
+                const std::string filename = fmt::format(
+                    "{}-{}.dot", *opt.dumpGraphDOTPrefix, currentCycle_);
+                graph->dumpDOT(*utility::openOfstream(filename));
             }
 
             spdlog::info("\tdone. ({} us)", duration.count());
