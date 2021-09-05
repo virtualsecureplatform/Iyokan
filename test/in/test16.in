@@ -1,0 +1,4 @@
+[[bits]]
+name = "A"
+size = 4
+bytes = [1]
