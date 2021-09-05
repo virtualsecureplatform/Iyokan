@@ -694,6 +694,13 @@ public:
         }
 
         // [connect]
+        // We need to treat "... = @..." and "@... = ..." differently from
+        // "..." = ...".
+        // First, check if ports that are connected to or from "@..." exist.
+        for (auto&& [key, port] : bp.atPorts()) {
+            get(port);  // Only checks if port exists
+        }
+        // Then, connect other ports. `get` checks if they also exist.
         for (const auto& [src, dst] : bp.edges()) {
             assert(src.portLabel.kind == "output");
             assert(dst.portLabel.kind == "input");
