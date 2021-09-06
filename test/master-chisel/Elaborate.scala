@@ -9,4 +9,5 @@ object Elaborate extends App {
     chisel3.Driver.execute(args, () => new Mux4bit)
     chisel3.Driver.execute(args, () => new Pass4bit)
     chisel3.Driver.execute(args, () => new Register4bit)
+    chisel3.Driver.execute(args, () => new RegisterInit4bit)
 }

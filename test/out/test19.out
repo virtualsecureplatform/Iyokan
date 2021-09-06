@@ -1,0 +1,6 @@
+rom = []
+ram = []
+cycles = 2
+bits = [
+{bytes=[12],size=4,name="out"},
+]
