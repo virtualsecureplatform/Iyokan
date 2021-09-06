@@ -45,6 +45,7 @@
 #include <cereal/types/vector.hpp>
 
 #include "error.hpp"
+#include "packet.hpp"
 #include "utility.hpp"
 
 // Forward declarations
@@ -974,6 +975,20 @@ public:
             node->tick();
     }
 
+    template <class T>
+    void setSDFFInitialValue()
+    {
+        for (auto &&[key, node] : id2node_) {
+            if (node->label().kind != "SDFF") {
+                continue;
+            }
+
+            auto sdff = std::dynamic_pointer_cast<T>(node->task());
+            assert(sdff);
+            sdff->setInitialValue();
+        }
+    }
+
     void checkValid(error::Stack &err)
     {
         for (auto &&[key, node] : id2node_)
@@ -1163,6 +1178,13 @@ protected:
         return task;
     }
 
+    std::shared_ptr<TaskTypeDFF> addSDFF(Bit initValue)
+    {
+        auto task = std::make_shared<TaskTypeDFF>(initValue);
+        this->addTask(NodeLabel{"SDFF", ""}, task);
+        return task;
+    }
+
     std::shared_ptr<TaskTypeDFF> addNamedDFF(const std::string &kind,
                                              const std::string &portName,
                                              int portBit)
@@ -1188,6 +1210,12 @@ public:
     int DFF()
     {
         auto task = addDFF();
+        return task->depnode()->label().id;
+    }
+
+    int SDFF(Bit initValue)
+    {
+        auto task = addSDFF(initValue);
         return task->depnode()->label().id;
     }
 
@@ -1910,7 +1938,7 @@ struct Options {
     std::optional<std::string> dumpTimeCSVPrefix, dumpGraphJSONPrefix,
         dumpGraphDOTPrefix;
     SCHED sched = SCHED::UND;
-    bool stdoutCSV = false;
+    bool stdoutCSV, skipReset = false;
 };
 
 template <class Func>
@@ -1995,6 +2023,13 @@ public:
         for (auto &&net : nets_)
             net->tick();
     }
+
+    template <class T>
+    void setSDFFInitialValue()
+    {
+        for (auto &&net : nets_)
+            net->template setSDFFInitialValue<T>();
+    }
 };
 
 class YosysJSONReader {
@@ -2024,6 +2059,8 @@ private:
         NOR,
         ORNOT,
         DFFP,
+        SDFFPP0,
+        SDFFPP1,
         MUX,
     };
 
@@ -2110,11 +2147,18 @@ public:
 
         // Create gates and extract gate connection info
         const std::unordered_map<std::string, CELL> mapCell = {
-            {"$_NOT_", CELL::NOT},       {"$_AND_", CELL::AND},
-            {"$_ANDNOT_", CELL::ANDNOT}, {"$_NAND_", CELL::NAND},
-            {"$_OR_", CELL::OR},         {"$_XOR_", CELL::XOR},
-            {"$_XNOR_", CELL::XNOR},     {"$_NOR_", CELL::NOR},
-            {"$_ORNOT_", CELL::ORNOT},   {"$_DFF_P_", CELL::DFFP},
+            {"$_NOT_", CELL::NOT},
+            {"$_AND_", CELL::AND},
+            {"$_ANDNOT_", CELL::ANDNOT},
+            {"$_NAND_", CELL::NAND},
+            {"$_OR_", CELL::OR},
+            {"$_XOR_", CELL::XOR},
+            {"$_XNOR_", CELL::XNOR},
+            {"$_NOR_", CELL::NOR},
+            {"$_ORNOT_", CELL::ORNOT},
+            {"$_DFF_P_", CELL::DFFP},
+            {"$_SDFF_PP0_", CELL::SDFFPP0},
+            {"$_SDFF_PP1_", CELL::SDFFPP1},
             {"$_MUX_", CELL::MUX},
         };
         std::vector<Cell> cellvec;
@@ -2173,6 +2217,16 @@ public:
                 cellvec.emplace_back(CELL::DFFP, id, get("D"));
                 bit = get("Q");
                 break;
+            case CELL::SDFFPP0:
+                id = builder.SDFF(Bit(false));
+                cellvec.emplace_back(CELL::DFFP, id, get("D"));
+                bit = get("Q");
+                break;
+            case CELL::SDFFPP1:
+                id = builder.SDFF(Bit(true));
+                cellvec.emplace_back(CELL::DFFP, id, get("D"));
+                bit = get("Q");
+                break;
             case CELL::NOT:
                 id = builder.NOT();
                 cellvec.emplace_back(CELL::NOT, id, get("A"));
@@ -2209,6 +2263,8 @@ public:
                 builder.connect(bit2id.at(cell.bit1), cell.id);
                 break;
             case CELL::DFFP:
+            case CELL::SDFFPP0:
+            case CELL::SDFFPP1:
             case CELL::NOT:
                 builder.connect(bit2id.at(cell.bit0), cell.id);
                 break;

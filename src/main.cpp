@@ -69,6 +69,7 @@ int main(int argc, char **argv)
                           "");
         plain->add_option("--sched", opt.sched, "")
             ->transform(CLI::CheckedTransformer(mapSched, CLI::ignore_case));
+        plain->add_flag("--skip-reset", opt.skipReset, "");
 
         auto ogroups = plain->add_option_group("run in plaintext",
                                                "Run in plaintext mode");
@@ -119,6 +120,7 @@ int main(int argc, char **argv)
             ->check(CLI::ExistingFile);
         tfhe->add_option("--dump-prefix", opt.dumpPrefix, "")
             ->needs("--secret-key");
+        tfhe->add_flag("--skip-reset", opt.skipReset, "");
 
 #ifdef IYOKAN_CUDA_ENABLED
         tfhe->add_option("--gpu", opt.numGPUWorkers, "")
@@ -216,6 +218,8 @@ int main(int argc, char **argv)
         }
         spdlog::info("\t--sched: {}", str);
     }
+    if (opt.skipReset)
+        spdlog::info("\t--skip-reset: {}", opt.skipReset);
 
     // Process depending on the options chosen.
     if (quiet)

@@ -17,10 +17,35 @@ using TaskTFHEppGate = Task<TLWELvl0, TLWELvl0, TFHEppWorkerInfo>;
 using TaskTFHEppGateMem = TaskMem<TLWELvl0, TLWELvl0, TFHEppWorkerInfo>;
 
 class TaskTFHEppGateDFF : public TaskDFF<TLWELvl0, TLWELvl0, TFHEppWorkerInfo> {
+private:
+    Bit initialValue_;
+
 public:
     TaskTFHEppGateDFF()
     {
+        initialValue_ = 0_b;
         TFHEpp::HomCONSTANTZERO(output());
+    }
+
+    TaskTFHEppGateDFF(Bit initValue)
+    {
+        initialValue_ = initValue;
+        if (initialValue_ == 0_b) {
+            TFHEpp::HomCONSTANTZERO(output());
+        }
+        else {
+            TFHEpp::HomCONSTANTONE(output());
+        }
+    }
+
+    void setInitialValue()
+    {
+        if (initialValue_ == 0_b) {
+            TFHEpp::HomCONSTANTZERO(output());
+        }
+        else {
+            TFHEpp::HomCONSTANTONE(output());
+        }
     }
 
     template <class Archive>

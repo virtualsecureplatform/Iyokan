@@ -6,3 +6,4 @@ _test*
 test0
 build/
 test/master-chisel/build
+.vscode
