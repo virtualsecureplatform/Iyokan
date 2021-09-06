@@ -13,6 +13,7 @@ enum class TYPE {
     PACK,
     PACKET2TOML,
     TOML2PACKET,
+    CONVERT,
 } type;
 
 using KeyVal = std::pair<std::string, std::string>;
@@ -221,6 +222,39 @@ void doToml2Packet(const std::string& in, const std::string& out)
     writeToArchive(out, pkt);
 }
 
+void doConvert(
+    const std::vector<std::pair<std::string, std::string>>& inNameFilepath,
+    const std::string& outFilepath, const std::vector<std::string>& rules)
+{
+    std::unordered_map<std::string, TFHEPacket> name2pkt;
+    for (auto&& [name, path] : inNameFilepath) {
+        name2pkt.emplace(name, readFromArchive<TFHEPacket>(path));
+    }
+
+    TFHEPacket out;
+    std::regex re{
+        R"((ram|rom|bits)\.([a-zA-Z0-9]+)\s*=\s*([a-zA-Z0-9]+)\.([a-zA-Z0-9]+))"};
+    std::smatch m;
+    for (const std::string& rule : rules) {
+        if (!std::regex_match(rule, m, re))
+            error::die("Invalid assignment: {}", rule);
+        if (m[1] == "ram") {
+            out.ram.emplace(m[2], name2pkt.at(m[3]).ram.at(m[4]));
+            out.ramInTLWE.emplace(m[2], name2pkt.at(m[3]).ramInTLWE.at(m[4]));
+        }
+        else if (m[1] == "rom") {
+            out.rom.emplace(m[2], name2pkt.at(m[3]).rom.at(m[4]));
+            out.romInTLWE.emplace(m[2], name2pkt.at(m[3]).romInTLWE.at(m[4]));
+        }
+        else {
+            assert(m[1] == "bits");
+            out.bits.emplace(m[2], name2pkt.at(m[3]).bits.at(m[4]));
+        }
+    }
+
+    writeToArchive(outFilepath, out);
+}
+
 std::string type2str(TYPE t)
 {
     switch (t) {
@@ -238,6 +272,8 @@ std::string type2str(TYPE t)
         return "packet2toml";
     case TYPE::TOML2PACKET:
         return "toml2packet";
+    case TYPE::CONVERT:
+        return "convert";
     }
 
     assert(0);
@@ -271,6 +307,8 @@ int main(int argc, char** argv)
 
     std::string in = "", out = "", key = "", bkey = "";
     std::optional<std::string> rom, ram, bits;
+    std::vector<std::pair<std::string, std::string>> ins;
+    std::vector<std::string> rules;
 
     enum class KEY_TYPE {
         TFHEPP,
@@ -331,6 +369,16 @@ int main(int argc, char** argv)
         sub->add_option("-o,--out", out)->required();
     }
 
+    {
+        CLI::App* cnv = app.add_subcommand("convert", "");
+        cnv->parse_complete_callback([&] { type = TYPE::CONVERT; });
+        cnv->add_option("-i,--in", ins)
+            ->required()
+            ->check(CLI::Validator(CLI::ExistingFile).application_index(1));
+        cnv->add_option("-o,--out", out)->required();
+        cnv->add_option("RULES", rules);
+    }
+
     CLI11_PARSE(app, argc, argv);
 
     spdlog::info("Starting {}...", type2str(type));
@@ -366,6 +414,10 @@ int main(int argc, char** argv)
 
     case TYPE::TOML2PACKET:
         doToml2Packet(in, out);
+        break;
+
+    case TYPE::CONVERT:
+        doConvert(ins, out, rules);
         break;
     }
     auto end = std::chrono::high_resolution_clock::now();
