@@ -166,6 +166,34 @@ else
   $logger.info "Testing toml2packet done."
 end
 
+if $SKIP_PREFACE
+  $logger.info "Skip test of iyokan-packet convert."
+else
+  $logger.info "Testing iyokan-packet convert running..."
+  run_iyokan_packet ["toml2packet", "--in", "test/in/test00.in", "--out", "_test_plain_pkt0"]
+  run_iyokan_packet ["toml2packet", "--in", "test/out/test08.out", "--out", "_test_plain_pkt1"]
+  run_iyokan_packet ["toml2packet", "--in", "test/in/test03.in", "--out", "_test_plain_pkt2"]
+  run_iyokan_packet ["enc", "--key", $skey, "--in", "_test_plain_pkt0", "--out", "_test_pkt0"]
+  run_iyokan_packet ["enc", "--key", $skey, "--in", "_test_plain_pkt1", "--out", "_test_pkt1"]
+  run_iyokan_packet ["enc", "--key", $skey, "--in", "_test_plain_pkt2", "--out", "_test_pkt2"]
+  run_iyokan_packet ["convert",
+                     "--in", "a", "_test_pkt0",
+                     "--in", "b", "_test_pkt1",
+                     "--in", "c", "_test_pkt2",
+                     "--out", "_test_pkt2",
+                     "rom.foo = a.rom",
+                     "ram.bar = a.ramB",
+                     "bits.baz = b.rdata",
+                     "ram.hoge = b.target",
+                     "bits.piyo = c.hoge"]
+  run_iyokan_packet ["dec", "--key", $skey, "--in", "_test_pkt2", "--out", "_test_plain_pkt2"]
+  r = run_iyokan_packet ["packet2toml", "--in", "_test_plain_pkt2"]
+  got = TomlRB.parse(r)
+  expected = TomlRB.load_file("test/in/test17.in")
+  assert_equal_packet got, expected
+  $logger.info "Testing iyokan-packet convert done."
+end
+
 ##### iyokan #####
 
 class TestRunner
