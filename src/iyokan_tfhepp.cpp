@@ -41,6 +41,11 @@ public:
     {
         tfhepp_.tick();
     }
+
+    void setSDFFInitialValue()
+    {
+        tfhepp_.setSDFFInitialValue<TaskTFHEppGateDFF>();
+    }
 };
 
 struct TFHEppRunParameter {
@@ -470,7 +475,7 @@ public:
             runner.addNetwork(p.second);
 
         // Reset
-        if (currentCycle_ == 0) {
+        if (currentCycle_ == 0 && !opt.skipReset) {
             if (auto reset = maybeGetAt("input", "reset"); reset) {
                 TLWELvl0 one, zero;
                 TFHEpp::HomCONSTANTONE(one);
@@ -501,6 +506,11 @@ public:
                 // Set values to RAM and input ports if necessary
                 if (currentCycle_ == 0)
                     setInitialRAM();
+
+                // Reset SDFF value with initial value
+                if (currentCycle_ == 0)
+                    runner.setSDFFInitialValue();
+
                 setCircularInputs(currentCycle_);
 
                 // Run

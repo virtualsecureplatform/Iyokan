@@ -1,0 +1,145 @@
+{
+  "creator": "Yosys 0.9+4292 (git sha1 50be8fd0, gcc 9.3.0-17ubuntu1~20.04 -fPIC -Os)",
+  "modules": {
+    "RegisterInit4bit": {
+      "attributes": {
+        "top": "00000000000000000000000000000001",
+        "src": "RegisterInit4bit.v:14.1-42.10"
+      },
+      "ports": {
+        "clock": {
+          "direction": "input",
+          "bits": [ 2 ]
+        },
+        "reset": {
+          "direction": "input",
+          "bits": [ 3 ]
+        },
+        "io_in": {
+          "direction": "input",
+          "bits": [ 4, 5, 6, 7 ]
+        },
+        "io_out": {
+          "direction": "output",
+          "bits": [ 8, 9, 10, 11 ]
+        }
+      },
+      "cells": {
+        "$auto$simplemap.cc:527:simplemap_adff_sdff$81": {
+          "hide_name": 1,
+          "type": "$_SDFF_PP1_",
+          "parameters": {
+          },
+          "attributes": {
+            "src": "RegisterInit4bit.v:35.3-41.6"
+          },
+          "port_directions": {
+            "C": "input",
+            "D": "input",
+            "Q": "output",
+            "R": "input"
+          },
+          "connections": {
+            "C": [ 2 ],
+            "D": [ 4 ],
+            "Q": [ 8 ],
+            "R": [ 3 ]
+          }
+        },
+        "$auto$simplemap.cc:527:simplemap_adff_sdff$82": {
+          "hide_name": 1,
+          "type": "$_SDFF_PP0_",
+          "parameters": {
+          },
+          "attributes": {
+            "src": "RegisterInit4bit.v:35.3-41.6"
+          },
+          "port_directions": {
+            "C": "input",
+            "D": "input",
+            "Q": "output",
+            "R": "input"
+          },
+          "connections": {
+            "C": [ 2 ],
+            "D": [ 5 ],
+            "Q": [ 9 ],
+            "R": [ 3 ]
+          }
+        },
+        "$auto$simplemap.cc:527:simplemap_adff_sdff$83": {
+          "hide_name": 1,
+          "type": "$_SDFF_PP0_",
+          "parameters": {
+          },
+          "attributes": {
+            "src": "RegisterInit4bit.v:35.3-41.6"
+          },
+          "port_directions": {
+            "C": "input",
+            "D": "input",
+            "Q": "output",
+            "R": "input"
+          },
+          "connections": {
+            "C": [ 2 ],
+            "D": [ 6 ],
+            "Q": [ 10 ],
+            "R": [ 3 ]
+          }
+        },
+        "$auto$simplemap.cc:527:simplemap_adff_sdff$84": {
+          "hide_name": 1,
+          "type": "$_SDFF_PP1_",
+          "parameters": {
+          },
+          "attributes": {
+            "src": "RegisterInit4bit.v:35.3-41.6"
+          },
+          "port_directions": {
+            "C": "input",
+            "D": "input",
+            "Q": "output",
+            "R": "input"
+          },
+          "connections": {
+            "C": [ 2 ],
+            "D": [ 7 ],
+            "Q": [ 11 ],
+            "R": [ 3 ]
+          }
+        }
+      },
+      "netnames": {
+        "clock": {
+          "hide_name": 0,
+          "bits": [ 2 ],
+          "attributes": {
+            "src": "RegisterInit4bit.v:15.16-15.21"
+          }
+        },
+        "io_in": {
+          "hide_name": 0,
+          "bits": [ 4, 5, 6, 7 ],
+          "attributes": {
+            "src": "RegisterInit4bit.v:17.16-17.21"
+          }
+        },
+        "io_out": {
+          "hide_name": 0,
+          "bits": [ 8, 9, 10, 11 ],
+          "attributes": {
+            "src": "RegisterInit4bit.v:18.16-18.22"
+          }
+        },
+        "reset": {
+          "hide_name": 0,
+          "bits": [ 3 ],
+          "attributes": {
+            "src": "RegisterInit4bit.v:16.16-16.21"
+          }
+        }
+      }
+    }
+  }
+}

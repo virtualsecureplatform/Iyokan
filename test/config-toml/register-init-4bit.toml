@@ -1,0 +1,11 @@
+[[file]]
+type = "yosys-json"
+path = "../yosys-json/register-init-4bit-yosys.json"
+name = "register_init"
+
+[connect]
+"register_init/reset" = "@reset"
+"@out[0:3]" = "register_init/io_out[0:3]"
+"register_init/io_in[0:3]" = "@in[0:3]"
+
+

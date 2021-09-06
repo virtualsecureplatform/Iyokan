@@ -11,10 +11,25 @@ using TaskPlainGate = Task<Bit, Bit, PlainWorkerInfo>;
 using TaskPlainGateMem = TaskMem<Bit, Bit, PlainWorkerInfo>;
 
 class TaskPlainGateDFF : public TaskDFF<Bit, Bit, PlainWorkerInfo> {
+private:
+    Bit initialValue_;
+
 public:
     TaskPlainGateDFF()
     {
-        output() = 0_b;
+        initialValue_ = 0_b;
+        output() = initialValue_;
+    }
+
+    TaskPlainGateDFF(Bit initValue)
+    {
+        initialValue_ = initValue;
+        output() = initialValue_;
+    }
+
+    void setInitialValue()
+    {
+        output() = initialValue_;
     }
 
     template <class Archive>

@@ -94,6 +94,9 @@ public:
 CEREAL_REGISTER_TYPE(TaskCUFHEGateMem);
 
 class TaskCUFHEGateDFF : public TaskCUFHEGateMem {
+private:
+    Bit initialValue_;
+
 protected:
     void startAsyncImpl(CUFHEWorkerInfo) override
     {
@@ -102,7 +105,29 @@ protected:
 public:
     TaskCUFHEGateDFF() : TaskCUFHEGateMem(1)
     {
+        initialValue_ = 0_b;
         setCtxtZero(output());
+    }
+
+    TaskCUFHEGateDFF(Bit initValue) : TaskCUFHEGateMem(1)
+    {
+        initialValue_ = initValue;
+        if (initialValue_ == 0_b) {
+            setCtxtZero(output());
+        }
+        else {
+            setCtxtOne(output());
+        }
+    }
+
+    void setInitialValue()
+    {
+        if (initialValue_ == 0_b) {
+            setCtxtZero(output());
+        }
+        else {
+            setCtxtOne(output());
+        }
     }
 
     bool areInputsReady() const override
@@ -720,6 +745,12 @@ public:
             bridge->tick();
         for (auto&& bridge : bridges1_)
             bridge->tick();
+    }
+
+    void setSDFFInitialValue()
+    {
+        cufhe_.setSDFFInitialValue<TaskCUFHEGateDFF>();
+        tfhepp_.setSDFFInitialValue<TaskTFHEppGateDFF>();
     }
 };
 

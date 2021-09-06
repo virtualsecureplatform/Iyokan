@@ -42,6 +42,11 @@ public:
     {
         plain_.tick();
     }
+
+    void setSDFFInitialValue()
+    {
+        plain_.setSDFFInitialValue<TaskPlainGateDFF>();
+    }
 };
 
 struct PlainRunParameter {
@@ -448,7 +453,7 @@ public:
             runner.addNetwork(p.second);
 
         // Reset
-        if (currentCycle_ == 0) {
+        if (currentCycle_ == 0 && !opt.skipReset) {
             if (auto reset = maybeGetAt("input", "reset"); reset) {
                 reset->set(1_b);
                 runner.run();
@@ -483,6 +488,11 @@ public:
                     // Set values to RAM and input ports if necessary
                     if (currentCycle_ == 0)
                         setInitialRAM();
+
+                    // Reset SDFF value with initial value only
+                    if (currentCycle_ == 0)
+                        runner.setSDFFInitialValue();
+
                     setCircularInputs(currentCycle_);
 
                     // Run
