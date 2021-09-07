@@ -314,7 +314,9 @@ void readFromArchive(T& res, const std::string& path)
 {
     try {
         std::ifstream ifs{path, std::ios::binary};
-        assert(ifs && "Can't open the file to read from; maybe not found?");
+        if (!ifs)
+            spdlog::error(
+                "Can't open the file to read from; Maybe not found?: {}", path);
         readFromArchive<T>(res, ifs);
     }
     catch (std::exception& ex) {

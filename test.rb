@@ -451,6 +451,38 @@ reg.add_in_out("cahp-diamond-dump-prefix-00", "test/config-toml/cahp-diamond.tom
   assert_include toml["bits"], { "bytes" => [42, 0], "size" => 16, "name" => "reg_x0" }
 end
 
+reg.add("tfhe-addr-addr-4bit-20", [:tfhe]) do
+  in_file = "test/in/test20.in"
+  out_file = "test/out/test20.out"
+
+  run_iyokan_packet ["toml2packet", "--in", in_file, "--out", $req_file]
+  run_iyokan_packet ["enc", "--key", $skey, "--in", $req_file, "--out", $req_file]
+  run_iyokan ["tfhe",
+              "--blueprint", "test/config-toml/addr-4bit.toml",
+              "--bkey", $bkey,
+              "-i", $req_file,
+              "-o", $res_file,
+              "-c", 1]
+  run_iyokan_packet ["convert",
+                     "-o", $req_file,
+                     "-i", "a", $res_file,
+                     "--",
+                     "bits.A = a.out",
+                     "bits.B = a.out"]
+  run_iyokan ["tfhe",
+              "--blueprint", "test/config-toml/addr-4bit.toml",
+              "--bkey", $bkey,
+              "-i", $req_file,
+              "-o", $res_file,
+              "-c", 1]
+  run_iyokan_packet ["dec", "--key", $skey, "--in", $res_file, "--out", $res_file]
+  r = run_iyokan_packet ["packet2toml", "--in", $res_file]
+
+  got = TomlRB.parse r
+  expected = TomlRB.load_file out_file
+  assert_equal_packet got, expected
+end
+
 ##### Run
 runner = reg.get_runner(tags: ARGV.map(&:to_sym))
 runner.run

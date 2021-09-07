@@ -1,0 +1,9 @@
+[[bits]]
+name = "A"
+size = 4
+bytes = [0xc]
+
+[[bits]]
+name = "B"
+size = 4
+bytes = [0xa]
