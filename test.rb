@@ -167,6 +167,32 @@ else
 end
 
 if $SKIP_PREFACE
+  $logger.info "Skip test of iyokan-packet convert-plain."
+else
+  $logger.info "Testing iyokan-packet convert-plain running..."
+  run_iyokan_packet ["toml2packet", "--in", "test/in/test00.in", "--out", "_test_plain_pkt0"]
+  run_iyokan_packet ["toml2packet", "--in", "test/out/test08.out", "--out", "_test_plain_pkt1"]
+  run_iyokan_packet ["toml2packet", "--in", "test/in/test03.in", "--out", "_test_plain_pkt2"]
+  run_iyokan_packet ["convert-plain",
+                     "--in",
+                     "a", "_test_plain_pkt0",
+                     "b", "_test_plain_pkt1",
+                     "c", "_test_plain_pkt2",
+                     "--",
+                     "--out", "_test_plain_pkt2",
+                     "rom.foo = a.rom",
+                     "ram.bar = a.ramB",
+                     "bits.baz = b.rdata",
+                     "ram.hoge = b.target",
+                     "bits.piyo = c.hoge"]
+  r = run_iyokan_packet ["packet2toml", "--in", "_test_plain_pkt2"]
+  got = TomlRB.parse(r)
+  expected = TomlRB.load_file("test/in/test17.in")
+  assert_equal_packet got, expected
+  $logger.info "Testing iyokan-packet convert-plain done."
+end
+
+if $SKIP_PREFACE
   $logger.info "Skip test of iyokan-packet convert."
 else
   $logger.info "Testing iyokan-packet convert running..."
@@ -451,6 +477,34 @@ reg.add_in_out("cahp-diamond-dump-prefix-00", "test/config-toml/cahp-diamond.tom
   assert_equal toml["cycles"].to_i, 7
   assert_include toml["bits"], { "bytes" => [0], "size" => 1, "name" => "finflag" }
   assert_include toml["bits"], { "bytes" => [42, 0], "size" => 16, "name" => "reg_x0" }
+end
+
+reg.add("plain-addr-addr-4bit-20", [:plain, :fast]) do
+  in_file = "test/in/test20.in"
+  out_file = "test/out/test20.out"
+
+  run_iyokan_packet ["toml2packet", "--in", in_file, "--out", $req_file]
+  run_iyokan ["plain",
+              "--blueprint", "test/config-toml/addr-4bit.toml",
+              "-i", $req_file,
+              "-o", $res_file,
+              "-c", 1]
+  run_iyokan_packet ["convert-plain",
+                     "-o", $req_file,
+                     "-i", "a", $res_file,
+                     "--",
+                     "bits.A = a.out",
+                     "bits.B = a.out"]
+  run_iyokan ["plain",
+              "--blueprint", "test/config-toml/addr-4bit.toml",
+              "-i", $req_file,
+              "-o", $res_file,
+              "-c", 1]
+  r = run_iyokan_packet ["packet2toml", "--in", $res_file]
+
+  got = TomlRB.parse r
+  expected = TomlRB.load_file out_file
+  assert_equal_packet got, expected
 end
 
 reg.add("tfhe-addr-addr-4bit-20", [:tfhe]) do

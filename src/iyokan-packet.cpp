@@ -14,6 +14,7 @@ enum class TYPE {
     PACKET2TOML,
     TOML2PACKET,
     CONVERT,
+    CONVERT_PLAIN,
 } type;
 
 using KeyVal = std::pair<std::string, std::string>;
@@ -255,6 +256,37 @@ void doConvert(
     writeToArchive(outFilepath, out);
 }
 
+void doConvertPlain(
+    const std::vector<std::pair<std::string, std::string>>& inNameFilepath,
+    const std::string& outFilepath, const std::vector<std::string>& rules)
+{
+    std::unordered_map<std::string, PlainPacket> name2pkt;
+    for (auto&& [name, path] : inNameFilepath) {
+        name2pkt.emplace(name, readFromArchive<PlainPacket>(path));
+    }
+
+    PlainPacket out;
+    std::regex re{
+        R"((ram|rom|bits)\.([a-zA-Z0-9]+)\s*=\s*([a-zA-Z0-9]+)\.([a-zA-Z0-9]+))"};
+    std::smatch m;
+    for (const std::string& rule : rules) {
+        if (!std::regex_match(rule, m, re))
+            error::die("Invalid assignment: {}", rule);
+        if (m[1] == "ram") {
+            out.ram.emplace(m[2], name2pkt.at(m[3]).ram.at(m[4]));
+        }
+        else if (m[1] == "rom") {
+            out.rom.emplace(m[2], name2pkt.at(m[3]).rom.at(m[4]));
+        }
+        else {
+            assert(m[1] == "bits");
+            out.bits.emplace(m[2], name2pkt.at(m[3]).bits.at(m[4]));
+        }
+    }
+
+    writeToArchive(outFilepath, out);
+}
+
 std::string type2str(TYPE t)
 {
     switch (t) {
@@ -274,6 +306,8 @@ std::string type2str(TYPE t)
         return "toml2packet";
     case TYPE::CONVERT:
         return "convert";
+    case TYPE::CONVERT_PLAIN:
+        return "convert-plain";
     }
 
     assert(0);
@@ -379,6 +413,16 @@ int main(int argc, char** argv)
         cnv->add_option("RULES", rules);
     }
 
+    {
+        CLI::App* cnv = app.add_subcommand("convert-plain", "");
+        cnv->parse_complete_callback([&] { type = TYPE::CONVERT_PLAIN; });
+        cnv->add_option("-i,--in", ins)
+            ->required()
+            ->check(CLI::Validator(CLI::ExistingFile).application_index(1));
+        cnv->add_option("-o,--out", out)->required();
+        cnv->add_option("RULES", rules);
+    }
+
     CLI11_PARSE(app, argc, argv);
 
     spdlog::info("Starting {}...", type2str(type));
@@ -418,6 +462,10 @@ int main(int argc, char** argv)
 
     case TYPE::CONVERT:
         doConvert(ins, out, rules);
+        break;
+
+    case TYPE::CONVERT_PLAIN:
+        doConvertPlain(ins, out, rules);
         break;
     }
     auto end = std::chrono::high_resolution_clock::now();
