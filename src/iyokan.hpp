@@ -1841,7 +1841,15 @@ public:
                         const std::string &name = to.portLabel.portName;
                         int bit = to.portLabel.portBit;
 
-                        atPorts_.emplace(std::make_tuple(name, bit), from);
+                        {
+                            auto [it, inserted] = atPorts_.emplace(
+                                std::make_tuple(name, bit), from);
+                            if (!inserted)
+                                spdlog::warn(
+                                    "{} is used multiple times. Only the first "
+                                    "one is effective.",
+                                    srcTo);
+                        }
 
                         auto [it, inserted] = atPortWidths_.emplace(name, 0);
                         it->second = std::max(it->second, bit + 1);
@@ -1853,7 +1861,15 @@ public:
                         const std::string &name = from.portLabel.portName;
                         int bit = from.portLabel.portBit;
 
-                        atPorts_.emplace(std::make_tuple(name, bit), to);
+                        {
+                            auto [it, inserted] = atPorts_.emplace(
+                                std::make_tuple(name, bit), to);
+                            if (!inserted)
+                                spdlog::warn(
+                                    "{} is used multiple times. Only the first "
+                                    "one is effective. (FIXME)",
+                                    srcFrom);
+                        }
 
                         auto [it, inserted] = atPortWidths_.emplace(name, 0);
                         it->second = std::max(it->second, bit + 1);
