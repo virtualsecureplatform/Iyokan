@@ -177,9 +177,11 @@ else
   run_iyokan_packet ["enc", "--key", $skey, "--in", "_test_plain_pkt1", "--out", "_test_pkt1"]
   run_iyokan_packet ["enc", "--key", $skey, "--in", "_test_plain_pkt2", "--out", "_test_pkt2"]
   run_iyokan_packet ["convert",
-                     "--in", "a", "_test_pkt0",
-                     "--in", "b", "_test_pkt1",
-                     "--in", "c", "_test_pkt2",
+                     "--in",
+                     "a", "_test_pkt0",
+                     "b", "_test_pkt1",
+                     "c", "_test_pkt2",
+                     "--",
                      "--out", "_test_pkt2",
                      "rom.foo = a.rom",
                      "ram.bar = a.ramB",
