@@ -15,6 +15,11 @@ int main(int argc, char **argv)
 
     // Show build config
     spdlog::info("Build config");
+#if defined(NDEBUG)
+    spdlog::info("\tType: Release");
+#else
+    spdlog::info("\tType: Debug");
+#endif
 #if defined(IYOKAN_GIT_REVISION)
     spdlog::info("\tGit revision: " IYOKAN_GIT_REVISION);
 #else
