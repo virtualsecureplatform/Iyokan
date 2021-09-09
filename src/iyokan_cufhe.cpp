@@ -37,34 +37,28 @@ void capTFHEppNetWithCUFHEWIRE(CUFHENetworkWithTFHEpp& net)
         auto&& [kind, portName, portBit] = name;
         if (kind == "input") {
             /*
-               CUFHE INPUT --> Bridge --> CUFHE2TFHEpp --> TFHEpp INPUT
+               CUFHE INPUT --> Bridge --> TFHEpp INPUT
             */
             // Create nodes
             auto tfheppINPUT = std::dynamic_pointer_cast<TaskTFHEppGate>(mem);
             assert(tfheppINPUT);
             auto cufheINPUT =
                 bc.addINPUT<TaskCUFHEGateWIRE>(portName, portBit, false);
-            auto cufhe2tfhepp =
-                bt.emplaceTask<TaskCUFHE2TFHEpp>(NodeLabel{"cufhe2tfhepp", ""});
             // Connect nodes
-            brs0.push_back(connectWithBridge(cufheINPUT, cufhe2tfhepp));
             tfheppINPUT->acceptOneMoreInput();
-            connectTasks(cufhe2tfhepp, tfheppINPUT);
+            brs0.push_back(connectWithBridge(cufheINPUT, tfheppINPUT));
         }
         else if (kind == "output") {
             /*
-                TFHEpp OUTPUT --> TFHEpp2CUFHE --> Bridge --> CUFHE OUTPUT
+                TFHEpp OUTPUT --> Bridge --> CUFHE OUTPUT
             */
             // Create nodes
             auto tfheppOUTPUT = std::dynamic_pointer_cast<TaskTFHEppGate>(mem);
             assert(tfheppOUTPUT);
             auto cufheOUTPUT =
                 bc.addOUTPUT<TaskCUFHEGateWIRE>(portName, portBit, true);
-            auto tfhepp2cufhe =
-                bt.emplaceTask<TaskTFHEpp2CUFHE>(NodeLabel{"tfhepp2cufhe", ""});
             // Connect nodes
-            connectTasks(tfheppOUTPUT, tfhepp2cufhe);
-            brs1.push_back(connectWithBridge(tfhepp2cufhe, cufheOUTPUT));
+            brs1.push_back(connectWithBridge(tfheppOUTPUT, cufheOUTPUT));
         }
     }
 
@@ -428,8 +422,7 @@ private:
             auto& bits = resPacket.bits[atPortName];
             if (bits.size() < atPortBit + 1)
                 bits.resize(atPortBit + 1);
-            bits.at(atPortBit) =
-                cufhe2tfhepp(get<TaskCUFHEGateMem>(port)->get());
+            bits.at(atPortBit) = get<TaskCUFHEGateMem>(port)->get();
         }
         // Get values of RAM
         // FIXME: subset of RAMs?
@@ -460,7 +453,7 @@ private:
                      i++) {
                     const auto& ram = *get<TaskCUFHEGateMem>(
                         {bp.name, {"ram", "ramdata", static_cast<int>(i)}});
-                    dst.push_back(cufhe2tfhepp(ram.get()));
+                    dst.push_back(ram.get());
                 }
                 break;
             }
@@ -506,7 +499,7 @@ private:
                         auto& ram = *get<TaskCUFHEGateMem>(
                             {bpram.name,
                              {"ram", "ramdata", static_cast<int>(i)}});
-                        ram.set(*::tfhepp2cufhe(init.at(i)));
+                        ram.set(init.at(i));
                     }
                 }
                 break;
@@ -535,7 +528,7 @@ private:
                  atPortBit) %
                 bits.size();
 
-            get<TaskCUFHEGateMem>(port)->set(*::tfhepp2cufhe(bits.at(index)));
+            get<TaskCUFHEGateMem>(port)->set(bits.at(index));
         }
     }
 
@@ -658,7 +651,7 @@ public:
                     for (size_t i = 0; i < init.size(); i++) {
                         auto& rom = *romnet->get<TaskCUFHEGateMem>(
                             {"rom", "romdata", static_cast<int>(i)});
-                        rom.set(*::tfhepp2cufhe(init.at(i)));
+                        rom.set(init.at(i));
                     }
                 }
 
@@ -775,10 +768,9 @@ public:
         // Reset
         if (currentCycle_ == 0 && !opt.skipReset) {
             if (auto reset = maybeGetAt("input", "reset"); reset) {
-                cufhe::Ctxt one, zero;
-                setCtxtOne(one);
-                setCtxtZero(zero);
-
+                TLWELvl0 one, zero;
+                setTLWELvl0Trivial1(one);
+                setTLWELvl0Trivial0(zero);
                 reset->set(one);
                 runner.run();
                 reset->set(zero);

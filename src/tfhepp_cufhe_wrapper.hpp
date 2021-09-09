@@ -28,6 +28,16 @@ inline bool decryptTLWELvl0(const TLWELvl0& src, const SecretKey& sk)
     return TFHEpp::bootsSymDecrypt({src}, sk).at(0);
 }
 
+inline void setTLWELvl0Trivial0(TLWELvl0& dst)
+{
+    TFHEpp::HomCONSTANTZERO(dst);
+}
+
+inline void setTLWELvl0Trivial1(TLWELvl0& dst)
+{
+    TFHEpp::HomCONSTANTONE(dst);
+}
+
 #ifdef IYOKAN_CUDA_ENABLED
 
 #include <cufhe.h>

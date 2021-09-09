@@ -28,6 +28,7 @@ public:
 
 struct CUFHEWorkerInfo {
     std::shared_ptr<CUFHEStream> stream;
+    std::vector<std::shared_ptr<cufhe::Ctxt>> ctxts;
 };
 
 CEREAL_REGISTER_TYPE(BridgeDepNode<TFHEppWorkerInfo, CUFHEWorkerInfo>);
@@ -35,7 +36,7 @@ CEREAL_REGISTER_TYPE(BridgeDepNode<CUFHEWorkerInfo, TFHEppWorkerInfo>);
 CEREAL_REGISTER_TYPE(TaskBlackHole<TFHEppWorkerInfo>);
 CEREAL_REGISTER_TYPE(TaskBlackHole<CUFHEWorkerInfo>);
 
-using TaskCUFHEGate = Task<cufhe::Ctxt, cufhe::Ctxt, CUFHEWorkerInfo>;
+using TaskCUFHEGate = Task<TLWELvl0, TLWELvl0, CUFHEWorkerInfo>;
 
 inline void copyCtxt(cufhe::Ctxt& dst, const cufhe::Ctxt& src)
 {
@@ -75,12 +76,12 @@ public:
     {
     }
 
-    void set(cufhe::Ctxt& newval)
+    void set(const TLWELvl0& newval)
     {
-        copyCtxt(output(), newval);
+        output() = newval;
     }
 
-    const cufhe::Ctxt& get() const
+    const TLWELvl0& get() const
     {
         return output();
     }
@@ -106,27 +107,27 @@ public:
     TaskCUFHEGateDFF() : TaskCUFHEGateMem(1)
     {
         initialValue_ = 0_b;
-        setCtxtZero(output());
+        setTLWELvl0Trivial0(output());
     }
 
     TaskCUFHEGateDFF(Bit initValue) : TaskCUFHEGateMem(1)
     {
         initialValue_ = initValue;
         if (initialValue_ == 0_b) {
-            setCtxtZero(output());
+            setTLWELvl0Trivial0(output());
         }
         else {
-            setCtxtOne(output());
+            setTLWELvl0Trivial1(output());
         }
     }
 
     void setInitialValue()
     {
         if (initialValue_ == 0_b) {
-            setCtxtZero(output());
+            setTLWELvl0Trivial0(output());
         }
         else {
-            setCtxtOne(output());
+            setTLWELvl0Trivial1(output());
         }
     }
 
@@ -140,7 +141,7 @@ public:
     void tick() override
     {
         TaskCUFHEGateMem::tick();
-        copyCtxt(output(), input(0));
+        output() = input(0);
     }
 
     bool hasFinished() const override
@@ -173,7 +174,7 @@ private:
             break;
         case 1:
             // FIXME: Optimization by using stream?
-            copyCtxt(output(), input(0));
+            output() = input(0);
             break;
         default:
             assert(false);
@@ -202,38 +203,47 @@ public:
 };
 CEREAL_REGISTER_TYPE(TaskCUFHEGateWIRE);
 
-#define DEFINE_TASK_GATE(name, numInputs, expr)                           \
-    class TaskCUFHEGate##name : public TaskCUFHEGate {                    \
-    private:                                                              \
-        CUFHEWorkerInfo wi_;                                              \
-                                                                          \
-    private:                                                              \
-        void startAsyncImpl(CUFHEWorkerInfo wi) override                  \
-        {                                                                 \
-            wi_ = std::move(wi);                                          \
-            auto st = wi_.stream;                                         \
-            (expr);                                                       \
-        }                                                                 \
-                                                                          \
-        cufhe::Ctxt& input(size_t index)                                  \
-        {                                                                 \
-            return const_cast<cufhe::Ctxt&>(TaskCUFHEGate::input(index)); \
-        }                                                                 \
-                                                                          \
-    public:                                                               \
-        TaskCUFHEGate##name() : TaskCUFHEGate(numInputs)                  \
-        {                                                                 \
-        }                                                                 \
-        bool hasFinished() const override                                 \
-        {                                                                 \
-            return cufhe::StreamQuery(*wi_.stream);                       \
-        }                                                                 \
-        template <class Archive>                                          \
-        void serialize(Archive& ar)                                       \
-        {                                                                 \
-            ar(cereal::base_class<TaskCUFHEGate>(this));                  \
-        }                                                                 \
-    };                                                                    \
+#define DEFINE_TASK_GATE(name, numInputs, expr)                  \
+    class TaskCUFHEGate##name : public TaskCUFHEGate {           \
+    private:                                                     \
+        CUFHEWorkerInfo wi_;                                     \
+                                                                 \
+    private:                                                     \
+        cufhe::Ctxt& output()                                    \
+        {                                                        \
+            return *wi_.ctxts.at(0);                             \
+        }                                                        \
+        cufhe::Ctxt& input(size_t index)                         \
+        {                                                        \
+            cufhe::Ctxt& in = *wi_.ctxts.at(index + 1);          \
+            in.tlwehost = TaskCUFHEGate::input(index);           \
+            return in;                                           \
+        }                                                        \
+        void startAsyncImpl(CUFHEWorkerInfo wi) override         \
+        {                                                        \
+            wi_ = wi;                                            \
+            auto st = wi_.stream;                                \
+            (expr);                                              \
+        }                                                        \
+                                                                 \
+    public:                                                      \
+        TaskCUFHEGate##name() : TaskCUFHEGate(numInputs)         \
+        {                                                        \
+        }                                                        \
+        bool hasFinished() const override                        \
+        {                                                        \
+            return cufhe::StreamQuery(*wi_.stream);              \
+        }                                                        \
+        void onBeforePropagate() override                        \
+        {                                                        \
+            TaskCUFHEGate::output() = wi_.ctxts.at(0)->tlwehost; \
+        }                                                        \
+        template <class Archive>                                 \
+        void serialize(Archive& ar)                              \
+        {                                                        \
+            ar(cereal::base_class<TaskCUFHEGate>(this));         \
+        }                                                        \
+    };                                                           \
     CEREAL_REGISTER_TYPE(TaskCUFHEGate##name);
 DEFINE_TASK_GATE(AND, 2, cufhe::And(output(), input(0), input(1), *st));
 DEFINE_TASK_GATE(NAND, 2, cufhe::Nand(output(), input(0), input(1), *st));
@@ -273,6 +283,8 @@ private:
 using CUFHENetwork = CUFHENetworkBuilder::NetworkType;
 
 class CUFHEWorker : public Worker<CUFHEWorkerInfo> {
+    const static size_t WORKER_INFO_CTXTS_SIZE = 10;
+
 private:
     CUFHEWorkerInfo wi_;
 
@@ -289,6 +301,8 @@ public:
         : Worker(readyQueue, numFinishedTargets, graph)
     {
         wi_.stream = std::make_shared<CUFHEStream>();
+        for (size_t i = 0; i < WORKER_INFO_CTXTS_SIZE; i++)
+            wi_.ctxts.push_back(std::make_shared<cufhe::Ctxt>());
     }
 };
 

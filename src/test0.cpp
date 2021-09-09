@@ -705,31 +705,33 @@ void processAllGates(CUFHENetwork& net,
 
 void setInput(std::shared_ptr<TaskCUFHEGateMem> task, int val)
 {
-    cufhe::Ctxt ctxt;
+    TLWELvl0 c;
     if (val)
-        setCtxtOne(ctxt);
+        setTLWELvl0Trivial1(c);
     else
-        setCtxtZero(ctxt);
-    task->set(ctxt);
+        setTLWELvl0Trivial0(c);
+    task->set(c);
 }
 
 int getOutput(std::shared_ptr<TaskCUFHEGateMem> task)
 {
-    return decryptTLWELvl0(cufhe2tfhepp(task->get()),
-                           *TFHEppTestHelper::instance().sk());
+    return decryptTLWELvl0(task->get(), *TFHEppTestHelper::instance().sk());
 }
 
 void testBridgeBetweenCUFHEAndTFHEpp()
 {
     auto& ht = TFHEppTestHelper::instance();
 
+    // FIXME: The network constructed here does not have any meanings anymore,
+    // but it is enough to check if bridges work correctly.
+    // We may need another network here.
     NetworkBuilderBase<CUFHEWorkerInfo> b0;
     NetworkBuilderBase<TFHEppWorkerInfo> b1;
     auto t0 = b0.addINPUT<TaskCUFHEGateWIRE>("in", 0, false);
-    auto t1 = std::make_shared<TaskCUFHE2TFHEpp>();
-    b1.addTask(NodeLabel{"cufhe2tfhepp", ""}, t1);
-    auto t2 = std::make_shared<TaskTFHEpp2CUFHE>();
-    b1.addTask(NodeLabel{"tfhepp2cufhe", ""}, t2);
+    auto t1 = std::make_shared<TaskTFHEpp2CUFHE>();
+    b1.addTask(NodeLabel{"tfhepp2cufhe", ""}, t1);
+    auto t2 = std::make_shared<TaskCUFHE2TFHEpp>();
+    b1.addTask(NodeLabel{"cufhe2tfhepp", ""}, t2);
     auto t3 = b0.addOUTPUT<TaskCUFHEGateWIRE>("out", 0, true);
     connectTasks(t1, t2);
 
@@ -744,18 +746,18 @@ void testBridgeBetweenCUFHEAndTFHEpp()
     runner.addBridge(bridge0);
     runner.addBridge(bridge1);
 
-    t0->set(*tfhepp2cufhe(ht.one()));
+    t0->set(ht.one());
     runner.run();
-    assert(cufhe2tfhepp(t3->get()) == ht.one());
+    assert(t3->get() == ht.one());
 
     net0->tick();
     net1->tick();
     bridge0->tick();
     bridge1->tick();
 
-    t0->set(*tfhepp2cufhe(ht.zero()));
+    t0->set(ht.zero());
     runner.run();
-    assert(cufhe2tfhepp(t3->get()) == ht.zero());
+    assert(t3->get() == ht.zero());
 }
 #endif
 

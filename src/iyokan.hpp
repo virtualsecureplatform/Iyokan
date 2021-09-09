@@ -341,6 +341,10 @@ public:
     virtual bool hasFinished() const = 0;
     virtual void tick() = 0;  // Reset for next process.
 
+    virtual void onBeforePropagate()
+    {
+    }
+
     template <class Archive>
     void serialize(Archive &ar)
     {
@@ -754,6 +758,11 @@ public:
         visitor.end();
     }
 
+    void onBeforePropagate()
+    {
+        task_->onBeforePropagate();
+    }
+
     template <class Archive>
     void serialize(Archive &ar)
     {
@@ -853,6 +862,7 @@ public:
 
         if (target_ != nullptr) {
             if (target_->hasFinished()) {
+                target_->onBeforePropagate();
                 if (graph_)
                     target_->propagate(readyQueue_, *graph_);
                 else
