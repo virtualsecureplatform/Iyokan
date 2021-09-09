@@ -747,7 +747,7 @@ void testBridgeBetweenCUFHEAndTFHEpp()
     runner.addBridge(bridge1);
 
     t0->set(ht.one());
-    runner.run();
+    runner.run(false);
     assert(t3->get() == ht.one());
 
     net0->tick();
@@ -756,7 +756,7 @@ void testBridgeBetweenCUFHEAndTFHEpp()
     bridge1->tick();
 
     t0->set(ht.zero());
-    runner.run();
+    runner.run(false);
     assert(t3->get() == ht.zero());
 }
 #endif

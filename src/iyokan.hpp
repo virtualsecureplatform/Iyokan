@@ -1966,7 +1966,8 @@ struct Options {
     std::optional<std::string> dumpTimeCSVPrefix, dumpGraphJSONPrefix,
         dumpGraphDOTPrefix;
     SCHED sched = SCHED::UND;
-    bool stdoutCSV, skipReset = false;
+    bool stdoutCSV = false, skipReset = false,
+         showCombinationalProgress = false;
 };
 
 template <class Func>
