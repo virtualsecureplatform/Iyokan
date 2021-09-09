@@ -200,12 +200,17 @@ void doToml2Packet(const std::string& in, const std::string& out)
                 const auto name = toml::find<std::string>(table, "name");
                 const auto size = toml::find<size_t>(table, "size");
                 const auto bytes =
-                    toml::find<std::vector<uint8_t>>(table, "bytes");
+                    toml::find<std::vector<uint64_t>>(table, "bytes");
 
                 std::vector<Bit>& v = name2bitvec[name];
                 v.resize(size, 0_b);
                 auto it = v.begin();
-                for (uint8_t byte : bytes) {
+                for (uint64_t byte : bytes) {
+                    if (byte >= 0xffu)
+                        spdlog::warn(
+                            "'bytes' field expects only <256 unsinged integer, "
+                            "but got '{}'. Only the lower 8bits is used.",
+                            byte);
                     for (int i = 0; i < 8; i++) {
                         if (it == v.end())
                             goto end;
