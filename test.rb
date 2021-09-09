@@ -466,6 +466,9 @@ reg.add_in_out("register-init-4bit-19", "test/config-toml/register-init-4bit.tom
                tfhe_iyokan_args: ["--skip-reset", "--secret-key", "_test_sk"],
                cufhe_iyokan_args: ["--skip-reset", "--secret-key", "_test_sk"])
 
+reg.add_in_out "big-mult-21", "test/config-toml/big-mult.toml",
+               "test/in/test21.in", "test/out/test21.out", ncycles: 1, set_plain_ncycles: true, tfhe_tags: nil, cufhe_tags: nil
+
 reg.add_in_out("cahp-diamond-dump-prefix-00", "test/config-toml/cahp-diamond.toml",
                "test/in/test00.in", "test/out/test00-diamond.out",
                ncycles: 8,

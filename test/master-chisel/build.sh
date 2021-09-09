@@ -23,7 +23,7 @@ cd build
 sbt run
 
 # Synthesize Verilog code (*.v) into netlist (*.json)
-SRC="Addr4bit.v And4_2bit.v And4bit.v Counter4bit.v Divider8bit.v Mux4bit.v Pass4bit.v Register4bit.v"
+SRC="Addr4bit.v And4_2bit.v And4bit.v BigMult.v Counter4bit.v Divider8bit.v Mux4bit.v Pass4bit.v Register4bit.v"
 for file in $SRC; do
     module=${file%.*}
     cat <<EOS > _build.ys

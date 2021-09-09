@@ -1,0 +1,9 @@
+[[file]]
+type = "yosys-json"
+path = "../yosys-json/big-mult-yosys.json"
+name = "mul"
+
+[connect]
+"mul/io_inA[0:299]" = "@A[0:299]"
+"mul/io_inB[0:299]" = "@B[0:299]"
+"@out[0:599]" = "mul/io_out[0:599]"
