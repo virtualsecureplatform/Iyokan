@@ -39,11 +39,11 @@ EOS
     yosys _build.ys
 done
 
-mv Addr4bit.json test-addr-4bit-yosys.json
-mv And4_2bit.json test-addr-4_2bit-yosys.json
-mv And4bit.json test-and-4bit-yosys.json
-mv Counter4bit.json test-counter-4bit-yosys.json
-mv Divider8bit.json test-div-8bit-yosys.json
-mv Mux4bit.json test-mux-4bit-yosys.json
-mv Pass4bit.json test-pass-4bit-yosys.json
-mv Register4bit.json test-register-4bit-yosys.json
+mv Addr4bit.json addr-4bit-yosys.json
+mv And4_2bit.json addr-4_2bit-yosys.json
+mv And4bit.json and-4bit-yosys.json
+mv Counter4bit.json counter-4bit-yosys.json
+mv Divider8bit.json div-8bit-yosys.json
+mv Mux4bit.json mux-4bit-yosys.json
+mv Pass4bit.json pass-4bit-yosys.json
+mv Register4bit.json register-4bit-yosys.json
