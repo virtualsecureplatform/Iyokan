@@ -1,5 +1,20 @@
 #!/usr/bin/bash -xeu
 
+failwith(){
+    echo "[ERROR] $1" >&2
+    exit 1
+}
+
+if ! command -v sbt &> /dev/null; then
+    failwith "sbt not found"
+fi
+if ! command -v yosys &> /dev/null; then
+    failwith "yosys not found"
+fi
+if ! command -v jq &> /dev/null; then
+    failwith "jq not found"
+fi
+
 mkdir -p build
 cp *.scala build.sbt build/
 cd build
