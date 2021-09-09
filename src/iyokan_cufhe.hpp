@@ -735,7 +735,7 @@ public:
         bridges1_.push_back(bridge);
     }
 
-    void run()
+    void run(bool showCombProg)
     {
         if (graph_)
             graph_->reset();
@@ -745,11 +745,17 @@ public:
         size_t numNodes = cufhe_.numNodes() + tfhepp_.numNodes() +
                           bridges0_.size() + bridges1_.size();
 
-        while (cufhe_.getNumFinishedTargets() +
-                   tfhepp_.getNumFinishedTargets() <
-               numNodes) {
+        int prevCount = 0, nowCount = 0;
+        while ((nowCount = cufhe_.getNumFinishedTargets() +
+                           tfhepp_.getNumFinishedTargets()) < numNodes) {
             assert((cufhe_.isRunning() || tfhepp_.isRunning()) &&
                    "Detected infinite loop");
+
+            if (showCombProg && nowCount - prevCount > 1000) {
+                spdlog::info("Circuit Executing... {}/{}", nowCount, numNodes);
+                prevCount = nowCount;
+            }
+
             cufhe_.update();
             tfhepp_.update();
         }

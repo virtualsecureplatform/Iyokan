@@ -1,3 +1,5 @@
+#include <stdio.h>
+
 #include "iyokan_plain.hpp"
 #include "packet.hpp"
 #include "utility.hpp"
@@ -26,14 +28,23 @@ public:
         plain_.addNetwork(net);
     }
 
-    void run()
+    void run(bool showCombProg)
     {
         if (graph_)
             graph_->reset();
         plain_.prepareToRun();
 
-        while (plain_.getNumFinishedTargets() < plain_.numNodes()) {
+        int prevCount = 0, nowCount = 0;
+        while ((nowCount = plain_.getNumFinishedTargets()) <
+               plain_.numNodes()) {
             assert(plain_.isRunning() && "Detected infinite loop");
+
+            if (showCombProg && nowCount - prevCount > 1000) {
+                spdlog::info("Circuit Executing... {}/{}", nowCount,
+                             plain_.numNodes());
+                prevCount = nowCount;
+            }
+
             plain_.update();
         }
     }
@@ -456,7 +467,7 @@ public:
         if (currentCycle_ == 0 && !opt.skipReset) {
             if (auto reset = maybeGetAt("input", "reset"); reset) {
                 reset->set(1_b);
-                runner.run();
+                runner.run(opt.showCombinationalProgress);
                 reset->set(0_b);
             }
         }
@@ -496,7 +507,7 @@ public:
                     setCircularInputs(currentCycle_);
 
                     // Run
-                    runner.run();
+                    runner.run(opt.showCombinationalProgress);
                 });
 
                 if (opt.dumpTimeCSVPrefix) {

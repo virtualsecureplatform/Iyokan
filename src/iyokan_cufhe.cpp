@@ -772,7 +772,7 @@ public:
                 setTLWELvl0Trivial1(one);
                 setTLWELvl0Trivial0(zero);
                 reset->set(one);
-                runner.run();
+                runner.run(opt.showCombinationalProgress);
                 reset->set(zero);
             }
         }
@@ -804,7 +804,7 @@ public:
                 setCircularInputs(currentCycle_);
 
                 // Run
-                runner.run();
+                runner.run(opt.showCombinationalProgress);
             });
 
             if (opt.dumpTimeCSVPrefix) {

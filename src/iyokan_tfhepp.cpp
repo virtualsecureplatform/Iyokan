@@ -25,14 +25,23 @@ public:
         tfhepp_.addNetwork(net);
     }
 
-    void run()
+    void run(bool showCombProg)
     {
         if (graph_)
             graph_->reset();
         tfhepp_.prepareToRun();
 
-        while (tfhepp_.getNumFinishedTargets() < tfhepp_.numNodes()) {
+        int prevCount = 0, nowCount = 0;
+        while ((nowCount = tfhepp_.getNumFinishedTargets()) <
+               tfhepp_.numNodes()) {
             assert(tfhepp_.isRunning() && "Detected infinite loop");
+
+            if (showCombProg && nowCount - prevCount > 1000) {
+                spdlog::info("Circuit Executing... {}/{}", nowCount,
+                             tfhepp_.numNodes());
+                prevCount = nowCount;
+            }
+
             tfhepp_.update();
         }
     }
@@ -482,7 +491,7 @@ public:
                 TFHEpp::HomCONSTANTZERO(zero);
 
                 reset->set(one);
-                runner.run();
+                runner.run(opt.showCombinationalProgress);
                 reset->set(zero);
             }
         }
@@ -514,7 +523,7 @@ public:
                 setCircularInputs(currentCycle_);
 
                 // Run
-                runner.run();
+                runner.run(opt.showCombinationalProgress);
             });
 
             if (opt.dumpTimeCSVPrefix) {

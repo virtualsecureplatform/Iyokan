@@ -75,6 +75,8 @@ int main(int argc, char **argv)
         plain->add_option("--sched", opt.sched, "")
             ->transform(CLI::CheckedTransformer(mapSched, CLI::ignore_case));
         plain->add_flag("--skip-reset", opt.skipReset, "");
+        plain->add_flag("--show-combinational-progress",
+                        opt.showCombinationalProgress, "");
 
         auto ogroups = plain->add_option_group("run in plaintext",
                                                "Run in plaintext mode");
@@ -126,6 +128,8 @@ int main(int argc, char **argv)
         tfhe->add_option("--dump-prefix", opt.dumpPrefix, "")
             ->needs("--secret-key");
         tfhe->add_flag("--skip-reset", opt.skipReset, "");
+        tfhe->add_flag("--show-combinational-progress",
+                       opt.showCombinationalProgress, "");
 
 #ifdef IYOKAN_CUDA_ENABLED
         tfhe->add_option("--gpu", opt.numGPUWorkers, "")
@@ -225,6 +229,9 @@ int main(int argc, char **argv)
     }
     if (opt.skipReset)
         spdlog::info("\t--skip-reset: {}", opt.skipReset);
+    if (opt.showCombinationalProgress)
+        spdlog::info("\t--show-combinational-progess: {}",
+                     opt.showCombinationalProgress);
 
     // Process depending on the options chosen.
     if (quiet)
