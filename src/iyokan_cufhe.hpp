@@ -256,6 +256,8 @@ DEFINE_TASK_GATE(XNOR, 2, cufhe::Xnor(output(), input(0), input(1), *st));
 DEFINE_TASK_GATE(MUX, 3,
                  cufhe::Mux(output(), input(2), input(1), input(0), *st));
 DEFINE_TASK_GATE(NOT, 1, cufhe::Not(output(), input(0), *st));
+DEFINE_TASK_GATE(CONSTONE, 0, TFHEpp::HomCONSTANTONE(output().tlwehost));
+DEFINE_TASK_GATE(CONSTZERO, 0, TFHEpp::HomCONSTANTZERO(output().tlwehost));
 #undef DEFINE_TASK_GATE
 
 class CUFHENetworkBuilder
@@ -277,6 +279,8 @@ private:
     DEFINE_GATE_IMPL(XNOR);
     DEFINE_GATE_IMPL(MUX);
     DEFINE_GATE_IMPL(NOT);
+    DEFINE_GATE_IMPL(CONSTONE);
+    DEFINE_GATE_IMPL(CONSTZERO);
 #undef DEFINE_GATE_IMPL
 };
 

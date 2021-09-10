@@ -423,6 +423,8 @@ reg.add_in_out "cahp-pearl-mux-10", "test/config-toml/cahp-pearl-mux.toml",
 reg.add_in_out "cahp-ruby-mux-1KiB-11", "test/config-toml/cahp-ruby-mux-1KiB.toml",
                "test/in/test11.in", "test/out/test11.out", ncycles: 7
 
+reg.add_in_out "const-4bit-22", "test/config-toml/const-4bit.toml",
+               "test/in/test22.in", "test/out/test22.out", ncycles: 1, set_plain_ncycles: true
 reg.add_in_out "addr-4bit-04", "test/config-toml/addr-4bit.toml",
                "test/in/test04.in", "test/out/test04.out", ncycles: 1, set_plain_ncycles: true
 reg.add_in_out "pass-addr-pass-4bit-04", "test/config-toml/pass-addr-pass-4bit.toml",

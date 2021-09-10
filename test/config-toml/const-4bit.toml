@@ -1,0 +1,8 @@
+[[file]]
+type = "yosys-json"
+path = "../yosys-json/const-4bit-yosys.json"
+name = "cnst"
+
+[connect]
+"@out[0:3]" = "cnst/io_out[0:3]"
+

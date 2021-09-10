@@ -140,6 +140,8 @@ DEFINE_TASK_GATE(XNOR, 2, TFHEpp::HomXNOR(output(), input(0), input(1), *gk));
 DEFINE_TASK_GATE(MUX, 3,
                  TFHEpp::HomMUX(output(), input(2), input(1), input(0), *gk));
 DEFINE_TASK_GATE(NOT, 1, TFHEpp::HomNOT(output(), input(0)));
+DEFINE_TASK_GATE(CONSTONE, 0, TFHEpp::HomCONSTANTONE(output()));
+DEFINE_TASK_GATE(CONSTZERO, 0, TFHEpp::HomCONSTANTZERO(output()));
 #undef DEFINE_TASK_GATE
 
 class TFHEppNetworkBuilder
@@ -162,6 +164,8 @@ private:
     DEFINE_GATE_IMPL(XNOR);
     DEFINE_GATE_IMPL(MUX);
     DEFINE_GATE_IMPL(NOT);
+    DEFINE_GATE_IMPL(CONSTONE);
+    DEFINE_GATE_IMPL(CONSTZERO);
 #undef DEFINE_GATE_IMPL
 };
 

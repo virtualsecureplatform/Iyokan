@@ -1,0 +1,6 @@
+cycles = 1
+
+[[bits]]
+name = "out"
+size = 4
+bytes = [5]

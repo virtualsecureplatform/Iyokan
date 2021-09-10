@@ -28,6 +28,7 @@ SRC+=" Addr4bit.v"
 SRC+=" And4_2bit.v"
 SRC+=" And4bit.v"
 #SRC+=" BigMult.v"
+SRC+=" Const4bit.v"
 SRC+=" Counter4bit.v"
 SRC+=" Divider8bit.v"
 SRC+=" Mux4bit.v"
@@ -74,6 +75,7 @@ mv Addr4bit.min.json addr-4bit-yosys.json
 mv And4_2bit.min.json addr-4_2bit-yosys.json
 mv And4bit.min.json and-4bit-yosys.json
 #mv BigMult.min.json big-mult-yosys.json
+mv Const4bit.min.json const-4bit-yosys.json
 mv Counter4bit.min.json counter-4bit-yosys.json
 mv Divider8bit.min.json div-8bit-yosys.json
 mv Mux4bit.min.json mux-4bit-yosys.json

@@ -1277,6 +1277,8 @@ public:                                                 \
     DEFINE_GATE(XNOR);
     DEFINE_GATE(MUX);
     DEFINE_GATE(NOT);
+    DEFINE_GATE(CONSTONE);
+    DEFINE_GATE(CONSTZERO);
 #undef DEFINE_GATE
 };
 
@@ -2160,14 +2162,41 @@ public:
             const std::string &portName = key;
             for (size_t i = 0; i < bits.size(); i++) {
                 const int portBit = i;
-                const int bit = bits.at(i).get<double>();
 
-                int id = isDirInput ? builder.INPUT(portName, portBit)
-                                    : builder.OUTPUT(portName, portBit);
-                portvec.emplace_back(isDirInput ? PORT::IN : PORT::OUT, id,
-                                     bit);
-                if (isDirInput)
-                    bit2id.emplace(bit, id);
+                if (bits.at(i).is<std::string>()) {
+                    // Yosys document
+                    // (https://yosyshq.net/yosys/cmd_write_json.html) says:
+                    //
+                    //     Signal bits that are connected to a constant driver
+                    //     are denoted as string "0" or "1" instead of a number.
+                    //
+                    // We handle this case here.
+
+                    if (isDirInput)
+                        error::die(
+                            "Invalid bits: INPUT that is connected to a "
+                            "constatn driver is not implemented");
+
+                    std::string cnstStr = bits.at(i).get<std::string>();
+                    bool cnst = cnstStr == "1";
+                    if (!cnst && cnstStr != "0")
+                        spdlog::warn("Constant bit of '{}' is regarded as '0'.",
+                                     cnstStr);
+
+                    int id1 = builder.OUTPUT(portName, portBit),
+                        id0 = cnst ? builder.CONSTONE() : builder.CONSTZERO();
+                    builder.connect(id0, id1);
+                }
+                else {
+                    const int bit = bits.at(i).get<double>();
+
+                    int id = isDirInput ? builder.INPUT(portName, portBit)
+                                        : builder.OUTPUT(portName, portBit);
+                    portvec.emplace_back(isDirInput ? PORT::IN : PORT::OUT, id,
+                                         bit);
+                    if (isDirInput)
+                        bit2id.emplace(bit, id);
+                }
             }
         }
 

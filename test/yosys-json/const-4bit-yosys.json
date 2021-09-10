@@ -1,0 +1,1 @@
+{"creator":"Yosys 0.9 (git sha1 1979e0b)","modules":{"Const4bit":{"ports":{"clock":{"direction":"input","bits":[2]},"reset":{"direction":"input","bits":[3]},"io_out":{"direction":"output","bits":["1","0","1","0"]}},"cells":{},"netnames":{"clock":{"bits":[2]},"io_out":{"bits":["1","0","1","0"]},"reset":{"bits":[3]}}}}}

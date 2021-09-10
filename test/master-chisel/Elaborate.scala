@@ -5,6 +5,7 @@ object Elaborate extends App {
     chisel3.Driver.execute(args, () => new And4_2bit)
     chisel3.Driver.execute(args, () => new And4bit)
     chisel3.Driver.execute(args, () => new BigMult)
+    chisel3.Driver.execute(args, () => new Const4bit)
     chisel3.Driver.execute(args, () => new Counter4bit)
     chisel3.Driver.execute(args, () => new Divider8bit)
     chisel3.Driver.execute(args, () => new Mux4bit)
