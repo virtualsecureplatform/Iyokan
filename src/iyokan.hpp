@@ -1754,7 +1754,7 @@ public:
                 else if (typeStr == "yosys-json")
                     type = blueprint::File::TYPE::YOSYS_JSON;
                 else
-                    error::die("Invalid file type: {}", typeStr);
+                    error::die("Invalid file type: ", typeStr);
 
                 if (path.is_relative())
                     path = wd / path;  // Make path absolute
@@ -2117,7 +2117,7 @@ private:
         using namespace picojson;
         const auto &bits = conn.at(key).get<array>();
         if (bits.size() != 1)
-            error::die("Invalid JSON: wrong conn size: expected 1, got {}",
+            error::die("Invalid JSON: wrong conn size: expected 1, got ",
                        bits.size());
         if (!bits.at(0).is<double>())
             error::die(
@@ -2160,7 +2160,7 @@ public:
             if (key == "reset" && bits.size() == 0)
                 continue;
             if (direction != "input" && direction != "output")
-                error::die("Invalid direction token: {}", direction);
+                error::die("Invalid direction token: ", direction);
 
             const bool isDirInput = direction == "input";
             const std::string &portName = key;

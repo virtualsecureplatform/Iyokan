@@ -243,7 +243,7 @@ void doConvert(
     std::smatch m;
     for (const std::string& rule : rules) {
         if (!std::regex_match(rule, m, re))
-            error::die("Invalid assignment: {}", rule);
+            error::die("Invalid assignment: ", rule);
         if (m[1] == "ram") {
             out.ram.emplace(m[2], name2pkt.at(m[3]).ram.at(m[4]));
             out.ramInTLWE.emplace(m[2], name2pkt.at(m[3]).ramInTLWE.at(m[4]));
@@ -276,7 +276,7 @@ void doConvertPlain(
     std::smatch m;
     for (const std::string& rule : rules) {
         if (!std::regex_match(rule, m, re))
-            error::die("Invalid assignment: {}", rule);
+            error::die("Invalid assignment: ", rule);
         if (m[1] == "ram") {
             out.ram.emplace(m[2], name2pkt.at(m[3]).ram.at(m[4]));
         }
