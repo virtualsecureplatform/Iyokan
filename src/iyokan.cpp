@@ -57,10 +57,12 @@ std::unordered_map<int, int> doRankuSort(
             if (!child->hasNoInputsToWaitFor)
                 pri = std::max(pri, node2pri.at(child));
         }
-        if (compCost.find(node->label.kind) == compCost.end())
-            spdlog::info("{}", node->label.kind);
-        int w = compCost.at(node->label.kind);
-        auto [it, inserted] = node2pri.emplace(node, pri + w);
+        auto it = compCost.find(node->label.kind);
+        if (it == compCost.end())
+            error::die("Internal error: compCost does not have key: ",
+                       node->label.kind);
+        int w = it->second;
+        auto [it2, inserted] = node2pri.emplace(node, pri + w);
         assert(inserted);
 
         if (node->hasNoInputsToWaitFor)
