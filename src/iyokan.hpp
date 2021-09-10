@@ -2118,6 +2118,9 @@ private:
         if (bits.size() != 1)
             error::die("Invalid JSON: wrong conn size: expected 1, got {}",
                        bits.size());
+        if (!bits.at(0).is<double>())
+            error::die(
+                "Connection of cells to a constant driver is not implemented.");
         return bits.at(0).get<double>();
     }
 
