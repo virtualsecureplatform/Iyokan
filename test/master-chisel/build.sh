@@ -23,7 +23,16 @@ cd build
 sbt run
 
 # Synthesize Verilog code (*.v) into netlist (*.json)
-SRC="Addr4bit.v And4_2bit.v And4bit.v BigMult.v Counter4bit.v Divider8bit.v Mux4bit.v Pass4bit.v Register4bit.v"
+SRC=""
+SRC+=" Addr4bit.v"
+SRC+=" And4_2bit.v"
+SRC+=" And4bit.v"
+#SRC+=" BigMult.v"
+SRC+=" Counter4bit.v"
+SRC+=" Divider8bit.v"
+SRC+=" Mux4bit.v"
+SRC+=" Pass4bit.v"
+SRC+=" Register4bit.v"
 for file in $SRC; do
     module=${file%.*}
     cat <<EOS > _build.ys
@@ -64,7 +73,7 @@ done
 mv Addr4bit.min.json addr-4bit-yosys.json
 mv And4_2bit.min.json addr-4_2bit-yosys.json
 mv And4bit.min.json and-4bit-yosys.json
-mv BigMult.min.json big-mult-yosys.json
+#mv BigMult.min.json big-mult-yosys.json
 mv Counter4bit.min.json counter-4bit-yosys.json
 mv Divider8bit.min.json div-8bit-yosys.json
 mv Mux4bit.min.json mux-4bit-yosys.json
