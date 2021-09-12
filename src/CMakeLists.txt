@@ -32,6 +32,7 @@ endif(IYOKAN_ENABLE_CUDA)
 ##### test0
 add_executable(test0
     test0.cpp iyokan.cpp iyokan_plain.cpp iyokan_tfhepp.cpp error.cpp
+    iyokan_nt.cpp iyokan_nt_plain.cpp
     ${CMAKE_CURRENT_BINARY_DIR}/mux-ram-8-8-8.o
     ${CMAKE_CURRENT_BINARY_DIR}/mux-ram-8-16-16.o
     ${CMAKE_CURRENT_BINARY_DIR}/mux-ram-9-16-16.o)

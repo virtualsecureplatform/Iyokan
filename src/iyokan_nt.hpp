@@ -18,20 +18,9 @@ private:
     std::vector<std::any> data_;
 
 public:
-    Allocator(/* optional snapshot file */)
-    {
-    }
+    Allocator(/* optional snapshot file */);
 
-    Allocator& subAllocator(const std::string& key)
-    {
-        assert(data_.size() == 0);
-        auto it = subs_.find(key);
-        if (it == subs_.end()) {
-            auto sub = std::make_unique<Allocator>();
-            std::tie(it, std::ignore) = subs_.emplace(key, std::move(sub));
-        }
-        return *it->second;
-    }
+    Allocator& subAllocator(const std::string& key);
 
     template <class T>
     T* make(size_t index)
@@ -71,25 +60,42 @@ struct Label {
 class Task {
 private:
     Label label_;
-    std::vector<Task*> dependents_;
+    std::vector<Task*> parents_, children_;
 
 public:
-    Task(Label label);
-    virtual ~Task();
+    Task(Label label) : label_(label)
+    {
+    }
+
+    virtual ~Task()
+    {
+    }
 
     const Label& label() const
     {
         return label_;
     }
 
-    const std::vector<Task*>& dependents() const
+    const std::vector<Task*>& parents() const
     {
-        return dependents_;
+        return parents_;
     }
 
-    void addDependent(Task* task)
+    const std::vector<Task*>& children() const
     {
-        dependents_.push_back(task);
+        return children_;
+    }
+
+    void addChild(Task* task)
+    {
+        assert(task != nullptr);
+        children_.push_back(task);
+    }
+
+    void addParent(Task* task)
+    {
+        assert(task != nullptr);
+        parents_.push_back(task);
     }
 
     virtual void notifyOneInputReady() = 0;
@@ -114,13 +120,15 @@ private:
     T* output_;
 
 protected:
-    T input(size_t i) const
+    const T& input(size_t i) const
     {
+        assert(inputs_.at(i) != nullptr);
         return *inputs_.at(i);
     }
 
     T& output()
     {
+        assert(output_ != nullptr);
         return *output_;
     }
 
@@ -153,8 +161,19 @@ public:
         numReadyInputs_ = 0;
     }
 
-    void addInput(T* newIn)
+    void addInput(TaskCommon<T>* newIn)
     {
+        assert(newIn != nullptr);
+        addInput(newIn, newIn->output_);
+    }
+
+    void addInput(Task* newParent, T* newIn)
+    {
+        assert(newParent != nullptr && newIn != nullptr);
+
+        addParent(newParent);
+        newParent->addChild(this);
+
         for (size_t i = 0; i < inputs_.size(); i++) {
             if (inputs_.at(i) != nullptr)
                 continue;
@@ -164,24 +183,18 @@ public:
         assert(false && "Too many calls of addInput");
     }
 
-    const T* const getOutput() const
+    const T& getOutput() const
     {
-        return output_;
+        return *output_;
     }
 };
 
-class NetworkBuilder {
-private:
-    Allocator& alc_;
-    std::unordered_map<UID, Task*> uid2task_;
-
-public:
-    NetworkBuilder(Allocator& alc);
-};
-
 class Network {
+private:
+    std::unordered_map<UID, std::unique_ptr<Task>> uid2task_;
+
 public:
-    Network(NetworkBuilder&& builder);
+    Network(std::unordered_map<UID, std::unique_ptr<Task>> uid2task);
 
     Task* findByUID(UID uid) const;
     Task* findByTags(const std::vector<Tag>& tags) const;
@@ -189,34 +202,41 @@ public:
     void eachTask(std::function<void(Task*)> handler) const;
 };
 
-}  // namespace nt
-
-#include "packet.hpp"
-
-namespace nt {
-namespace plain {
-
-class TaskNand : public TaskCommon<Bit> {
+class NetworkBuilder {
 public:
-    TaskNand(Label label, Allocator& alc) : TaskCommon<Bit>(label, alc, 2)
+    NetworkBuilder()
     {
     }
 
-    ~TaskNand()
+    virtual ~NetworkBuilder()
     {
     }
 
-    void startAsynchronously() override
-    {
-        output() = ~(input(0) & input(1));
-    }
+    virtual Network createNetwork() = 0;
 
-    bool hasFinished() const override
-    {
-        return true;
-    }
+    virtual void connect(UID from, UID to) = 0;
+
+    // not/and/or are C++ keywords, so member functions here are in capitals.
+    // virtual UID INPUT(const std::string& alcKey, const std::string& portName,
+    //                  int portBit) = 0;
+    // virtual UID OUTPUT(const std::string& alcKey, const std::string&
+    // portName,
+    //                   int portBit) = 0;
+    virtual UID CONSTONE(const std::string& alcKey) = 0;
+    virtual UID CONSTZERO(const std::string& alcKey) = 0;
+    // virtual UID AND(const std::string& alcKey) = 0;
+    // virtual UID ANDNOT(const std::string& alcKey) = 0;
+    // virtual UID MUX(const std::string& alcKey) = 0;
+    virtual UID NAND(const std::string& alcKey) = 0;
+    // virtual UID NMUX(const std::string& alcKey) = 0;
+    // virtual UID NOR(const std::string& alcKey) = 0;
+    // virtual UID NOT(const std::string& alcKey) = 0;
+    // virtual UID OR(const std::string& alcKey) = 0;
+    // virtual UID ORNOT(const std::string& alcKey) = 0;
+    // virtual UID XNOR(const std::string& alcKey) = 0;
+    // virtual UID XOR(const std::string& alcKey) = 0;
 };
-}  // namespace plain
+
 }  // namespace nt
 
 #endif
