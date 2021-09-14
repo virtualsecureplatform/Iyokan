@@ -20,11 +20,40 @@ Allocator& Allocator::subAllocator(const std::string& key)
     return *it->second;
 }
 
+/* class ReadyQueue */
+
+bool ReadyQueue::empty() const
+{
+    return queue_.empty();
+}
+
+void ReadyQueue::pop()
+{
+    queue_.pop();
+}
+
+Task* ReadyQueue::peek() const
+{
+    auto [pri, task] = queue_.top();
+    return task;
+}
+
+void ReadyQueue::push(Task* task)
+{
+    queue_.emplace(task->priority(), task);
+    task->setQueued();
+}
+
 /* class Network */
 
 Network::Network(std::unordered_map<UID, std::unique_ptr<Task>> uid2task)
     : uid2task_(std::move(uid2task))
 {
+}
+
+size_t Network::size() const
+{
+    return uid2task_.size();
 }
 
 Task* Network::findByUID(UID uid) const
@@ -47,6 +76,108 @@ Task* Network::findByTags(const std::vector<Tag>& tags) const
             return task.get();
     }
     throw std::runtime_error("Network::findByTags: not found");
+}
+
+void Network::pushReadyTasks(ReadyQueue& readyQueue)
+{
+    for (auto&& [uid, task] : uid2task_)
+        if (task->areAllInputsReady())
+            readyQueue.push(task.get());
+}
+
+void Network::tick()
+{
+    for (auto&& [uid, task] : uid2task_)
+        task->tick();
+}
+
+/* class Worker */
+
+Worker::Worker() : target_(nullptr)
+{
+}
+
+Worker::~Worker()
+{
+}
+
+void Worker::update(ReadyQueue& readyQueue, size_t& numFinishedTargets)
+{
+    if (target_ == nullptr && !readyQueue.empty()) {
+        // Try to find the task to tackle next
+        Task* cand = readyQueue.peek();
+        assert(cand != nullptr);
+        if (canExecute(cand)) {
+            target_ = cand;
+            readyQueue.pop();
+            startTask(target_);
+        }
+    }
+
+    if (target_ != nullptr && target_->hasFinished()) {
+        for (Task* child : target_->children()) {
+            child->notifyOneInputReady();
+            if (!child->hasQueued() && child->areAllInputsReady())
+                readyQueue.push(child);
+        }
+        target_ = nullptr;
+        numFinishedTargets++;
+    }
+}
+
+bool Worker::isWorking() const
+{
+    return target_ != nullptr;
+}
+
+/* class NetworkRunner */
+
+NetworkRunner::NetworkRunner(Network network,
+                             std::vector<std::unique_ptr<Worker>> workers)
+    : network_(std::move(network)),
+      workers_(std::move(workers)),
+      readyQueue_(),
+      numFinishedTargets_(0)
+{
+    assert(workers_.size() != 0);
+    for (auto&& w : workers)
+        assert(w != nullptr);
+}
+
+const Network& NetworkRunner::network() const
+{
+    return network_;
+}
+
+size_t NetworkRunner::numFinishedTargets() const
+{
+    return numFinishedTargets_;
+}
+
+void NetworkRunner::prepareToRun()
+{
+    assert(readyQueue_.empty());
+
+    numFinishedTargets_ = 0;
+    network_.pushReadyTasks(readyQueue_);
+}
+
+bool NetworkRunner::isRunning() const
+{
+    return std::any_of(workers_.begin(), workers_.end(),
+                       [](auto&& w) { return w->isWorking(); }) ||
+           !readyQueue_.empty();
+}
+
+void NetworkRunner::update()
+{
+    for (auto&& w : workers_)
+        w->update(readyQueue_, numFinishedTargets_);
+}
+
+void NetworkRunner::tick()
+{
+    network_.tick();
 }
 
 /**************************************************/

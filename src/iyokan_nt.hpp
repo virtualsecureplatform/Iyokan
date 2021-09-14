@@ -6,6 +6,7 @@
 #include <cstdint>
 #include <functional>
 #include <memory>
+#include <queue>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -57,10 +58,16 @@ struct Label {
     std::unordered_map<TAG_KEY, std::string> tags;
 };
 
+namespace plain {
+class WorkerInfo;
+}
+
 class Task {
 private:
     Label label_;
     std::vector<Task*> parents_, children_;
+    int priority_;
+    bool hasQueued_;
 
 public:
     Task(Label label) : label_(label)
@@ -86,6 +93,16 @@ public:
         return children_;
     }
 
+    int priority() const
+    {
+        return priority_;
+    }
+
+    bool hasQueued() const
+    {
+        return hasQueued_;
+    }
+
     void addChild(Task* task)
     {
         assert(task != nullptr);
@@ -98,11 +115,31 @@ public:
         parents_.push_back(task);
     }
 
+    void setPriority(int newPri)
+    {
+        priority_ = newPri;
+    }
+
+    void setQueued()
+    {
+        assert(!hasQueued_);
+        hasQueued_ = true;
+    }
+
     virtual void notifyOneInputReady() = 0;
     virtual bool areAllInputsReady() const = 0;
-    virtual void startAsynchronously() = 0;
     virtual bool hasFinished() const = 0;
     virtual void tick() = 0;  // Reset for next cycle
+
+    virtual bool canRunPlain() const
+    {
+        return false;
+    }
+
+    virtual void startAsynchronously(plain::WorkerInfo&)
+    {
+        assert(0 && "Internal error: not implemented task for plain mode");
+    }
 };
 
 // TaskCommon can be used as base class of many "common" tasks.
@@ -189,6 +226,17 @@ public:
     }
 };
 
+class ReadyQueue {
+private:
+    std::priority_queue<std::pair<int, Task*>> queue_;
+
+public:
+    bool empty() const;
+    void pop();
+    Task* peek() const;
+    void push(Task* task);
+};
+
 class Network {
 private:
     std::unordered_map<UID, std::unique_ptr<Task>> uid2task_;
@@ -196,9 +244,13 @@ private:
 public:
     Network(std::unordered_map<UID, std::unique_ptr<Task>> uid2task);
 
+    size_t size() const;
+
     Task* findByUID(UID uid) const;
     Task* findByTags(const std::vector<Tag>& tags) const;
 
+    void pushReadyTasks(ReadyQueue& readyQueue);
+    void tick();
     void eachTask(std::function<void(Task*)> handler) const;
 };
 
@@ -235,6 +287,41 @@ public:
     // virtual UID ORNOT(const std::string& alcKey) = 0;
     // virtual UID XNOR(const std::string& alcKey) = 0;
     // virtual UID XOR(const std::string& alcKey) = 0;
+};
+
+class Worker {
+private:
+    Task* target_;
+
+public:
+    Worker();
+    virtual ~Worker();
+
+    void update(ReadyQueue& readyQueue, size_t& numFinishedTargets);
+    bool isWorking() const;
+
+protected:
+    virtual void startTask(Task* task) = 0;
+    virtual bool canExecute(Task* task) = 0;
+};
+
+class NetworkRunner {
+private:
+    Network network_;
+    std::vector<std::unique_ptr<Worker>> workers_;
+    ReadyQueue readyQueue_;
+    size_t numFinishedTargets_;
+
+public:
+    NetworkRunner(Network network,
+                  std::vector<std::unique_ptr<Worker>> workers);
+
+    const Network& network() const;
+    size_t numFinishedTargets() const;
+    void prepareToRun();
+    bool isRunning() const;
+    void update();
+    void tick();
 };
 
 }  // namespace nt

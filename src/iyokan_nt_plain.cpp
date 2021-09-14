@@ -5,6 +5,25 @@
 namespace nt {
 namespace plain {
 
+class WorkerInfo {
+};
+
+class Worker : public nt::Worker {
+private:
+    WorkerInfo wi_;
+
+protected:
+    bool canExecute(Task* task) override
+    {
+        return task->canRunPlain();
+    }
+
+    void startTask(Task* task) override
+    {
+        task->startAsynchronously(wi_);
+    }
+};
+
 class TaskConstZero : public TaskCommon<Bit> {
 public:
     TaskConstZero(Label label, Allocator& alc) : TaskCommon<Bit>(label, alc, 0)
@@ -15,12 +34,17 @@ public:
     {
     }
 
-    void startAsynchronously() override
+    void startAsynchronously(WorkerInfo&) override
     {
         output() = 0_b;
     }
 
     bool hasFinished() const override
+    {
+        return true;
+    }
+
+    bool canRunPlain() const override
     {
         return true;
     }
@@ -36,12 +60,17 @@ public:
     {
     }
 
-    void startAsynchronously() override
+    void startAsynchronously(WorkerInfo&) override
     {
         output() = 1_b;
     }
 
     bool hasFinished() const override
+    {
+        return true;
+    }
+
+    bool canRunPlain() const override
     {
         return true;
     }
@@ -57,7 +86,7 @@ public:
     {
     }
 
-    void startAsynchronously() override
+    void startAsynchronously(WorkerInfo&) override
     {
         output() = ~(input(0) & input(1));
     }
@@ -66,9 +95,14 @@ public:
     {
         return true;
     }
+
+    bool canRunPlain() const override
+    {
+        return true;
+    }
 };
 
-class PlainNetworkBuilder : public NetworkBuilder {
+class NetworkBuilder : public nt::NetworkBuilder {
 private:
     Allocator& alc_;
     std::unordered_map<UID, std::unique_ptr<TaskCommon<Bit>>> uid2common_;
@@ -81,11 +115,11 @@ private:
     }
 
 public:
-    PlainNetworkBuilder(Allocator& alc) : alc_(alc), uid2common_(), nextUID_(0)
+    NetworkBuilder(Allocator& alc) : alc_(alc), uid2common_(), nextUID_(0)
     {
     }
 
-    ~PlainNetworkBuilder()
+    ~NetworkBuilder()
     {
     }
 
@@ -127,10 +161,12 @@ public:
 
 void test0()
 {
+    WorkerInfo wi;
+
     {
         Allocator root;
         TaskConstOne t{Label{1, {}}, root};
-        t.startAsynchronously();
+        t.startAsynchronously(wi);
         assert(t.hasFinished());
         assert(t.getOutput() == 1_b);
     }
@@ -138,7 +174,7 @@ void test0()
     {
         Allocator root;
         TaskConstZero t{Label{1, {}}, root};
-        t.startAsynchronously();
+        t.startAsynchronously(wi);
         assert(t.hasFinished());
         assert(t.getOutput() == 0_b);
     }
@@ -153,16 +189,16 @@ void test0()
         TaskNand t2{Label{2, {}}, sub2};
         t2.addInput(&t0);
         t2.addInput(&t1);
-        t0.startAsynchronously();
-        t1.startAsynchronously();
-        t2.startAsynchronously();
+        t0.startAsynchronously(wi);
+        t1.startAsynchronously(wi);
+        t2.startAsynchronously(wi);
         assert(t0.hasFinished() && t1.hasFinished() && t2.hasFinished());
         assert(t2.getOutput() == 1_b);
     }
 
     {
         Allocator root;
-        PlainNetworkBuilder nb{root};
+        NetworkBuilder nb{root};
         UID id0 = nb.CONSTZERO("0"), id1 = nb.CONSTONE("1"), id2 = nb.NAND("2");
         nb.connect(id0, id2);
         nb.connect(id1, id2);
@@ -171,14 +207,37 @@ void test0()
         Task* t1 = nw.findByUID(id1);
         Task* t2 = nw.findByUID(id2);
         assert(t0 != nullptr && t1 != nullptr && t2 != nullptr);
-        t0->startAsynchronously();
-        t1->startAsynchronously();
-        t2->startAsynchronously();
+        t0->startAsynchronously(wi);
+        t1->startAsynchronously(wi);
+        t2->startAsynchronously(wi);
         assert(t0->hasFinished() && t1->hasFinished() && t2->hasFinished());
         assert(dynamic_cast<TaskCommon<Bit>*>(t2)->getOutput() == 1_b);
     }
 
-    // FIXME NetworkRunner
+    {
+        Allocator root;
+        NetworkBuilder nb{root};
+        UID id0 = nb.CONSTZERO("0"), id1 = nb.CONSTONE("1"), id2 = nb.NAND("2");
+        nb.connect(id0, id2);
+        nb.connect(id1, id2);
+
+        std::vector<std::unique_ptr<nt::Worker>> workers;
+        workers.emplace_back(std::make_unique<Worker>());
+
+        NetworkRunner runner{nb.createNetwork(), std::move(workers)};
+        runner.prepareToRun();
+
+        while (runner.numFinishedTargets() < runner.network().size()) {
+            assert(runner.isRunning());
+            runner.update();
+        }
+
+        Task* t0 = runner.network().findByUID(id0);
+        Task* t1 = runner.network().findByUID(id1);
+        Task* t2 = runner.network().findByUID(id2);
+        assert(t0->hasFinished() && t1->hasFinished() && t2->hasFinished());
+        assert(dynamic_cast<TaskCommon<Bit>*>(t2)->getOutput() == 1_b);
+    }
 }
 
 }  // namespace plain
