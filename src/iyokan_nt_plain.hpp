@@ -1,0 +1,8 @@
+#ifndef VIRTUALSECUREPLATFORM_IYOKAN_NT_PLAIN_HPP
+#define VIRTUALSECUREPLATFORM_IYOKAN_NT_PLAIN_HPP
+
+namespace nt::plain {
+void test0();
+}
+
+#endif
