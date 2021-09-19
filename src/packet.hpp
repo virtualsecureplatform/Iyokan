@@ -4,7 +4,6 @@
 #include <fstream>
 #include <iomanip>
 #include <memory>
-#include <regex>
 
 #include <cereal/archives/portable_binary.hpp>
 #include <cereal/cereal.hpp>
@@ -17,7 +16,6 @@
 #include "tfhepp_cufhe_wrapper.hpp"
 
 #include "error.hpp"
-#include "utility.hpp"
 
 enum class Bit : bool {};
 inline constexpr Bit operator~(Bit l) noexcept

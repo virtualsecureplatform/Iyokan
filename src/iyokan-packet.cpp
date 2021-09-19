@@ -3,6 +3,8 @@
 #include <CLI/CLI.hpp>
 #include <toml.hpp>
 
+#include <regex>
+
 namespace {
 
 enum class TYPE {
@@ -336,7 +338,6 @@ int main(int argc, char** argv)
        toml2packet --in packet.toml --out packet.plain
     */
 
-    using namespace utility;
     using namespace std::chrono;
 
     error::initialize("iyokan-packet");

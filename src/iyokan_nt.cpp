@@ -1,12 +1,24 @@
 #include "iyokan_nt.hpp"
 #include "error.hpp"
-#include "utility.hpp"
 
 #include <toml.hpp>
 
+#include <regex>
 #include <stdexcept>
 
 namespace nt {
+
+std::vector<std::string> regexMatch(const std::string& text,
+                                    const std::regex& re)
+{
+    std::vector<std::string> ret;
+    std::smatch m;
+    if (!std::regex_match(text, m, re))
+        return ret;
+    for (auto&& elm : m)
+        ret.push_back(elm.str());
+    return ret;
+}
 
 /* class Allocator */
 
@@ -132,15 +144,6 @@ Network NetworkBuilder::createNetwork()
     assert(!consumed_);
     consumed_ = true;
     return Network{std::move(finder_), std::move(tasks_)};
-}
-
-void NetworkBuilder::withSubAllocator(const std::string& alcKey,
-                                      std::function<void(NetworkBuilder&)> f)
-{
-    Allocator* original = currentAlc_;
-    currentAlc_ = &original->subAllocator(alcKey);
-    f(*this);
-    currentAlc_ = original;
 }
 
 /* class Worker */
@@ -339,8 +342,8 @@ Blueprint::Blueprint(const std::string& fileName)
 
             std::string srcTo = srcKey,
                         srcFrom = toml::get<std::string>(srcValue),
-                        errMsg = utility::fok("Invalid connect: ", srcTo, " = ",
-                                              srcFrom);
+                        errMsg = fmt::format("Invalid connect: {} = {}", srcTo,
+                                             srcFrom);
 
             // Check if input is correct.
             if (srcTo.empty() || srcFrom.empty() ||
@@ -413,7 +416,7 @@ std::vector<blueprint::Port> Blueprint::parsePortString(const std::string& src,
     std::string nodeName, portName;
     int portBitFrom, portBitTo;
 
-    auto match = utility::regexMatch(
+    auto match = regexMatch(
         src,
         std::regex(R"(^@?(?:([^/]+)/)?([^[]+)(?:\[([0-9]+):([0-9]+)\])?$)"));
     if (match.empty())

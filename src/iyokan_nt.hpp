@@ -1,10 +1,10 @@
 #ifndef VIRTUALSECUREPLATFORM_IYOKAN_NT_HPP
 #define VIRTUALSECUREPLATFORM_IYOKAN_NT_HPP
 
-#include <any>
 #include <cassert>
 #include <cstdint>
-#include <functional>
+
+#include <any>
 #include <map>
 #include <memory>
 #include <queue>
@@ -258,7 +258,6 @@ public:
 
     void pushReadyTasks(ReadyQueue& readyQueue);
     void tick();
-    void eachTask(std::function<void(Task*)> handler) const;
 };
 
 class NetworkBuilder {
@@ -290,8 +289,14 @@ public:
 
     Network createNetwork();
 
-    void withSubAllocator(const std::string& alcKey,
-                          std::function<void(NetworkBuilder&)> f);
+    template <class F>
+    void withSubAllocator(const std::string& alcKey, F f)
+    {
+        Allocator* original = currentAlc_;
+        currentAlc_ = &original->subAllocator(alcKey);
+        f(*this);
+        currentAlc_ = original;
+    }
 
     virtual void connect(UID from, UID to) = 0;
 
