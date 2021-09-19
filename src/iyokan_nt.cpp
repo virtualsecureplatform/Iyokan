@@ -1,4 +1,9 @@
 #include "iyokan_nt.hpp"
+#include "error.hpp"
+#include "utility.hpp"
+
+#include <toml.hpp>
+
 #include <stdexcept>
 
 namespace nt {
@@ -18,6 +23,32 @@ Allocator& Allocator::subAllocator(const std::string& key)
         std::tie(it, std::ignore) = subs_.emplace(key, std::move(sub));
     }
     return *it->second;
+}
+
+/* class TaskFinder */
+
+void TaskFinder::add(Task* task)
+{
+    const Label& label = task->label();
+    byUID_.emplace(label.uid, task);
+
+    if (label.cname) {
+        const ConfigName& cname = task->label().cname.value();
+        byConfigName_.emplace(
+            std::make_tuple(cname.nodeName, cname.portName, cname.portBit),
+            task);
+    }
+}
+
+Task* TaskFinder::findByUID(UID uid) const
+{
+    return byUID_.at(uid);
+}
+
+Task* TaskFinder::findByConfigName(const ConfigName& cname) const
+{
+    return byConfigName_.at(
+        std::make_tuple(cname.nodeName, cname.portName, cname.portBit));
 }
 
 /* class ReadyQueue */
@@ -46,49 +77,70 @@ void ReadyQueue::push(Task* task)
 
 /* class Network */
 
-Network::Network(std::unordered_map<UID, std::unique_ptr<Task>> uid2task)
-    : uid2task_(std::move(uid2task))
+Network::Network(TaskFinder finder, std::vector<std::unique_ptr<Task>> tasks)
+    : finder_(std::move(finder)), tasks_(std::move(tasks))
 {
 }
 
 size_t Network::size() const
 {
-    return uid2task_.size();
+    return tasks_.size();
 }
 
-Task* Network::findByUID(UID uid) const
+const TaskFinder& Network::finder() const
 {
-    Task* ret = uid2task_.at(uid).get();
-    assert(ret != nullptr);
-    return ret;
-}
-
-Task* Network::findByTags(const std::vector<Tag>& tags) const
-{
-    // FIXME: More efficient way?
-    for (auto&& [uid, task] : uid2task_) {
-        const auto& taskTags = task->label().tags;
-        bool found = std::all_of(tags.begin(), tags.end(), [&](const Tag& t) {
-            auto it = taskTags.find(t.first);
-            return it != taskTags.end() && it->second == t.second;
-        });
-        if (found)
-            return task.get();
-    }
-    throw std::runtime_error("Network::findByTags: not found");
+    return finder_;
 }
 
 void Network::pushReadyTasks(ReadyQueue& readyQueue)
 {
-    for (auto&& [uid, task] : uid2task_)
+    for (auto&& task : tasks_)
         if (task->areAllInputsReady())
             readyQueue.push(task.get());
 }
 
 void Network::tick()
 {
-    for (auto&& [uid, task] : uid2task_)
+    for (auto&& task : tasks_)
         task->tick();
+}
+
+/* class NetworkBuilder */
+
+NetworkBuilder::NetworkBuilder(Allocator& alcRoot)
+    : finder_(), tasks_(), consumed_(false), currentAlc_(&alcRoot)
+{
+}
+
+NetworkBuilder::~NetworkBuilder()
+{
+}
+
+Allocator& NetworkBuilder::currentAllocator()
+{
+    return *currentAlc_;
+}
+
+const TaskFinder& NetworkBuilder::finder() const
+{
+    assert(!consumed_);
+    return finder_;
+}
+
+Network NetworkBuilder::createNetwork()
+{
+    assert(!consumed_);
+    consumed_ = true;
+    return Network{std::move(finder_), std::move(tasks_)};
+}
+
+void NetworkBuilder::withSubAllocator(const std::string& alcKey,
+                                      std::function<void(NetworkBuilder&)> f)
+{
+    Allocator* original = currentAlc_;
+    currentAlc_ = &original->subAllocator(alcKey);
+    f(*this);
+    currentAlc_ = original;
 }
 
 /* class Worker */
@@ -178,6 +230,277 @@ void NetworkRunner::update()
 void NetworkRunner::tick()
 {
     network_.tick();
+}
+
+/* class Blueprint */
+
+Blueprint::Blueprint(const std::string& fileName)
+{
+    namespace fs = std::filesystem;
+
+    // Read the file
+    std::stringstream inputStream;
+    {
+        std::ifstream ifs{fileName};
+        if (!ifs)
+            error::die("File not found: ", fileName);
+        inputStream << ifs.rdbuf();
+        source_ = inputStream.str();
+        inputStream.seekg(std::ios::beg);
+    }
+
+    // Parse config file
+    const auto src = toml::parse(inputStream, fileName);
+
+    // Find working directory of config
+    fs::path wd = fs::absolute(fileName);
+    wd.remove_filename();
+
+    // [[file]]
+    {
+        const auto srcFiles =
+            toml::find_or<std::vector<toml::value>>(src, "file", {});
+        for (const auto& srcFile : srcFiles) {
+            std::string typeStr = toml::find<std::string>(srcFile, "type");
+            fs::path path = toml::find<std::string>(srcFile, "path");
+            std::string name = toml::find<std::string>(srcFile, "name");
+
+            blueprint::File::TYPE type;
+            if (typeStr == "iyokanl1-json")
+                type = blueprint::File::TYPE::IYOKANL1_JSON;
+            else if (typeStr == "yosys-json")
+                type = blueprint::File::TYPE::YOSYS_JSON;
+            else
+                error::die("Invalid file type: ", typeStr);
+
+            if (path.is_relative())
+                path = wd / path;  // Make path absolute
+
+            files_.push_back(blueprint::File{type, path.string(), name});
+        }
+    }
+
+    // [[builtin]]
+    {
+        const auto srcBuiltins =
+            toml::find_or<std::vector<toml::value>>(src, "builtin", {});
+        for (const auto& srcBuiltin : srcBuiltins) {
+            const auto type = toml::find<std::string>(srcBuiltin, "type");
+            const auto name = toml::find<std::string>(srcBuiltin, "name");
+
+            if (type == "rom" || type == "mux-rom") {
+                auto romType = type == "rom"
+                                   ? blueprint::BuiltinROM::TYPE::CMUX_MEMORY
+                                   : blueprint::BuiltinROM::TYPE::MUX;
+                const auto inAddrWidth =
+                    toml::find<size_t>(srcBuiltin, "in_addr_width");
+                const auto outRdataWidth =
+                    toml::find<size_t>(srcBuiltin, "out_rdata_width");
+
+                builtinROMs_.push_back(blueprint::BuiltinROM{
+                    romType, name, inAddrWidth, outRdataWidth});
+            }
+            else if (type == "ram" || type == "mux-ram") {
+                auto ramType = type == "ram"
+                                   ? blueprint::BuiltinRAM::TYPE::CMUX_MEMORY
+                                   : blueprint::BuiltinRAM::TYPE::MUX;
+                const auto inAddrWidth =
+                    toml::find<size_t>(srcBuiltin, "in_addr_width");
+                const auto inWdataWidth =
+                    toml::find<size_t>(srcBuiltin, "in_wdata_width");
+                const auto outRdataWidth =
+                    toml::find<size_t>(srcBuiltin, "out_rdata_width");
+
+                builtinRAMs_.push_back(blueprint::BuiltinRAM{
+                    ramType, name, inAddrWidth, inWdataWidth, outRdataWidth});
+            }
+        }
+    }
+
+    // [connect]
+    {
+        const auto srcConnect = toml::find_or<toml::table>(src, "connect", {});
+        for (const auto& [srcKey, srcValue] : srcConnect) {
+            if (srcKey == "TOGND") {  // TOGND = [@...[n:m], @...[n:m], ...]
+                auto ary = toml::get<std::vector<std::string>>(srcValue);
+                for (const auto& portStr : ary) {  // @...[n:m]
+                    if (portStr.empty() || portStr.at(0) != '@')
+                        error::die("Invalid port name for TOGND: ", portStr);
+                    auto ports = parsePortString(portStr, "output");
+                    for (auto&& port : ports) {  // @...[n]
+                        const std::string& name = port.portName;
+                        int bit = port.portBit;
+                        auto [it, inserted] = atPortWidths_.emplace(name, 0);
+                        it->second = std::max(it->second, bit + 1);
+                    }
+                }
+                continue;
+            }
+
+            std::string srcTo = srcKey,
+                        srcFrom = toml::get<std::string>(srcValue),
+                        errMsg = utility::fok("Invalid connect: ", srcTo, " = ",
+                                              srcFrom);
+
+            // Check if input is correct.
+            if (srcTo.empty() || srcFrom.empty() ||
+                (srcTo[0] == '@' && srcFrom[0] == '@'))
+                error::die(errMsg);
+
+            // Others.
+            std::vector<blueprint::Port> portsTo =
+                                             parsePortString(srcTo, "input"),
+                                         portsFrom =
+                                             parsePortString(srcFrom, "output");
+            if (portsTo.size() != portsFrom.size())
+                error::die(errMsg);
+
+            for (size_t i = 0; i < portsTo.size(); i++) {
+                const blueprint::Port& to = portsTo[i];
+                const blueprint::Port& from = portsFrom[i];
+
+                if (srcTo[0] == '@') {  // @... = ...
+                    if (!to.nodeName.empty() || from.nodeName.empty())
+                        error::die(errMsg);
+
+                    const std::string& name = to.portName;
+                    int bit = to.portBit;
+
+                    {
+                        auto [it, inserted] =
+                            atPorts_.emplace(std::make_tuple(name, bit), from);
+                        if (!inserted)
+                            spdlog::warn(
+                                "{} is used multiple times. Only the first "
+                                "one is effective.",
+                                srcTo);
+                    }
+
+                    auto [it, inserted] = atPortWidths_.emplace(name, 0);
+                    it->second = std::max(it->second, bit + 1);
+                }
+                else if (srcFrom[0] == '@') {  // ... = @...
+                    if (!from.nodeName.empty() || to.nodeName.empty())
+                        error::die(errMsg);
+
+                    const std::string& name = from.portName;
+                    int bit = from.portBit;
+
+                    {
+                        auto [it, inserted] =
+                            atPorts_.emplace(std::make_tuple(name, bit), to);
+                        if (!inserted)
+                            spdlog::warn(
+                                "{} is used multiple times. Only the first "
+                                "one is effective. (FIXME)",
+                                srcFrom);
+                    }
+
+                    auto [it, inserted] = atPortWidths_.emplace(name, 0);
+                    it->second = std::max(it->second, bit + 1);
+                }
+                else {  // ... = ...
+                    edges_.emplace_back(from, to);
+                }
+            }
+        }
+    }
+}
+
+std::vector<blueprint::Port> Blueprint::parsePortString(const std::string& src,
+                                                        const std::string& kind)
+{
+    std::string nodeName, portName;
+    int portBitFrom, portBitTo;
+
+    auto match = utility::regexMatch(
+        src,
+        std::regex(R"(^@?(?:([^/]+)/)?([^[]+)(?:\[([0-9]+):([0-9]+)\])?$)"));
+    if (match.empty())
+        error::die("Invalid port string: ", src);
+
+    assert(match.size() == 1 + 4);
+
+    nodeName = match[1];
+    portName = match[2];
+
+    if (match[3].empty()) {  // hoge/piyo
+        assert(match[4].empty());
+        portBitFrom = 0;
+        portBitTo = 0;
+    }
+    else {  // hoge/piyo[foo:bar]
+        assert(!match[4].empty());
+        portBitFrom = std::stoi(match[3]);
+        portBitTo = std::stoi(match[4]);
+    }
+
+    std::vector<blueprint::Port> ret;
+    for (int i = portBitFrom; i < portBitTo + 1; i++)
+        ret.push_back(blueprint::Port{nodeName, kind, portName, i});
+    return ret;
+}
+
+bool Blueprint::needsCircuitKey() const
+{
+    for (const auto& bprom : builtinROMs_)
+        if (bprom.type == blueprint::BuiltinROM::TYPE::CMUX_MEMORY)
+            return true;
+    for (const auto& bpram : builtinRAMs_)
+        if (bpram.type == blueprint::BuiltinRAM::TYPE::CMUX_MEMORY)
+            return true;
+    return false;
+}
+
+const std::string& Blueprint::sourceFile() const
+{
+    return sourceFile_;
+}
+
+const std::string& Blueprint::source() const
+{
+    return source_;
+}
+
+const std::vector<blueprint::File>& Blueprint::files() const
+{
+    return files_;
+}
+
+const std::vector<blueprint::BuiltinROM>& Blueprint::builtinROMs() const
+{
+    return builtinROMs_;
+}
+
+const std::vector<blueprint::BuiltinRAM>& Blueprint::builtinRAMs() const
+{
+    return builtinRAMs_;
+}
+
+const std::vector<std::pair<blueprint::Port, blueprint::Port>>&
+Blueprint::edges() const
+{
+    return edges_;
+}
+
+const std::map<std::tuple<std::string, int>, blueprint::Port>&
+Blueprint::atPorts() const
+{
+    return atPorts_;
+}
+
+std::optional<blueprint::Port> Blueprint::at(const std::string& portName,
+                                             int portBit) const
+{
+    auto it = atPorts_.find(std::make_tuple(portName, portBit));
+    if (it == atPorts_.end())
+        return std::nullopt;
+    return it->second;
+}
+
+const std::unordered_map<std::string, int>& Blueprint::atPortWidths() const
+{
+    return atPortWidths_;
 }
 
 /**************************************************/

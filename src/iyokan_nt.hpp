@@ -5,6 +5,7 @@
 #include <cassert>
 #include <cstdint>
 #include <functional>
+#include <map>
 #include <memory>
 #include <queue>
 #include <string>
@@ -26,7 +27,6 @@ public:
     template <class T>
     T* make(size_t index)
     {
-        assert(subs_.size() == 0);
         if (data_.size() <= index)
             data_.resize(index + 1);
         std::any& v = data_.at(index);
@@ -37,7 +37,6 @@ public:
     template <class T>
     T* get(size_t index)
     {
-        assert(subs_.size() == 0);
         assert(index < data_.size());
         T* ret = std::any_cast<T>(&data_.at(index));
         assert(ret != nullptr);
@@ -45,17 +44,15 @@ public:
     }
 };
 
-enum class TAG_KEY {
-    KIND,
-    PORT_NAME,
-    PORT_BIT,
-};
-using Tag = std::pair<TAG_KEY, std::string>;
-
 using UID = uint64_t;
+struct ConfigName {
+    std::string nodeName, portName;
+    int portBit;
+};
 struct Label {
     UID uid;
-    std::unordered_map<TAG_KEY, std::string> tags;
+    std::string kind;
+    std::optional<ConfigName> cname;
 };
 
 namespace plain {
@@ -142,6 +139,17 @@ public:
     }
 };
 
+class TaskFinder {
+private:
+    std::unordered_map<UID, Task*> byUID_;
+    std::map<std::tuple<std::string, std::string, int>, Task*> byConfigName_;
+
+public:
+    void add(Task* task);
+    Task* findByUID(UID uid) const;
+    Task* findByConfigName(const ConfigName& cname) const;
+};
+
 // TaskCommon can be used as base class of many "common" tasks.
 // "Common" here means:
 //   1. # of outputs is 1. (#inputs can be >1.)
@@ -153,13 +161,19 @@ template <class T>
 class TaskCommon : public Task {
 private:
     size_t numReadyInputs_;
+    const size_t numMinExpectedInputs_, numMaxExpectedInputs_;
     std::vector<T*> inputs_;
     T* output_;
 
 protected:
+    size_t getInputSize() const
+    {
+        return inputs_.size();
+    }
+
     const T& input(size_t i) const
     {
-        assert(inputs_.at(i) != nullptr);
+        assert(i < inputs_.size());
         return *inputs_.at(i);
     }
 
@@ -170,10 +184,14 @@ protected:
     }
 
 public:
-    TaskCommon(Label label, Allocator& alc, size_t numExpectedInputs)
+    TaskCommon(Label label, Allocator& alc, size_t numMinExpectedInputs,
+               std::optional<size_t> numMaxExpectedInputs = std::nullopt)
         : Task(std::move(label)),
           numReadyInputs_(0),
-          inputs_(numExpectedInputs, nullptr),
+          numMinExpectedInputs_(numMinExpectedInputs),
+          numMaxExpectedInputs_(
+              numMaxExpectedInputs.value_or(numMinExpectedInputs)),
+          inputs_(),
           output_(alc.make<T>(0))
     {
     }
@@ -207,22 +225,12 @@ public:
     void addInput(Task* newParent, T* newIn)
     {
         assert(newParent != nullptr && newIn != nullptr);
+        assert(inputs_.size() < numMaxExpectedInputs_);
 
         addParent(newParent);
         newParent->addChild(this);
 
-        for (size_t i = 0; i < inputs_.size(); i++) {
-            if (inputs_.at(i) != nullptr)
-                continue;
-            inputs_.at(i) = newIn;
-            return;
-        }
-        assert(false && "Too many calls of addInput");
-    }
-
-    const T& getOutput() const
-    {
-        return *output_;
+        inputs_.push_back(newIn);
     }
 };
 
@@ -239,15 +247,14 @@ public:
 
 class Network {
 private:
-    std::unordered_map<UID, std::unique_ptr<Task>> uid2task_;
+    TaskFinder finder_;
+    std::vector<std::unique_ptr<Task>> tasks_;
 
 public:
-    Network(std::unordered_map<UID, std::unique_ptr<Task>> uid2task);
+    Network(TaskFinder finder, std::vector<std::unique_ptr<Task>> tasks);
 
     size_t size() const;
-
-    Task* findByUID(UID uid) const;
-    Task* findByTags(const std::vector<Tag>& tags) const;
+    const TaskFinder& finder() const;
 
     void pushReadyTasks(ReadyQueue& readyQueue);
     void tick();
@@ -255,25 +262,44 @@ public:
 };
 
 class NetworkBuilder {
+private:
+    TaskFinder finder_;
+    std::vector<std::unique_ptr<Task>> tasks_;
+    bool consumed_;
+    Allocator* currentAlc_;
+
+protected:
+    // Create a new task. T must be derived from class Task.
+    template <class T, class... Args>
+    T* emplaceTask(Args&&... args)
+    {
+        assert(!consumed_);
+        T* task = new T(std::forward<Args>(args)...);
+        tasks_.emplace_back(task);
+        finder_.add(task);
+        return task;
+    }
+
+    Allocator& currentAllocator();
+
 public:
-    NetworkBuilder()
-    {
-    }
+    NetworkBuilder(Allocator& alcRoot);
+    virtual ~NetworkBuilder();
 
-    virtual ~NetworkBuilder()
-    {
-    }
+    const TaskFinder& finder() const;
 
-    virtual Network createNetwork() = 0;
+    Network createNetwork();
+
+    void withSubAllocator(const std::string& alcKey,
+                          std::function<void(NetworkBuilder&)> f);
 
     virtual void connect(UID from, UID to) = 0;
 
     // not/and/or are C++ keywords, so member functions here are in capitals.
-    // virtual UID INPUT(const std::string& alcKey, const std::string& portName,
-    //                  int portBit) = 0;
-    // virtual UID OUTPUT(const std::string& alcKey, const std::string&
-    // portName,
-    //                   int portBit) = 0;
+    virtual UID INPUT(const std::string& alcKey, const std::string& nodeName,
+                      const std::string& portName, int portBit) = 0;
+    virtual UID OUTPUT(const std::string& alcKey, const std::string& nodeName,
+                       const std::string& portName, int portBit) = 0;
     virtual UID CONSTONE(const std::string& alcKey) = 0;
     virtual UID CONSTZERO(const std::string& alcKey) = 0;
     // virtual UID AND(const std::string& alcKey) = 0;
@@ -322,6 +348,73 @@ public:
     bool isRunning() const;
     void update();
     void tick();
+};
+
+namespace blueprint {  // blueprint components
+struct File {
+    enum class TYPE {
+        IYOKANL1_JSON,
+        YOSYS_JSON,
+    } type;
+    std::string path, name;
+};
+
+struct BuiltinROM {
+    enum class TYPE {
+        CMUX_MEMORY,
+        MUX,
+    } type;
+    std::string name;
+    size_t inAddrWidth, outRdataWidth;
+};
+
+struct BuiltinRAM {
+    enum class TYPE {
+        CMUX_MEMORY,
+        MUX,
+    } type;
+    std::string name;
+    size_t inAddrWidth, inWdataWidth, outRdataWidth;
+};
+
+struct Port {
+    std::string nodeName, kind, portName;
+    int portBit;
+};
+}  // namespace blueprint
+
+class Blueprint {
+private:
+    std::string sourceFile_, source_;
+
+    std::vector<blueprint::File> files_;
+    std::vector<blueprint::BuiltinROM> builtinROMs_;
+    std::vector<blueprint::BuiltinRAM> builtinRAMs_;
+    std::vector<std::pair<blueprint::Port, blueprint::Port>> edges_;
+
+    std::map<std::tuple<std::string, int>, blueprint::Port> atPorts_;
+    std::unordered_map<std::string, int> atPortWidths_;
+
+private:
+    std::vector<blueprint::Port> parsePortString(const std::string& src,
+                                                 const std::string& kind);
+
+public:
+    Blueprint(const std::string& fileName);
+
+    bool needsCircuitKey() const;
+    const std::string& sourceFile() const;
+    const std::string& source() const;
+    const std::vector<blueprint::File>& files() const;
+    const std::vector<blueprint::BuiltinROM>& builtinROMs() const;
+    const std::vector<blueprint::BuiltinRAM>& builtinRAMs() const;
+    const std::vector<std::pair<blueprint::Port, blueprint::Port>>& edges()
+        const;
+    const std::map<std::tuple<std::string, int>, blueprint::Port>& atPorts()
+        const;
+    std::optional<blueprint::Port> at(const std::string& portName,
+                                      int portBit = 0) const;
+    const std::unordered_map<std::string, int>& atPortWidths() const;
 };
 
 }  // namespace nt

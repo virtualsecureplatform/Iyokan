@@ -19,6 +19,31 @@ inline void initialize(const std::string& tag)
 }
 
 template <class... Args>
+[[noreturn]] void diefmt(Args&&... args)
+{
+    using namespace backward;
+
+    // Print error message
+    spdlog::error(std::forward<Args>(args)...);
+
+#ifndef NDEBUG
+    {
+        // Print backtrace
+        spdlog::error("Preparing backtrace...");
+        std::stringstream ss;
+        StackTrace st;
+        st.load_here(32);
+        Printer p;
+        p.print(st, ss);
+        spdlog::error(ss.str());
+    }
+#endif
+
+    // Abort
+    std::exit(EXIT_FAILURE);
+}
+
+template <class... Args>
 [[noreturn]] void die(Args... args)
 {
     using namespace backward;
