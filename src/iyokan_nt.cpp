@@ -1,6 +1,7 @@
 #include "iyokan_nt.hpp"
-#include "error.hpp"
+#include "error_nt.hpp"
 
+#include <fmt/format.h>
 #include <toml.hpp>
 
 #include <regex>
@@ -246,7 +247,7 @@ Blueprint::Blueprint(const std::string& fileName)
     {
         std::ifstream ifs{fileName};
         if (!ifs)
-            error::die("File not found: ", fileName);
+            ERROR_DIE("File not found: %s", fileName.c_str());
         inputStream << ifs.rdbuf();
         source_ = inputStream.str();
         inputStream.seekg(std::ios::beg);
@@ -274,7 +275,7 @@ Blueprint::Blueprint(const std::string& fileName)
             else if (typeStr == "yosys-json")
                 type = blueprint::File::TYPE::YOSYS_JSON;
             else
-                error::die("Invalid file type: ", typeStr);
+                ERROR_DIE("Invalid file type: %s", typeStr.c_str());
 
             if (path.is_relative())
                 path = wd / path;  // Make path absolute
@@ -328,7 +329,8 @@ Blueprint::Blueprint(const std::string& fileName)
                 auto ary = toml::get<std::vector<std::string>>(srcValue);
                 for (const auto& portStr : ary) {  // @...[n:m]
                     if (portStr.empty() || portStr.at(0) != '@')
-                        error::die("Invalid port name for TOGND: ", portStr);
+                        ERROR_DIE("Invalid port name for TOGND: %s",
+                                  portStr.c_str());
                     auto ports = parsePortString(portStr, "output");
                     for (auto&& port : ports) {  // @...[n]
                         const std::string& name = port.portName;
@@ -348,7 +350,7 @@ Blueprint::Blueprint(const std::string& fileName)
             // Check if input is correct.
             if (srcTo.empty() || srcFrom.empty() ||
                 (srcTo[0] == '@' && srcFrom[0] == '@'))
-                error::die(errMsg);
+                ERROR_DIE("%s", errMsg.c_str());
 
             // Others.
             std::vector<blueprint::Port> portsTo =
@@ -356,7 +358,7 @@ Blueprint::Blueprint(const std::string& fileName)
                                          portsFrom =
                                              parsePortString(srcFrom, "output");
             if (portsTo.size() != portsFrom.size())
-                error::die(errMsg);
+                ERROR_DIE("%s", errMsg.c_str());
 
             for (size_t i = 0; i < portsTo.size(); i++) {
                 const blueprint::Port& to = portsTo[i];
@@ -364,7 +366,7 @@ Blueprint::Blueprint(const std::string& fileName)
 
                 if (srcTo[0] == '@') {  // @... = ...
                     if (!to.nodeName.empty() || from.nodeName.empty())
-                        error::die(errMsg);
+                        ERROR_DIE("%s", errMsg.c_str());
 
                     const std::string& name = to.portName;
                     int bit = to.portBit;
@@ -373,10 +375,10 @@ Blueprint::Blueprint(const std::string& fileName)
                         auto [it, inserted] =
                             atPorts_.emplace(std::make_tuple(name, bit), from);
                         if (!inserted)
-                            spdlog::warn(
-                                "{} is used multiple times. Only the first "
-                                "one is effective.",
-                                srcTo);
+                            LOG_S(WARNING)
+                                << srcTo
+                                << " is used multiple times. Only the first "
+                                   "one is effective.";
                     }
 
                     auto [it, inserted] = atPortWidths_.emplace(name, 0);
@@ -384,7 +386,7 @@ Blueprint::Blueprint(const std::string& fileName)
                 }
                 else if (srcFrom[0] == '@') {  // ... = @...
                     if (!from.nodeName.empty() || to.nodeName.empty())
-                        error::die(errMsg);
+                        ERROR_DIE("%s", errMsg.c_str());
 
                     const std::string& name = from.portName;
                     int bit = from.portBit;
@@ -393,10 +395,10 @@ Blueprint::Blueprint(const std::string& fileName)
                         auto [it, inserted] =
                             atPorts_.emplace(std::make_tuple(name, bit), to);
                         if (!inserted)
-                            spdlog::warn(
-                                "{} is used multiple times. Only the first "
-                                "one is effective. (FIXME)",
-                                srcFrom);
+                            LOG_S(WARNING)
+                                << srcFrom
+                                << " is used multiple times. Only the first "
+                                   "one is effective. (FIXME)";
                     }
 
                     auto [it, inserted] = atPortWidths_.emplace(name, 0);
@@ -420,7 +422,7 @@ std::vector<blueprint::Port> Blueprint::parsePortString(const std::string& src,
         src,
         std::regex(R"(^@?(?:([^/]+)/)?([^[]+)(?:\[([0-9]+):([0-9]+)\])?$)"));
     if (match.empty())
-        error::die("Invalid port string: ", src);
+        ERROR_DIE("Invalid port string: %s", src.c_str());
 
     assert(match.size() == 1 + 4);
 

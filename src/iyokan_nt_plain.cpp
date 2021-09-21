@@ -1,6 +1,15 @@
 #include "iyokan_nt_plain.hpp"
+#include "error_nt.hpp"
 #include "iyokan_nt.hpp"
-#include "packet.hpp"
+#include "packet_nt.hpp"
+
+template <class T1, class T2>
+std::string fok2(T1 t1, T2 t2)
+{
+    std::stringstream ss;
+    ss << t1 << t2;
+    return ss.str();
+}
 
 namespace nt {
 namespace plain {
@@ -231,14 +240,15 @@ struct RunParameter {
 
     void print() const
     {
-        spdlog::info("Run Parameters");
-        spdlog::info("\tMode: Plain");
-        spdlog::info("\tBlueprint: {}", blueprintFile);
-        spdlog::info("\t# of CPU workers: {}", numCPUWorkers);
-        spdlog::info("\t# of cycles: {}", numCycles);
-        spdlog::info("\tInput file (request packet): {}", inputFile);
-        spdlog::info("\tOutput file (result packet): {}", outputFile);
-        spdlog::info("\tSchedule: {}", sched == SCHED::TOPO ? "topo" : "ranku");
+        LOG_S(INFO) << "Run parameters";
+        LOG_S(INFO) << "\tMode: plain";
+        LOG_S(INFO) << "\tBlueprint: " << blueprintFile;
+        LOG_S(INFO) << "\t# of CPU Workers: " << numCPUWorkers;
+        LOG_S(INFO) << "\t# of cycles: " << numCycles;
+        LOG_S(INFO) << "\tInput file (request packet): " << inputFile;
+        LOG_S(INFO) << "\tOutput file (result packet): " << outputFile;
+        LOG_S(INFO) << "\tSchedule: "
+                    << (sched == SCHED::TOPO ? "topo" : "ranku");
     }
 };
 
@@ -272,7 +282,7 @@ public:
 Frontend::Frontend(const RunParameter& pr, Allocator& alc)
     : pr_(pr),
       runner_(nullptr),
-      reqPacket_(readFromArchive<PlainPacket>(pr_.inputFile)),
+      reqPacket_(readPlainPacket(pr_.inputFile)),
       currentCycle_(0),
       bp_(pr_.blueprintFile)
 {
@@ -321,7 +331,10 @@ Frontend::Frontend(const RunParameter& pr, Allocator& alc)
         Task* task = nb.finder().findByConfigName(
             {port.nodeName, port.portName, port.portBit});
         if (task->label().kind != port.kind)
-            error::diefmt("Invalid port: {}/{}[{}] is not {}");
+            ERROR_DIE("Invalid port: %s/%s[%d] is %s, not %s",
+                      port.nodeName.c_str(), port.portName.c_str(),
+                      port.portBit, task->label().kind.c_str(),
+                      port.kind.c_str());
         return task;
     };
 
@@ -365,7 +378,7 @@ void Frontend::makeRAM(const blueprint::BuiltinRAM& ram, nt::NetworkBuilder& nb)
 {
     // FIXME: relax this constraint
     if (ram.inWdataWidth != ram.outRdataWidth)
-        error::die(
+        ERROR_DIE(
             "Invalid RAM size; RAM that has different sizes of "
             "wdata and rdata is not implemented.");
 
@@ -377,16 +390,15 @@ void Frontend::makeROM(const blueprint::BuiltinROM& rom, nt::NetworkBuilder& nb)
     // Create inputs
     std::vector<UID> addrInputs;
     for (size_t i = 0; i < rom.inAddrWidth; i++) {
-        UID id = nb.INPUT(fmt::format("addr{}", i), rom.name, "addr", i);
+        UID id = nb.INPUT(fok2("addr", i), rom.name, "addr", i);
         addrInputs.push_back(id);
     }
 
     // Create 1bit ROMs
     for (size_t i = 0; i < rom.outRdataWidth; i++) {
-        nb.withSubAllocator(fmt::format("rom1bit{}", i),
-                            [&](nt::NetworkBuilder& nb) {
-                                make1bitROMWithMUX(rom, addrInputs, nb);
-                            });
+        nb.withSubAllocator(fok2("rom1bit{}", i), [&](nt::NetworkBuilder& nb) {
+            make1bitROMWithMUX(rom, addrInputs, nb);
+        });
     }
 }
 
