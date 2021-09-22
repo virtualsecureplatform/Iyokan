@@ -14,6 +14,12 @@
 
 namespace nt {
 
+// Forward declarations
+namespace plain {
+class WorkerInfo;
+}
+class DataHolder;
+
 class Allocator {
 private:
     std::unordered_map<std::string, std::unique_ptr<Allocator>> subs_;
@@ -55,13 +61,6 @@ struct Label {
     std::optional<ConfigName> cname;
 };
 
-namespace plain {
-class WorkerInfo;
-}
-
-// Data holder for getOutput/setInput
-class DataHolder;
-
 class Task {
 private:
     Label label_;
@@ -70,91 +69,29 @@ private:
     bool hasQueued_;
 
 public:
-    Task(Label label)
-        : label_(label),
-          parents_(),
-          children_(),
-          priority_(0),
-          hasQueued_(false)
-    {
-    }
+    Task(Label label);
+    virtual ~Task();
 
-    virtual ~Task()
-    {
-    }
-
-    const Label& label() const
-    {
-        return label_;
-    }
-
-    const std::vector<Task*>& parents() const
-    {
-        return parents_;
-    }
-
-    const std::vector<Task*>& children() const
-    {
-        return children_;
-    }
-
-    int priority() const
-    {
-        return priority_;
-    }
-
-    bool hasQueued() const
-    {
-        return hasQueued_;
-    }
-
-    void addChild(Task* task)
-    {
-        assert(task != nullptr);
-        children_.push_back(task);
-    }
-
-    void addParent(Task* task)
-    {
-        assert(task != nullptr);
-        parents_.push_back(task);
-    }
-
-    void setPriority(int newPri)
-    {
-        priority_ = newPri;
-    }
-
-    void setQueued()
-    {
-        assert(!hasQueued_);
-        hasQueued_ = true;
-    }
+    const Label& label() const;
+    const std::vector<Task*>& parents() const;
+    const std::vector<Task*>& children() const;
+    int priority() const;
+    bool hasQueued() const;
+    void addChild(Task* task);
+    void addParent(Task* task);
+    void setPriority(int newPri);
+    void setQueued();
 
     virtual void notifyOneInputReady() = 0;
     virtual bool areAllInputsReady() const = 0;
     virtual bool hasFinished() const = 0;
-    virtual void tick() = 0;  // Reset for next cycle
 
-    virtual void getOutput(DataHolder&)
-    {
-        assert(0 && "Internal error: unreachable here");
-    }
-
-    virtual void setInput(const DataHolder&)
-    {
-        assert(0 && "Internal error: unreachable here");
-    }
-
-    virtual bool canRunPlain() const
-    {
-        return false;
-    }
-
-    virtual void startAsynchronously(plain::WorkerInfo&)
-    {
-        assert(0 && "Internal error: not implemented task for plain mode");
-    }
+    // tick() resets the internal state of the task for the next cycle
+    virtual void tick();
+    virtual void getOutput(DataHolder&);
+    virtual void setInput(const DataHolder&);
+    virtual bool canRunPlain() const;
+    virtual void startAsynchronously(plain::WorkerInfo&);
 };
 
 class TaskFinder {
@@ -218,19 +155,20 @@ public:
     {
     }
 
-    void notifyOneInputReady() override
+    virtual void notifyOneInputReady() override
     {
         numReadyInputs_++;
         assert(numReadyInputs_ <= inputs_.size());
     }
 
-    bool areAllInputsReady() const override
+    virtual bool areAllInputsReady() const override
     {
         return numReadyInputs_ == inputs_.size();
     }
 
-    void tick() override
+    virtual void tick() override
     {
+        Task::tick();
         numReadyInputs_ = 0;
     }
 
@@ -249,6 +187,47 @@ public:
         newParent->addChild(this);
 
         inputs_.push_back(newIn);
+    }
+};
+
+// class TaskDFF can be used as base class of DFF tasks.
+// TaskDFF inherits TaskCommon, so it has addInput member functions.
+// NetworkBuilder can use it to connect common gates with DFFs.
+template <class T>
+class TaskDFF : public TaskCommon<T> {
+public:
+    TaskDFF(Label label, Allocator& alc)
+        : TaskCommon<T>(std::move(label), alc, 1)
+    {
+    }
+
+    virtual ~TaskDFF()
+    {
+    }
+
+    void notifyOneInputReady() override
+    {
+        assert(0 && "Internal error: unreachable here");
+    }
+
+    bool areAllInputsReady() const override
+    {
+        // Since areAllInputsReady() is called after calling of tick(), the
+        // input should already be in output().
+        return true;
+    }
+
+    bool hasFinished() const override
+    {
+        // Since hasFinished() is called after calling of tick(), the
+        // input should already be in output().
+        return true;
+    }
+
+    void tick() override
+    {
+        TaskCommon<T>::tick();
+        this->output() = this->input(0);
     }
 };
 
@@ -318,24 +297,27 @@ public:
 
     virtual void connect(UID from, UID to) = 0;
 
-    // not/and/or are C++ keywords, so member functions here are in capitals.
+    // not/and/or are C++ keywords, so the member functions here are in
+    // capitals.
     virtual UID INPUT(const std::string& alcKey, const std::string& nodeName,
                       const std::string& portName, int portBit) = 0;
     virtual UID OUTPUT(const std::string& alcKey, const std::string& nodeName,
                        const std::string& portName, int portBit) = 0;
+
+    virtual UID AND(const std::string& alcKey) = 0;
+    virtual UID ANDNOT(const std::string& alcKey) = 0;
     virtual UID CONSTONE(const std::string& alcKey) = 0;
     virtual UID CONSTZERO(const std::string& alcKey) = 0;
-    // virtual UID AND(const std::string& alcKey) = 0;
-    // virtual UID ANDNOT(const std::string& alcKey) = 0;
-    // virtual UID MUX(const std::string& alcKey) = 0;
+    virtual UID DFF(const std::string& alcKey) = 0;
+    virtual UID MUX(const std::string& alcKey) = 0;
     virtual UID NAND(const std::string& alcKey) = 0;
-    // virtual UID NMUX(const std::string& alcKey) = 0;
-    // virtual UID NOR(const std::string& alcKey) = 0;
-    // virtual UID NOT(const std::string& alcKey) = 0;
-    // virtual UID OR(const std::string& alcKey) = 0;
-    // virtual UID ORNOT(const std::string& alcKey) = 0;
-    // virtual UID XNOR(const std::string& alcKey) = 0;
-    // virtual UID XOR(const std::string& alcKey) = 0;
+    virtual UID NMUX(const std::string& alcKey) = 0;
+    virtual UID NOR(const std::string& alcKey) = 0;
+    virtual UID NOT(const std::string& alcKey) = 0;
+    virtual UID OR(const std::string& alcKey) = 0;
+    virtual UID ORNOT(const std::string& alcKey) = 0;
+    virtual UID XNOR(const std::string& alcKey) = 0;
+    virtual UID XOR(const std::string& alcKey) = 0;
 };
 
 class Worker {

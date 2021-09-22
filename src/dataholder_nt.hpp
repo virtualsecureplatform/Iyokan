@@ -9,6 +9,7 @@ namespace nt {
 
 enum class Bit : bool;
 
+// DataHolder holds data using Task::setInput/Task::getOutput.
 class DataHolder {
 private:
     union {

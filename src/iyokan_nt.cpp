@@ -38,6 +38,94 @@ Allocator& Allocator::subAllocator(const std::string& key)
     return *it->second;
 }
 
+/* class Task */
+
+Task::Task(Label label)
+    : label_(std::move(label)),
+      parents_(),
+      children_(),
+      priority_(0),
+      hasQueued_(false)
+{
+}
+
+Task::~Task()
+{
+}
+
+const Label& Task::label() const
+{
+    return label_;
+}
+
+const std::vector<Task*>& Task::parents() const
+{
+    return parents_;
+}
+
+const std::vector<Task*>& Task::children() const
+{
+    return children_;
+}
+
+int Task::priority() const
+{
+    return priority_;
+}
+
+bool Task::hasQueued() const
+{
+    return hasQueued_;
+}
+
+void Task::addChild(Task* task)
+{
+    assert(task != nullptr);
+    children_.push_back(task);
+}
+
+void Task::addParent(Task* task)
+{
+    assert(task != nullptr);
+    parents_.push_back(task);
+}
+
+void Task::setPriority(int newPri)
+{
+    priority_ = newPri;
+}
+
+void Task::setQueued()
+{
+    assert(!hasQueued_);
+    hasQueued_ = true;
+}
+
+void Task::tick()
+{
+    hasQueued_ = false;
+}
+
+void Task::getOutput(DataHolder&)
+{
+    assert(0 && "Internal error: unreachable here");
+}
+
+void Task::setInput(const DataHolder&)
+{
+    assert(0 && "Internal error: unreachable here");
+}
+
+bool Task::canRunPlain() const
+{
+    return false;
+}
+
+void Task::startAsynchronously(plain::WorkerInfo&)
+{
+    assert(0 && "Internal error: not implemented task for plain mode");
+}
+
 /* class TaskFinder */
 
 void TaskFinder::add(Task* task)
@@ -172,8 +260,10 @@ void Worker::update(ReadyQueue& readyQueue, size_t& numFinishedTargets)
 
     if (target_ != nullptr && target_->hasFinished()) {
         for (Task* child : target_->children()) {
+            if (child->hasQueued())
+                continue;
             child->notifyOneInputReady();
-            if (!child->hasQueued() && child->areAllInputsReady())
+            if (child->areAllInputsReady())
                 readyQueue.push(child);
         }
         target_ = nullptr;
