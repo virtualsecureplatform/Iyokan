@@ -59,6 +59,9 @@ namespace plain {
 class WorkerInfo;
 }
 
+// Data holder for getOutput/setInput
+class DataHolder;
+
 class Task {
 private:
     Label label_;
@@ -67,7 +70,12 @@ private:
     bool hasQueued_;
 
 public:
-    Task(Label label) : label_(label)
+    Task(Label label)
+        : label_(label),
+          parents_(),
+          children_(),
+          priority_(0),
+          hasQueued_(false)
     {
     }
 
@@ -127,6 +135,16 @@ public:
     virtual bool areAllInputsReady() const = 0;
     virtual bool hasFinished() const = 0;
     virtual void tick() = 0;  // Reset for next cycle
+
+    virtual void getOutput(DataHolder&)
+    {
+        assert(0 && "Internal error: unreachable here");
+    }
+
+    virtual void setInput(const DataHolder&)
+    {
+        assert(0 && "Internal error: unreachable here");
+    }
 
     virtual bool canRunPlain() const
     {

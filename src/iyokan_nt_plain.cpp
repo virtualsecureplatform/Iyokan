@@ -1,4 +1,5 @@
 #include "iyokan_nt_plain.hpp"
+#include "dataholder_nt.hpp"
 #include "error_nt.hpp"
 #include "iyokan_nt.hpp"
 #include "packet_nt.hpp"
@@ -55,10 +56,10 @@ public:
         return true;
     }
 
-    void setInput(Bit val)
+    void setInput(const DataHolder& h) override
     {
         // Set the input i.e., set the output value of this gate
-        output() = val;
+        output() = h.getBit();
     }
 };
 
@@ -83,9 +84,9 @@ public:
         return true;
     }
 
-    const Bit& getOutput()
+    void getOutput(DataHolder& h) override
     {
-        return output();
+        h.setBit(&output());
     }
 };
 
@@ -416,6 +417,8 @@ void Frontend::make1bitROMWithMUX(const blueprint::BuiltinROM& rom,
 void test0()
 {
     WorkerInfo wi;
+    DataHolder dh;
+    Bit /*bit0 = 0_b,*/ bit1 = 1_b;
 
     {
         Allocator root;
@@ -426,7 +429,8 @@ void test0()
         t0.startAsynchronously(wi);
         t1.startAsynchronously(wi);
         assert(t0.hasFinished());
-        assert(t1.getOutput() == 1_b);
+        t1.getOutput(dh);
+        assert(dh.getBit() == 1_b);
     }
 
     {
@@ -448,7 +452,8 @@ void test0()
         t3.startAsynchronously(wi);
         assert(t0.hasFinished() && t1.hasFinished() && t2.hasFinished() &&
                t3.hasFinished());
-        assert(t3.getOutput() == 1_b);
+        t3.getOutput(dh);
+        assert(dh.getBit() == 1_b);
     }
 
     {
@@ -467,12 +472,9 @@ void test0()
         Task* t0 = runner.network().finder().findByUID(id0);
         Task* t1 = runner.network().finder().findByUID(id1);
         Task* t3 = runner.network().finder().findByUID(id3);
-        TaskInput *inA = dynamic_cast<TaskInput*>(t0),
-                  *inB = dynamic_cast<TaskInput*>(t1);
-        TaskOutput* out = dynamic_cast<TaskOutput*>(t3);
 
-        inA->setInput(1_b);
-        inB->setInput(1_b);
+        t0->setInput(&bit1);
+        t1->setInput(&bit1);
 
         runner.prepareToRun();
         while (runner.numFinishedTargets() < runner.network().size()) {
@@ -480,7 +482,8 @@ void test0()
             runner.update();
         }
 
-        assert(out->getOutput() == 0_b);
+        t3->getOutput(dh);
+        assert(dh.getBit() == 0_b);
     }
 }
 

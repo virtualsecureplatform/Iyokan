@@ -2,6 +2,8 @@
 
 #include <backward.hpp>
 
+#include <cassert>
+
 namespace nt::error {
 void initialize()
 {
@@ -26,6 +28,7 @@ void abortWithBacktrace()
     // Abort
     std::exit(EXIT_FAILURE);
 }
+
 }  // namespace nt::error
 
 #include <loguru.cpp>
