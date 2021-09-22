@@ -345,15 +345,18 @@ private:
     ReadyQueue readyQueue_;
     size_t numFinishedTargets_;
 
+private:
+    void prepareToRun();
+    void update();
+
 public:
     NetworkRunner(Network network,
                   std::vector<std::unique_ptr<Worker>> workers);
 
     const Network& network() const;
     size_t numFinishedTargets() const;
-    void prepareToRun();
     bool isRunning() const;
-    void update();
+    void run();
     void tick();
 };
 

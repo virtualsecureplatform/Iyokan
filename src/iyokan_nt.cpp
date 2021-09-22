@@ -290,6 +290,20 @@ NetworkRunner::NetworkRunner(Network network,
         assert(w != nullptr);
 }
 
+void NetworkRunner::prepareToRun()
+{
+    assert(readyQueue_.empty());
+
+    numFinishedTargets_ = 0;
+    network_.pushReadyTasks(readyQueue_);
+}
+
+void NetworkRunner::update()
+{
+    for (auto&& w : workers_)
+        w->update(readyQueue_, numFinishedTargets_);
+}
+
 const Network& NetworkRunner::network() const
 {
     return network_;
@@ -300,14 +314,6 @@ size_t NetworkRunner::numFinishedTargets() const
     return numFinishedTargets_;
 }
 
-void NetworkRunner::prepareToRun()
-{
-    assert(readyQueue_.empty());
-
-    numFinishedTargets_ = 0;
-    network_.pushReadyTasks(readyQueue_);
-}
-
 bool NetworkRunner::isRunning() const
 {
     return std::any_of(workers_.begin(), workers_.end(),
@@ -315,10 +321,13 @@ bool NetworkRunner::isRunning() const
            !readyQueue_.empty();
 }
 
-void NetworkRunner::update()
+void NetworkRunner::run()
 {
-    for (auto&& w : workers_)
-        w->update(readyQueue_, numFinishedTargets_);
+    prepareToRun();
+    while (numFinishedTargets() < network().size()) {
+        assert(isRunning() && "Invalid network: maybe some unreachable tasks?");
+        update();
+    }
 }
 
 void NetworkRunner::tick()

@@ -473,13 +473,7 @@ void test0()
 
         t0->setInput(&bit1);
         t1->setInput(&bit1);
-
-        runner.prepareToRun();
-        while (runner.numFinishedTargets() < runner.network().size()) {
-            assert(runner.isRunning());
-            runner.update();
-        }
-
+        runner.run();
         t3->getOutput(dh);
         assert(dh.getBit() == 0_b);
     }
@@ -511,25 +505,17 @@ void test0()
         Task* t0 = runner.network().finder().findByUID(id0);
         Task* t1 = runner.network().finder().findByUID(id1);
 
-        auto run = [&] {
-            runner.prepareToRun();
-            while (runner.numFinishedTargets() < runner.network().size()) {
-                assert(runner.isRunning());
-                runner.update();
-            }
-        };
-
         t0->setInput(&bit1);
-        run();
+        runner.run();
         t0->setInput(&bit0);
 
         runner.tick();
-        run();
+        runner.run();
         t1->getOutput(dh);
         assert(dh.getBit() == 0_b);
 
         runner.tick();
-        run();
+        runner.run();
         t1->getOutput(dh);
         assert(dh.getBit() == 1_b);
     }
