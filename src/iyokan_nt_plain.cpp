@@ -1,6 +1,5 @@
 #include "iyokan_nt_plain.hpp"
 #include "dataholder_nt.hpp"
-#include "error_nt.hpp"
 #include "iyokan_nt.hpp"
 #include "packet_nt.hpp"
 
@@ -331,10 +330,10 @@ Frontend::Frontend(const RunParameter& pr, Allocator& alc)
         Task* task = nb.finder().findByConfigName(
             {port.nodeName, port.portName, port.portBit});
         if (task->label().kind != port.kind)
-            ERROR_DIE("Invalid port: %s/%s[%d] is %s, not %s",
-                      port.nodeName.c_str(), port.portName.c_str(),
-                      port.portBit, task->label().kind.c_str(),
-                      port.kind.c_str());
+            ERR_DIE("Invalid port: " << port.nodeName << "/" << port.portName
+                                     << "[" << port.portBit << "] is "
+                                     << task->label().kind << ", not "
+                                     << port.kind);
         return task;
     };
 
@@ -378,7 +377,7 @@ void Frontend::makeRAM(const blueprint::BuiltinRAM& ram, nt::NetworkBuilder& nb)
 {
     // FIXME: relax this constraint
     if (ram.inWdataWidth != ram.outRdataWidth)
-        ERROR_DIE(
+        ERR_DIE(
             "Invalid RAM size; RAM that has different sizes of "
             "wdata and rdata is not implemented.");
 

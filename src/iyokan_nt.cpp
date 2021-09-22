@@ -2,7 +2,7 @@
 #include "error_nt.hpp"
 
 #include <fmt/format.h>
-#include <toml.hpp>
+#include <toml.hpp>  // FIXME: this makes compilation slow
 
 #include <regex>
 #include <stdexcept>
@@ -108,12 +108,12 @@ void Task::tick()
 
 void Task::getOutput(DataHolder&)
 {
-    assert(0 && "Internal error: unreachable here");
+    ERR_UNREACHABLE;
 }
 
 void Task::setInput(const DataHolder&)
 {
-    assert(0 && "Internal error: unreachable here");
+    ERR_UNREACHABLE;
 }
 
 bool Task::canRunPlain() const
@@ -123,7 +123,7 @@ bool Task::canRunPlain() const
 
 void Task::startAsynchronously(plain::WorkerInfo&)
 {
-    assert(0 && "Internal error: not implemented task for plain mode");
+    ERR_UNREACHABLE;
 }
 
 /* class TaskFinder */
@@ -337,7 +337,7 @@ Blueprint::Blueprint(const std::string& fileName)
     {
         std::ifstream ifs{fileName};
         if (!ifs)
-            ERROR_DIE("File not found: %s", fileName.c_str());
+            ERR_DIE("File not found: " << fileName);
         inputStream << ifs.rdbuf();
         source_ = inputStream.str();
         inputStream.seekg(std::ios::beg);
@@ -365,7 +365,7 @@ Blueprint::Blueprint(const std::string& fileName)
             else if (typeStr == "yosys-json")
                 type = blueprint::File::TYPE::YOSYS_JSON;
             else
-                ERROR_DIE("Invalid file type: %s", typeStr.c_str());
+                ERR_DIE("Invalid file type: " << typeStr);
 
             if (path.is_relative())
                 path = wd / path;  // Make path absolute
@@ -419,8 +419,7 @@ Blueprint::Blueprint(const std::string& fileName)
                 auto ary = toml::get<std::vector<std::string>>(srcValue);
                 for (const auto& portStr : ary) {  // @...[n:m]
                     if (portStr.empty() || portStr.at(0) != '@')
-                        ERROR_DIE("Invalid port name for TOGND: %s",
-                                  portStr.c_str());
+                        ERR_DIE("Invalid port name for TOGND: " << portStr);
                     auto ports = parsePortString(portStr, "output");
                     for (auto&& port : ports) {  // @...[n]
                         const std::string& name = port.portName;
@@ -440,7 +439,7 @@ Blueprint::Blueprint(const std::string& fileName)
             // Check if input is correct.
             if (srcTo.empty() || srcFrom.empty() ||
                 (srcTo[0] == '@' && srcFrom[0] == '@'))
-                ERROR_DIE("%s", errMsg.c_str());
+                ERR_DIE(errMsg);
 
             // Others.
             std::vector<blueprint::Port> portsTo =
@@ -448,7 +447,7 @@ Blueprint::Blueprint(const std::string& fileName)
                                          portsFrom =
                                              parsePortString(srcFrom, "output");
             if (portsTo.size() != portsFrom.size())
-                ERROR_DIE("%s", errMsg.c_str());
+                ERR_DIE(errMsg);
 
             for (size_t i = 0; i < portsTo.size(); i++) {
                 const blueprint::Port& to = portsTo[i];
@@ -456,7 +455,7 @@ Blueprint::Blueprint(const std::string& fileName)
 
                 if (srcTo[0] == '@') {  // @... = ...
                     if (!to.nodeName.empty() || from.nodeName.empty())
-                        ERROR_DIE("%s", errMsg.c_str());
+                        ERR_DIE(errMsg);
 
                     const std::string& name = to.portName;
                     int bit = to.portBit;
@@ -476,7 +475,7 @@ Blueprint::Blueprint(const std::string& fileName)
                 }
                 else if (srcFrom[0] == '@') {  // ... = @...
                     if (!from.nodeName.empty() || to.nodeName.empty())
-                        ERROR_DIE("%s", errMsg.c_str());
+                        ERR_DIE(errMsg);
 
                     const std::string& name = from.portName;
                     int bit = from.portBit;
@@ -512,7 +511,7 @@ std::vector<blueprint::Port> Blueprint::parsePortString(const std::string& src,
         src,
         std::regex(R"(^@?(?:([^/]+)/)?([^[]+)(?:\[([0-9]+):([0-9]+)\])?$)"));
     if (match.empty())
-        ERROR_DIE("Invalid port string: %s", src.c_str());
+        ERR_DIE("Invalid port string: " << src);
 
     assert(match.size() == 1 + 4);
 

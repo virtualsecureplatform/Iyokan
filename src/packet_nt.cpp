@@ -25,12 +25,12 @@ void readFromArchive(T& res, const std::string& path)
     try {
         std::ifstream ifs{path, std::ios::binary};
         if (!ifs)
-            ERRDIE(
+            ERR_DIE(
                 "Can't open the file to read from; Maybe not found?: " << path);
         readFromArchive<T>(res, ifs);
     }
     catch (std::exception& ex) {
-        ERRDIE("Invalid archive: " << path);
+        ERR_DIE("Invalid archive: " << path);
     }
 }
 
@@ -63,12 +63,12 @@ void writeToArchive(const std::string& path, const T& src)
     try {
         std::ofstream ofs{path, std::ios::binary};
         if (!ofs)
-            ERRDIE("Can't open the file to write in; maybe not allowed?: "
-                   << path);
+            ERR_DIE("Can't open the file to write in; maybe not allowed?: "
+                    << path);
         return writeToArchive(ofs, src);
     }
     catch (std::exception& ex) {
-        ERRDIE("Unable to write into archive: " << path << ": " << ex.what());
+        ERR_DIE("Unable to write into archive: " << path << ": " << ex.what());
     }
 }
 
@@ -230,29 +230,29 @@ TFHEPacket PlainPacket::encrypt(const TFHEpp::SecretKey& key) const
     for (auto&& [name, src] : ram) {
         if (auto [it, inserted] = tfhe.ram.emplace(name, encryptRAM(key, src));
             !inserted)
-            ERRDIE("Invalid PlainPacket. Duplicate ram's key: " << name);
+            ERR_DIE("Invalid PlainPacket. Duplicate ram's key: " << name);
         if (auto [it, inserted] =
                 tfhe.ramInTLWE.emplace(name, encryptRAMInTLWE(key, src));
             !inserted)
-            ERRDIE("Invalid PlainPacket. Duplicate ram's key: " << name);
+            ERR_DIE("Invalid PlainPacket. Duplicate ram's key: " << name);
     }
 
     // Encrypt ROM
     for (auto&& [name, src] : rom) {
         if (auto [it, inserted] = tfhe.rom.emplace(name, encryptROM(key, src));
             !inserted)
-            ERRDIE("Invalid PlainPacket. Duplicate rom's key: " << name);
+            ERR_DIE("Invalid PlainPacket. Duplicate rom's key: " << name);
         if (auto [it, inserted] =
                 tfhe.romInTLWE.emplace(name, encryptROMInTLWE(key, src));
             !inserted)
-            ERRDIE("Invalid PlainPacket. Duplicate rom's key: " << name);
+            ERR_DIE("Invalid PlainPacket. Duplicate rom's key: " << name);
     }
 
     // Encrypt bits
     for (auto&& [name, src] : bits) {
         auto [it, inserted] = tfhe.bits.emplace(name, encryptBits(key, src));
         if (!inserted)
-            ERRDIE("Invalid PlainPacket. Duplicate bits's key: " << name);
+            ERR_DIE("Invalid PlainPacket. Duplicate bits's key: " << name);
     }
 
     return tfhe;
@@ -278,7 +278,7 @@ PlainPacket TFHEPacket::decrypt(const TFHEpp::SecretKey& key) const
     for (auto&& [name, tlwes] : bits) {
         auto [it, inserted] = plain.bits.emplace(name, decryptBits(key, tlwes));
         if (!inserted)
-            ERRDIE("Invalid TFHEPacket. Duplicate bits's key: " << name);
+            ERR_DIE("Invalid TFHEPacket. Duplicate bits's key: " << name);
     }
 
     return plain;

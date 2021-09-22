@@ -11,16 +11,12 @@ void initialize();
 
 #define DBG 1  // verbosity debug for loguru
 
-#define ERROR_DIE(...)                     \
-    {                                      \
-        LOG_F(ERROR, __VA_ARGS__);         \
-        ::nt::error::abortWithBacktrace(); \
-    }
-
-#define ERRDIE(cont)                     \
+#define ERR_DIE(cont)                    \
     do {                                 \
         LOG_S(ERROR) << cont;            \
         nt::error::abortWithBacktrace(); \
     } while (false);
+
+#define ERR_UNREACHABLE ERR_DIE("Internal error: unreachable here")
 
 #endif

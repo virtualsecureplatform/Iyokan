@@ -12,6 +12,8 @@
 #include <unordered_map>
 #include <vector>
 
+#include "error_nt.hpp"
+
 namespace nt {
 
 // Forward declarations
@@ -207,7 +209,7 @@ public:
 
     void notifyOneInputReady() override
     {
-        assert(0 && "Internal error: unreachable here");
+        ERR_UNREACHABLE;
     }
 
     bool areAllInputsReady() const override
