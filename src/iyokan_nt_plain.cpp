@@ -3,6 +3,8 @@
 #include "iyokan_nt.hpp"
 #include "packet_nt.hpp"
 
+#include <fstream>
+
 template <class T1, class T2>
 std::string fok2(T1 t1, T2 t2)
 {
@@ -353,12 +355,30 @@ Frontend::Frontend(const RunParameter& pr, Allocator& alc)
 
     // Set priority to each DepNode
     // FIXME
+
+    // FIXME check if network is valid
 }
 
 void Frontend::readNetworkFromFile(const blueprint::File& file,
                                    nt::NetworkBuilder& nb)
 {
-    // FIXME
+    std::ifstream ifs{file.path, std::ios::binary};
+    if (!ifs)
+        ERR_DIE("Invalid [[file]] path: " << file.path);
+
+    switch (file.type) {
+    case blueprint::File::TYPE::IYOKANL1_JSON:
+        LOG_S(WARNING)
+            << "[[file]] of type 'iyokanl1-json' is deprecated. You don't need "
+               "to use Iyokan-L1. Use Yosys JSON directly by specifying type "
+               "'yosys-json'.";
+        readIyokanL1JSONNetwork(ifs, nb);
+        break;
+
+    case blueprint::File::TYPE::YOSYS_JSON:
+        readYosysJSONNetwork(ifs, nb);
+        break;
+    }
 }
 
 void Frontend::makeMUXRAM(const blueprint::BuiltinRAM& ram,

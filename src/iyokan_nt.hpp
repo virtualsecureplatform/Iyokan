@@ -427,6 +427,9 @@ public:
     const std::unordered_map<std::string, int>& atPortWidths() const;
 };
 
+void readYosysJSONNetwork(std::istream& is, NetworkBuilder& nb);
+void readIyokanL1JSONNetwork(std::istream& is, NetworkBuilder& nb);
+
 }  // namespace nt
 
 #endif
