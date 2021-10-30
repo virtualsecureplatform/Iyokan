@@ -1001,6 +1001,8 @@ int main()
     // testProgressGraphMaker();
     // testBlueprint();
 
+    loguru::g_stderr_verbosity = loguru::Verbosity_1;
+
     nt::testAllocator();
     nt::plain::test0();
 }

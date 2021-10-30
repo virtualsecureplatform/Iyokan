@@ -131,17 +131,17 @@ public:
         }                                                       \
     };
 DEF_COMMON_TASK_CLASS(And, 2, (input(0) & input(1)));
-DEF_COMMON_TASK_CLASS(Andnot, 2, (input(0) & ~input(1)));
+DEF_COMMON_TASK_CLASS(Andnot, 2, (input(0) & !input(1)));
 DEF_COMMON_TASK_CLASS(ConstOne, 0, 1_b);
 DEF_COMMON_TASK_CLASS(ConstZero, 0, 0_b);
 DEF_COMMON_TASK_CLASS(Mux, 3, input(2) == 0_b ? input(0) : input(1));
-DEF_COMMON_TASK_CLASS(Nand, 2, ~(input(0) & input(1)));
-DEF_COMMON_TASK_CLASS(Nmux, 3, input(2) == 0_b ? ~input(0) : ~input(1));
-DEF_COMMON_TASK_CLASS(Nor, 2, ~(input(0) | input(1)));
-DEF_COMMON_TASK_CLASS(Not, 1, ~input(0));
+DEF_COMMON_TASK_CLASS(Nand, 2, !(input(0) & input(1)));
+DEF_COMMON_TASK_CLASS(Nmux, 3, input(2) == 0_b ? !input(0) : !input(1));
+DEF_COMMON_TASK_CLASS(Nor, 2, !(input(0) | input(1)));
+DEF_COMMON_TASK_CLASS(Not, 1, !input(0));
 DEF_COMMON_TASK_CLASS(Or, 2, (input(0) | input(1)));
-DEF_COMMON_TASK_CLASS(Ornot, 2, (input(0) | ~input(1)));
-DEF_COMMON_TASK_CLASS(Xnor, 2, ~(input(0) ^ input(1)));
+DEF_COMMON_TASK_CLASS(Ornot, 2, (input(0) | !input(1)));
+DEF_COMMON_TASK_CLASS(Xnor, 2, !(input(0) ^ input(1)));
 DEF_COMMON_TASK_CLASS(Xor, 2, (input(0) ^ input(1)));
 #undef DEF_COMMON_TASK_CLASS
 

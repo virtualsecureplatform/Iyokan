@@ -9,9 +9,9 @@
 namespace nt {
 
 enum class Bit : bool {};
-inline constexpr Bit operator~(Bit l) noexcept
+inline constexpr Bit operator!(Bit l) noexcept
 {
-    return Bit(~static_cast<int>(l));
+    return Bit(!static_cast<int>(l));
 }
 inline constexpr Bit operator|(Bit l, Bit r) noexcept
 {
@@ -40,6 +40,11 @@ inline constexpr Bit operator^=(Bit& l, Bit r) noexcept
 inline Bit operator"" _b(unsigned long long x)
 {
     return Bit(x != 0);
+}
+inline std::ostream& operator<<(std::ostream& os, const Bit& bit)
+{
+    os << (bit == 1_b ? 1 : 0);
+    return os;
 }
 
 struct TFHEppBKey {

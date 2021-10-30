@@ -9,7 +9,7 @@ void initialize();
 [[noreturn]] void abortWithBacktrace();
 }  // namespace nt::error
 
-#define DBG 1  // verbosity debug for loguru
+#define LOG_DBG LOG_S(1)
 
 #define ERR_DIE(cont)                    \
     do {                                 \
