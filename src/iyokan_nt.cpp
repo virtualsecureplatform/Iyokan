@@ -28,17 +28,6 @@ Allocator::Allocator()
 {
 }
 
-Allocator& Allocator::subAllocator(const std::string& key)
-{
-    assert(data_.size() == 0);
-    auto it = subs_.find(key);
-    if (it == subs_.end()) {
-        auto sub = std::make_unique<Allocator>();
-        std::tie(it, std::ignore) = subs_.emplace(key, std::move(sub));
-    }
-    return *it->second;
-}
-
 /* class Task */
 
 Task::Task(Label label)
@@ -209,8 +198,8 @@ void Network::tick()
 
 /* class NetworkBuilder */
 
-NetworkBuilder::NetworkBuilder(Allocator& alcRoot)
-    : finder_(), tasks_(), consumed_(false), currentAlc_(&alcRoot)
+NetworkBuilder::NetworkBuilder(Allocator& alc)
+    : finder_(), tasks_(), consumed_(false), alc_(&alc)
 {
 }
 
@@ -220,7 +209,7 @@ NetworkBuilder::~NetworkBuilder()
 
 Allocator& NetworkBuilder::currentAllocator()
 {
-    return *currentAlc_;
+    return *alc_;
 }
 
 const TaskFinder& NetworkBuilder::finder() const

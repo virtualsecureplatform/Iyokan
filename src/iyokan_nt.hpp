@@ -23,30 +23,28 @@ class WorkerInfo;
 class DataHolder;
 
 class Allocator {
+public:
+    using Index = size_t;
+
 private:
-    std::unordered_map<std::string, std::unique_ptr<Allocator>> subs_;
-    std::vector<std::any> data_;
+    std::vector<std::unique_ptr<std::any>> data_;
 
 public:
     Allocator(/* optional snapshot file */);
 
-    Allocator& subAllocator(const std::string& key);
-
     template <class T>
-    T* make(size_t index)
+    T* make()
     {
-        if (data_.size() <= index)
-            data_.resize(index + 1);
-        std::any& v = data_.at(index);
-        assert(!v.has_value());
+        data_.emplace_back(std::make_unique<std::any>());
+        std::any& v = *data_.back();
         return &v.emplace<T>();
     }
 
     template <class T>
-    T* get(size_t index)
+    T* get(Index index)
     {
         assert(index < data_.size());
-        T* ret = std::any_cast<T>(&data_.at(index));
+        T* ret = std::any_cast<T>(data_.at(index).get());
         assert(ret != nullptr);
         return ret;
     }
@@ -112,8 +110,6 @@ public:
 //   1. # of outputs is 1. (#inputs can be >1.)
 //   2. All the inputs and output have the same type.
 //   3. (and so on)
-// TaskCommon guarantees:
-//   1. Its output exists in alc.get<T>(0).
 template <class T>
 class TaskCommon : public Task {
 private:
@@ -149,7 +145,7 @@ public:
           numMaxExpectedInputs_(
               numMaxExpectedInputs.value_or(numMinExpectedInputs)),
           inputs_(),
-          output_(alc.make<T>(0))
+          output_(alc.make<T>())
     {
     }
 
@@ -264,7 +260,7 @@ private:
     TaskFinder finder_;
     std::vector<std::unique_ptr<Task>> tasks_;
     bool consumed_;
-    Allocator* currentAlc_;
+    Allocator* alc_;
 
 protected:
     // Create a new task. T must be derived from class Task.
@@ -281,45 +277,36 @@ protected:
     Allocator& currentAllocator();
 
 public:
-    NetworkBuilder(Allocator& alcRoot);
+    NetworkBuilder(Allocator& alc);
     virtual ~NetworkBuilder();
 
     const TaskFinder& finder() const;
 
     Network createNetwork();
 
-    template <class F>
-    void withSubAllocator(const std::string& alcKey, F f)
-    {
-        Allocator* original = currentAlc_;
-        currentAlc_ = &original->subAllocator(alcKey);
-        f(*this);
-        currentAlc_ = original;
-    }
-
     virtual void connect(UID from, UID to) = 0;
 
     // not/and/or are C++ keywords, so the member functions here are in
     // capitals.
-    virtual UID INPUT(const std::string& alcKey, const std::string& nodeName,
-                      const std::string& portName, int portBit) = 0;
-    virtual UID OUTPUT(const std::string& alcKey, const std::string& nodeName,
-                       const std::string& portName, int portBit) = 0;
+    virtual UID INPUT(const std::string& nodeName, const std::string& portName,
+                      int portBit) = 0;
+    virtual UID OUTPUT(const std::string& nodeName, const std::string& portName,
+                       int portBit) = 0;
 
-    virtual UID AND(const std::string& alcKey) = 0;
-    virtual UID ANDNOT(const std::string& alcKey) = 0;
-    virtual UID CONSTONE(const std::string& alcKey) = 0;
-    virtual UID CONSTZERO(const std::string& alcKey) = 0;
-    virtual UID DFF(const std::string& alcKey) = 0;
-    virtual UID MUX(const std::string& alcKey) = 0;
-    virtual UID NAND(const std::string& alcKey) = 0;
-    virtual UID NMUX(const std::string& alcKey) = 0;
-    virtual UID NOR(const std::string& alcKey) = 0;
-    virtual UID NOT(const std::string& alcKey) = 0;
-    virtual UID OR(const std::string& alcKey) = 0;
-    virtual UID ORNOT(const std::string& alcKey) = 0;
-    virtual UID XNOR(const std::string& alcKey) = 0;
-    virtual UID XOR(const std::string& alcKey) = 0;
+    virtual UID AND() = 0;
+    virtual UID ANDNOT() = 0;
+    virtual UID CONSTONE() = 0;
+    virtual UID CONSTZERO() = 0;
+    virtual UID DFF() = 0;
+    virtual UID MUX() = 0;
+    virtual UID NAND() = 0;
+    virtual UID NMUX() = 0;
+    virtual UID NOR() = 0;
+    virtual UID NOT() = 0;
+    virtual UID OR() = 0;
+    virtual UID ORNOT() = 0;
+    virtual UID XNOR() = 0;
+    virtual UID XOR() = 0;
 };
 
 class Worker {

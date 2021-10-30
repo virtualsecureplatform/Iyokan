@@ -172,17 +172,15 @@ public:
         to->addInput(from);
     }
 
-#define DEF_COMMON_TASK(CAPName, CamelName)                                \
-    UID CAPName(const std::string& alcKey) override                        \
-    {                                                                      \
-        UID uid = genUID();                                                \
-        Task##CamelName* task = nullptr;                                   \
-        this->withSubAllocator(alcKey, [&](auto&&) {                       \
-            task = emplaceTask<Task##CamelName>(                           \
-                Label{uid, #CamelName, std::nullopt}, currentAllocator()); \
-        });                                                                \
-        uid2common_.emplace(uid, task);                                    \
-        return uid;                                                        \
+#define DEF_COMMON_TASK(CAPName, CamelName)                            \
+    UID CAPName() override                                             \
+    {                                                                  \
+        UID uid = genUID();                                            \
+        Task##CamelName* task = nullptr;                               \
+        task = emplaceTask<Task##CamelName>(                           \
+            Label{uid, #CamelName, std::nullopt}, currentAllocator()); \
+        uid2common_.emplace(uid, task);                                \
+        return uid;                                                    \
     }
     DEF_COMMON_TASK(AND, And);
     DEF_COMMON_TASK(ANDNOT, Andnot);
@@ -200,30 +198,26 @@ public:
     DEF_COMMON_TASK(XOR, Xor);
 #undef DEF_COMMON_TASK
 
-    UID INPUT(const std::string& alcKey, const std::string& nodeName,
-              const std::string& portName, int portBit) override
+    UID INPUT(const std::string& nodeName, const std::string& portName,
+              int portBit) override
     {
         UID uid = genUID();
         TaskInput* task = nullptr;
-        withSubAllocator(alcKey, [&](auto&&) {
-            task = emplaceTask<TaskInput>(
-                Label{uid, "Input", ConfigName{nodeName, portName, portBit}},
-                currentAllocator());
-        });
+        task = emplaceTask<TaskInput>(
+            Label{uid, "Input", ConfigName{nodeName, portName, portBit}},
+            currentAllocator());
         uid2common_.emplace(uid, task);
         return uid;
     }
 
-    UID OUTPUT(const std::string& alcKey, const std::string& nodeName,
-               const std::string& portName, int portBit) override
+    UID OUTPUT(const std::string& nodeName, const std::string& portName,
+               int portBit) override
     {
         UID uid = genUID();
         TaskOutput* task = nullptr;
-        withSubAllocator(alcKey, [&](auto&&) {
-            task = emplaceTask<TaskOutput>(
-                Label{uid, "Output", ConfigName{nodeName, portName, portBit}},
-                currentAllocator());
-        });
+        task = emplaceTask<TaskOutput>(
+            Label{uid, "Output", ConfigName{nodeName, portName, portBit}},
+            currentAllocator());
         uid2common_.emplace(uid, task);
         return uid;
     }
@@ -291,35 +285,30 @@ Frontend::Frontend(const RunParameter& pr, Allocator& alc)
 
     // [[file]]
     for (auto&& file : bp_.files())
-        nb.withSubAllocator(file.name,
-                            [&](auto&& nb) { readNetworkFromFile(file, nb); });
+        readNetworkFromFile(file, nb);
 
     // [[builtin]] type = ram | type = mux-ram
     for (auto&& ram : bp_.builtinRAMs()) {
-        nb.withSubAllocator(ram.name, [&](auto&& nb) {
-            switch (ram.type) {
-            case blueprint::BuiltinRAM::TYPE::CMUX_MEMORY:
-                makeRAM(ram, nb);
-                break;
-            case blueprint::BuiltinRAM::TYPE::MUX:
-                makeMUXRAM(ram, nb);
-                break;
-            }
-        });
+        switch (ram.type) {
+        case blueprint::BuiltinRAM::TYPE::CMUX_MEMORY:
+            makeRAM(ram, nb);
+            break;
+        case blueprint::BuiltinRAM::TYPE::MUX:
+            makeMUXRAM(ram, nb);
+            break;
+        }
     }
 
     // [[builtin]] type = rom | type = mux-rom
     for (auto&& rom : bp_.builtinROMs()) {
-        nb.withSubAllocator(rom.name, [&](auto&& nb) {
-            switch (rom.type) {
-            case blueprint::BuiltinROM::TYPE::CMUX_MEMORY:
-                makeROM(rom, nb);
-                break;
-            case blueprint::BuiltinROM::TYPE::MUX:
-                makeMUXROM(rom, nb);
-                break;
-            }
-        });
+        switch (rom.type) {
+        case blueprint::BuiltinROM::TYPE::CMUX_MEMORY:
+            makeROM(rom, nb);
+            break;
+        case blueprint::BuiltinROM::TYPE::MUX:
+            makeMUXROM(rom, nb);
+            break;
+        }
 
         auto it = reqPacket_.rom.find(rom.name);
         if (it != reqPacket_.rom.end()) {
@@ -409,15 +398,13 @@ void Frontend::makeROM(const blueprint::BuiltinROM& rom, nt::NetworkBuilder& nb)
     // Create inputs
     std::vector<UID> addrInputs;
     for (size_t i = 0; i < rom.inAddrWidth; i++) {
-        UID id = nb.INPUT(fok2("addr", i), rom.name, "addr", i);
+        UID id = nb.INPUT(rom.name, "addr", i);
         addrInputs.push_back(id);
     }
 
     // Create 1bit ROMs
     for (size_t i = 0; i < rom.outRdataWidth; i++) {
-        nb.withSubAllocator(fok2("rom1bit{}", i), [&](nt::NetworkBuilder& nb) {
-            make1bitROMWithMUX(rom, addrInputs, nb);
-        });
+        make1bitROMWithMUX(rom, addrInputs, nb);
     }
 }
 
@@ -439,10 +426,9 @@ void test0()
     Bit bit0 = 0_b, bit1 = 1_b;
 
     {
-        Allocator root;
-        TaskConstOne t0{Label{1, "", std::nullopt},
-                        root.subAllocator("constone")};
-        TaskOutput t1{Label{2, "", std::nullopt}, root.subAllocator("out")};
+        Allocator alc;
+        TaskConstOne t0{Label{1, "", std::nullopt}, alc};
+        TaskOutput t1{Label{2, "", std::nullopt}, alc};
         t1.addInput(&t0);
         t0.startAsynchronously(wi);
         t1.startAsynchronously(wi);
@@ -452,15 +438,11 @@ void test0()
     }
 
     {
-        Allocator root;
-        Allocator &sub0 = root.subAllocator("0"),
-                  &sub1 = root.subAllocator("1"),
-                  &sub2 = root.subAllocator("2"),
-                  &sub3 = root.subAllocator("3");
-        TaskConstZero t0{Label{0, "", std::nullopt}, sub0};
-        TaskConstOne t1{Label{1, "", std::nullopt}, sub1};
-        TaskNand t2{Label{2, "", std::nullopt}, sub2};
-        TaskOutput t3{Label{3, "", std::nullopt}, sub3};
+        Allocator alc;
+        TaskConstZero t0{Label{0, "", std::nullopt}, alc};
+        TaskConstOne t1{Label{1, "", std::nullopt}, alc};
+        TaskNand t2{Label{2, "", std::nullopt}, alc};
+        TaskOutput t3{Label{3, "", std::nullopt}, alc};
         t2.addInput(&t0);
         t2.addInput(&t1);
         t3.addInput(&t2);
@@ -475,10 +457,10 @@ void test0()
     }
 
     {
-        Allocator root;
-        NetworkBuilder nb{root};
-        UID id0 = nb.INPUT("0", "", "A", 0), id1 = nb.INPUT("1", "", "B", 0),
-            id2 = nb.NAND("2"), id3 = nb.OUTPUT("3", "", "C", 0);
+        Allocator alc;
+        NetworkBuilder nb{alc};
+        UID id0 = nb.INPUT("", "A", 0), id1 = nb.INPUT("", "B", 0),
+            id2 = nb.NAND(), id3 = nb.OUTPUT("", "C", 0);
         nb.connect(id0, id2);
         nb.connect(id1, id2);
         nb.connect(id2, id3);
@@ -507,11 +489,10 @@ void test0()
                             *--< NOT(3) <--*-----> OUTPUT(1)
                                         A
         */
-        Allocator root;
-        NetworkBuilder nb{root};
-        UID id0 = nb.INPUT("0", "", "reset", 0),
-            id1 = nb.OUTPUT("1", "", "out", 0), id2 = nb.DFF("2"),
-            id3 = nb.NOT("3"), id4 = nb.ANDNOT("4");
+        Allocator alc;
+        NetworkBuilder nb{alc};
+        UID id0 = nb.INPUT("", "reset", 0), id1 = nb.OUTPUT("", "out", 0),
+            id2 = nb.DFF(), id3 = nb.NOT(), id4 = nb.ANDNOT();
         nb.connect(id2, id1);
         nb.connect(id4, id2);
         nb.connect(id2, id3);
