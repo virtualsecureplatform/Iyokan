@@ -22,7 +22,7 @@
 enum class Bit : bool {};
 inline constexpr Bit operator~(Bit l) noexcept
 {
-    return Bit(~static_cast<int>(l));
+    return Bit(!static_cast<int>(l));
 }
 inline constexpr Bit operator|(Bit l, Bit r) noexcept
 {
