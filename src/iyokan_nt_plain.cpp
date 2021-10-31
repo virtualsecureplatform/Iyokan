@@ -302,6 +302,24 @@ public:
         uid2common_.emplace(uid, task);
         return uid;
     }
+
+    UID RAM(const std::string& nodeName, const std::string& portName,
+            int portBit) override
+    {
+        assert(reqPacket_ != nullptr);
+        assert(portName == "ramdata");
+
+        UID uid = genUID();
+        TaskDFF* task = emplaceTask<TaskDFF>(
+            reqPacket_->ram.at(nodeName).at(portBit),
+            Label{uid, "RAM", ConfigName{nodeName, portName, portBit}},
+            currentAllocator());
+        uid2common_.emplace(uid, task);
+
+        // FIXME: We need to memorize this task to make a response packet.
+
+        return uid;
+    }
 };
 
 enum class SCHED {
@@ -785,6 +803,62 @@ void test0()
         assert(dh.getBit() == 1_b);
         tRdata1->getOutput(dh);
         assert(dh.getBit() == 0_b);
+    }
+
+    {
+        PlainPacket pkt;
+        pkt.ram["ram"] = {0_b, 1_b, 0_b, 0_b, 1_b, 0_b, 1_b, 1_b};
+
+        Allocator alc;
+        NetworkBuilder nb{pkt, alc};
+        makeMUXRAM(blueprint::BuiltinRAM{blueprint::BuiltinRAM::TYPE::MUX,
+                                         "ram", 2, 2, 2},
+                   nb);
+
+        std::vector<std::unique_ptr<nt::Worker>> workers;
+        workers.emplace_back(std::make_unique<Worker>());
+
+        NetworkRunner runner{nb.createNetwork(), std::move(workers)};
+        auto&& finder = runner.network().finder();
+        Task *tAddr0 = finder.findByConfigName({"ram", "addr", 0}),
+             *tAddr1 = finder.findByConfigName({"ram", "addr", 1}),
+             *tWren = finder.findByConfigName({"ram", "wren", 0}),
+             *tRdata0 = finder.findByConfigName({"ram", "rdata", 0}),
+             *tRdata1 = finder.findByConfigName({"ram", "rdata", 1}),
+             *tWdata0 = finder.findByConfigName({"ram", "wdata", 0}),
+             *tWdata1 = finder.findByConfigName({"ram", "wdata", 1});
+
+        // Reset cycle
+        runner.run();
+
+        // Cycle #1
+        runner.tick();
+        runner.onAfterFirstTick();
+        tAddr0->setInput(&bit1);
+        tAddr1->setInput(&bit0);
+        tWren->setInput(&bit0);
+        tWdata0->setInput(&bit1);
+        tWdata1->setInput(&bit1);
+        runner.run();
+
+        tRdata0->getOutput(dh);
+        assert(dh.getBit() == 0_b);
+        tRdata1->getOutput(dh);
+        assert(dh.getBit() == 0_b);
+
+        // Cycle #2
+        runner.tick();
+        tWren->setInput(&bit1);
+        runner.run();
+
+        // Cycle #3
+        runner.tick();
+        runner.run();
+
+        tRdata0->getOutput(dh);
+        assert(dh.getBit() == 1_b);
+        tRdata1->getOutput(dh);
+        assert(dh.getBit() == 1_b);
     }
 }
 
