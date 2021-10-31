@@ -315,6 +315,8 @@ public:
                       int portBit) = 0;
     virtual UID OUTPUT(const std::string& nodeName, const std::string& portName,
                        int portBit) = 0;
+    virtual UID ROM(const std::string& nodeName, const std::string& portName,
+                    int portBit) = 0;
 
     virtual UID AND() = 0;
     virtual UID ANDNOT() = 0;
@@ -444,6 +446,7 @@ void readYosysJSONNetwork(const std::string& nodeName, std::istream& is,
                           NetworkBuilder& nb);
 void readIyokanL1JSONNetwork(const std::string& nodeName, std::istream& is,
                              NetworkBuilder& nb);
+void makeMUXROM(const blueprint::BuiltinROM& rom, NetworkBuilder& nb);
 
 }  // namespace nt
 

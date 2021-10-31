@@ -123,6 +123,29 @@ public:
     }
 };
 
+class TaskROM : public TaskCommon<Bit> {
+public:
+    TaskROM(Bit value, Label label, Allocator& alc)
+        : TaskCommon<Bit>(label, alc, 0)
+    {
+        output() = value;
+    }
+
+    void startAsynchronously(WorkerInfo&) override
+    {
+    }
+
+    bool hasFinished() const override
+    {
+        return true;
+    }
+
+    bool canRunPlain() const override
+    {
+        return true;
+    }
+};
+
 #define DEF_COMMON_TASK_CLASS(CamelName, inputSize, expr)       \
     class Task##CamelName : public TaskCommon<Bit> {            \
     public:                                                     \
@@ -162,6 +185,7 @@ class NetworkBuilder : public nt::NetworkBuilder {
 private:
     std::unordered_map<UID, TaskCommon<Bit>*> uid2common_;
     UID nextUID_;
+    const PlainPacket* const reqPacket_;
 
 private:
     UID genUID()
@@ -171,7 +195,18 @@ private:
 
 public:
     NetworkBuilder(Allocator& alc)
-        : nt::NetworkBuilder(alc), uid2common_(), nextUID_(0)
+        : nt::NetworkBuilder(alc),
+          uid2common_(),
+          nextUID_(0),
+          reqPacket_(nullptr)
+    {
+    }
+
+    NetworkBuilder(const PlainPacket& reqPacket, Allocator& alc)
+        : nt::NetworkBuilder(alc),
+          uid2common_(),
+          nextUID_(0),
+          reqPacket_(&reqPacket)
     {
     }
 
@@ -252,6 +287,21 @@ public:
         uid2common_.emplace(uid, task);
         return uid;
     }
+
+    UID ROM(const std::string& nodeName, const std::string& portName,
+            int portBit) override
+    {
+        assert(reqPacket_ != nullptr);
+        assert(portName == "romdata");
+
+        UID uid = genUID();
+        TaskROM* task = emplaceTask<TaskROM>(
+            reqPacket_->rom.at(nodeName).at(portBit),
+            Label{uid, "ROM", ConfigName{nodeName, portName, portBit}},
+            currentAllocator());
+        uid2common_.emplace(uid, task);
+        return uid;
+    }
 };
 
 enum class SCHED {
@@ -289,17 +339,6 @@ private:
 private:
     static void readNetworkFromFile(const blueprint::File& file,
                                     nt::NetworkBuilder& nb);
-    static void makeMUXRAM(const blueprint::BuiltinRAM& ram,
-                           nt::NetworkBuilder& nb);
-    static void makeMUXROM(const blueprint::BuiltinROM& rom,
-                           nt::NetworkBuilder& nb);
-
-protected:
-    void makeRAM(const blueprint::BuiltinRAM& ram, nt::NetworkBuilder& nb);
-    void makeROM(const blueprint::BuiltinROM& rom, nt::NetworkBuilder& nb);
-    void make1bitROMWithMUX(const blueprint::BuiltinROM& rom,
-                            const std::vector<UID>& addrInputs,
-                            nt::NetworkBuilder& nb);
 
 public:
     Frontend(const RunParameter& pr, Allocator& alc);
@@ -312,7 +351,7 @@ Frontend::Frontend(const RunParameter& pr, Allocator& alc)
       currentCycle_(0),
       bp_(pr_.blueprintFile)
 {
-    NetworkBuilder nb{alc};
+    NetworkBuilder nb{reqPacket_, alc};
 
     // [[file]]
     for (auto&& file : bp_.files())
@@ -322,10 +361,14 @@ Frontend::Frontend(const RunParameter& pr, Allocator& alc)
     for (auto&& ram : bp_.builtinRAMs()) {
         switch (ram.type) {
         case blueprint::BuiltinRAM::TYPE::CMUX_MEMORY:
-            makeRAM(ram, nb);
+            // FIXME
+            // makeRAM(ram, nb);
+            ERR_UNREACHABLE;
             break;
         case blueprint::BuiltinRAM::TYPE::MUX:
-            makeMUXRAM(ram, nb);
+            // FIXME
+            // makeMUXRAM(ram, nb);
+            ERR_UNREACHABLE;
             break;
         }
     }
@@ -334,17 +377,13 @@ Frontend::Frontend(const RunParameter& pr, Allocator& alc)
     for (auto&& rom : bp_.builtinROMs()) {
         switch (rom.type) {
         case blueprint::BuiltinROM::TYPE::CMUX_MEMORY:
-            makeROM(rom, nb);
+            // FIXME
+            // makeROM(rom, nb);
+            ERR_UNREACHABLE;
             break;
         case blueprint::BuiltinROM::TYPE::MUX:
             makeMUXROM(rom, nb);
             break;
-        }
-
-        auto it = reqPacket_.rom.find(rom.name);
-        if (it != reqPacket_.rom.end()) {
-            // FIXME: rom init
-            assert(false);
         }
     }
 
@@ -401,18 +440,7 @@ void Frontend::readNetworkFromFile(const blueprint::File& file,
     }
 }
 
-void Frontend::makeMUXRAM(const blueprint::BuiltinRAM& ram,
-                          nt::NetworkBuilder& nb)
-{
-    // FIXME
-}
-
-void Frontend::makeMUXROM(const blueprint::BuiltinROM& rom,
-                          nt::NetworkBuilder& nb)
-{
-    // FIXME
-}
-
+/*
 void Frontend::makeRAM(const blueprint::BuiltinRAM& ram, nt::NetworkBuilder& nb)
 {
     // FIXME: relax this constraint
@@ -423,28 +451,7 @@ void Frontend::makeRAM(const blueprint::BuiltinRAM& ram, nt::NetworkBuilder& nb)
 
     // FIXME
 }
-
-void Frontend::makeROM(const blueprint::BuiltinROM& rom, nt::NetworkBuilder& nb)
-{
-    // Create inputs
-    std::vector<UID> addrInputs;
-    for (size_t i = 0; i < rom.inAddrWidth; i++) {
-        UID id = nb.INPUT(rom.name, "addr", i);
-        addrInputs.push_back(id);
-    }
-
-    // Create 1bit ROMs
-    for (size_t i = 0; i < rom.outRdataWidth; i++) {
-        make1bitROMWithMUX(rom, addrInputs, nb);
-    }
-}
-
-void Frontend::make1bitROMWithMUX(const blueprint::BuiltinROM& rom,
-                                  const std::vector<UID>& addrInputs,
-                                  nt::NetworkBuilder& nb)
-{
-    // FIXME
-}
+*/
 
 /**************************************************/
 /***** TEST ***************************************/
@@ -748,6 +755,36 @@ void test0()
         assert(dh.getBit() == 1_b);
         tOut3->getOutput(dh);
         assert(dh.getBit() == 1_b);
+    }
+
+    {
+        PlainPacket pkt;
+        pkt.rom["rom"] = {0_b, 1_b, 0_b, 0_b, 1_b, 0_b, 1_b, 1_b};
+
+        Allocator alc;
+        NetworkBuilder nb{pkt, alc};
+        makeMUXROM(blueprint::BuiltinROM{blueprint::BuiltinROM::TYPE::MUX,
+                                         "rom", 2, 2},
+                   nb);
+
+        std::vector<std::unique_ptr<nt::Worker>> workers;
+        workers.emplace_back(std::make_unique<Worker>());
+
+        NetworkRunner runner{nb.createNetwork(), std::move(workers)};
+        auto&& finder = runner.network().finder();
+        Task *tAddr0 = finder.findByConfigName({"rom", "addr", 0}),
+             *tAddr1 = finder.findByConfigName({"rom", "addr", 1}),
+             *tRdata0 = finder.findByConfigName({"rom", "rdata", 0}),
+             *tRdata1 = finder.findByConfigName({"rom", "rdata", 1});
+
+        tAddr0->setInput(&bit0);
+        tAddr1->setInput(&bit1);
+        runner.run();
+
+        tRdata0->getOutput(dh);
+        assert(dh.getBit() == 1_b);
+        tRdata1->getOutput(dh);
+        assert(dh.getBit() == 0_b);
     }
 }
 
