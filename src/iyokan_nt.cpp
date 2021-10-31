@@ -94,6 +94,11 @@ bool Task::canRunPlain() const
     return false;
 }
 
+void Task::onAfterFirstTick()
+{
+    // Do nothing by default.
+}
+
 void Task::startAsynchronously(plain::WorkerInfo&)
 {
     ERR_UNREACHABLE;
@@ -164,19 +169,6 @@ size_t Network::size() const
 const TaskFinder& Network::finder() const
 {
     return finder_;
-}
-
-void Network::pushReadyTasks(ReadyQueue& readyQueue)
-{
-    for (auto&& task : tasks_)
-        if (task->areAllInputsReady())
-            readyQueue.push(task.get());
-}
-
-void Network::tick()
-{
-    for (auto&& task : tasks_)
-        task->tick();
 }
 
 /* class NetworkBuilder */
@@ -268,7 +260,12 @@ void NetworkRunner::prepareToRun()
     assert(readyQueue_.empty());
 
     numFinishedTargets_ = 0;
-    network_.pushReadyTasks(readyQueue_);
+
+    // Push ready tasks to the ready queue.
+    network_.eachTask([&](Task* task) {
+        if (task->areAllInputsReady())
+            readyQueue_.push(task);
+    });
 }
 
 void NetworkRunner::update()
@@ -305,7 +302,12 @@ void NetworkRunner::run()
 
 void NetworkRunner::tick()
 {
-    network_.tick();
+    network_.eachTask([&](Task* task) { task->tick(); });
+}
+
+void NetworkRunner::onAfterFirstTick()
+{
+    network_.eachTask([&](Task* task) { task->onAfterFirstTick(); });
 }
 
 }  // namespace nt

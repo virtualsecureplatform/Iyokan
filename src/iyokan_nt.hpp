@@ -88,9 +88,21 @@ public:
 
     // tick() resets the internal state of the task for the next cycle
     virtual void tick();
+
+    // Get output value. Only available for output gates.
     virtual void getOutput(DataHolder&);
+
+    // Set input value. Only available for input gates.
     virtual void setInput(const DataHolder&);
+
+    // onAfterFirstTick() will be called after the first tick.
+    virtual void onAfterFirstTick();
+
+    // Return true iff this task can be run in plaintext mode.
     virtual bool canRunPlain() const;
+
+    // Start this task asynchronously in plaintext mode.
+    // Only available when canRunPlain() returns true.
     virtual void startAsynchronously(plain::WorkerInfo&);
 };
 
@@ -251,8 +263,19 @@ public:
     size_t size() const;
     const TaskFinder& finder() const;
 
-    void pushReadyTasks(ReadyQueue& readyQueue);
-    void tick();
+    template <class F>
+    void eachTask(F f) const
+    {
+        for (auto&& task : tasks_)
+            f(task.get());
+    }
+
+    template <class F>
+    void eachTask(F f)
+    {
+        for (auto&& task : tasks_)
+            f(task.get());
+    }
 };
 
 class NetworkBuilder {
@@ -305,6 +328,8 @@ public:
     virtual UID NOT() = 0;
     virtual UID OR() = 0;
     virtual UID ORNOT() = 0;
+    virtual UID SDFF0() = 0;
+    virtual UID SDFF1() = 0;
     virtual UID XNOR() = 0;
     virtual UID XOR() = 0;
 };
@@ -345,6 +370,7 @@ public:
     bool isRunning() const;
     void run();
     void tick();
+    void onAfterFirstTick();
 };
 
 namespace blueprint {  // blueprint components

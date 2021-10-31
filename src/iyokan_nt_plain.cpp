@@ -92,10 +92,23 @@ public:
 };
 
 class TaskDFF : public nt::TaskDFF<Bit> {
+private:
+    std::optional<Bit> initialValue_;
+
 public:
     TaskDFF(Label label, Allocator& alc)
-        : nt::TaskDFF<Bit>(std::move(label), alc)
+        : nt::TaskDFF<Bit>(std::move(label), alc), initialValue_(std::nullopt)
     {
+    }
+
+    TaskDFF(Bit initialValue, Label label, Allocator& alc)
+        : nt::TaskDFF<Bit>(std::move(label), alc), initialValue_(initialValue)
+    {
+    }
+
+    void onAfterFirstTick() override
+    {
+        output() = initialValue_.value_or(output());
     }
 
     bool canRunPlain() const override
@@ -197,6 +210,24 @@ public:
     DEF_COMMON_TASK(XNOR, Xnor);
     DEF_COMMON_TASK(XOR, Xor);
 #undef DEF_COMMON_TASK
+
+    UID SDFF0() override
+    {
+        UID uid = genUID();
+        TaskDFF* task = emplaceTask<TaskDFF>(
+            0_b, Label{uid, "SDFF0", std::nullopt}, currentAllocator());
+        uid2common_.emplace(uid, task);
+        return uid;
+    }
+
+    UID SDFF1() override
+    {
+        UID uid = genUID();
+        TaskDFF* task = emplaceTask<TaskDFF>(
+            1_b, Label{uid, "SDFF1", std::nullopt}, currentAllocator());
+        uid2common_.emplace(uid, task);
+        return uid;
+    }
 
     UID INPUT(const std::string& nodeName, const std::string& portName,
               int portBit) override
@@ -657,6 +688,66 @@ void test0()
         assert(dh.getBit() == 0_b);
         tOut3->getOutput(dh);
         assert(dh.getBit() == 0_b);
+    }
+
+    {
+        Allocator alc;
+        NetworkBuilder nb{alc};
+
+        std::ifstream ifs{"test/yosys-json/register-init-4bit-yosys.json"};
+        assert(ifs);
+        readYosysJSONNetwork("register_init", ifs, nb);
+
+        std::vector<std::unique_ptr<nt::Worker>> workers;
+        workers.emplace_back(std::make_unique<Worker>());
+
+        NetworkRunner runner{nb.createNetwork(), std::move(workers)};
+        auto&& finder = runner.network().finder();
+        Task *tIn0 = finder.findByConfigName({"register_init", "io_in", 0}),
+             *tIn1 = finder.findByConfigName({"register_init", "io_in", 1}),
+             *tIn2 = finder.findByConfigName({"register_init", "io_in", 2}),
+             *tIn3 = finder.findByConfigName({"register_init", "io_in", 3}),
+             *tOut0 = finder.findByConfigName({"register_init", "io_out", 0}),
+             *tOut1 = finder.findByConfigName({"register_init", "io_out", 1}),
+             *tOut2 = finder.findByConfigName({"register_init", "io_out", 2}),
+             *tOut3 = finder.findByConfigName({"register_init", "io_out", 3});
+
+        // Set 0xc to input
+        tIn0->setInput(&bit0);
+        tIn1->setInput(&bit0);
+        tIn2->setInput(&bit1);
+        tIn3->setInput(&bit1);
+
+        // Skip the reset cycle (assume --skip-reset flag).
+
+        // Cycle #1
+        runner.tick();
+        runner.onAfterFirstTick();
+        runner.run();
+
+        // The output is 9, that is, '0b1001'
+        tOut0->getOutput(dh);
+        assert(dh.getBit() == 1_b);
+        tOut1->getOutput(dh);
+        assert(dh.getBit() == 0_b);
+        tOut2->getOutput(dh);
+        assert(dh.getBit() == 0_b);
+        tOut3->getOutput(dh);
+        assert(dh.getBit() == 1_b);
+
+        // Cycle #2
+        runner.tick();
+        runner.run();
+
+        // The output is 12, that is, '0b1100'
+        tOut0->getOutput(dh);
+        assert(dh.getBit() == 0_b);
+        tOut1->getOutput(dh);
+        assert(dh.getBit() == 0_b);
+        tOut2->getOutput(dh);
+        assert(dh.getBit() == 1_b);
+        tOut3->getOutput(dh);
+        assert(dh.getBit() == 1_b);
     }
 }
 

@@ -35,8 +35,8 @@ private:
         NOR,
         ORNOT,
         DFFP,
-        // SDFFPP0,
-        // SDFFPP1,
+        SDFFPP0,
+        SDFFPP1,
         MUX,
     };
 
@@ -166,8 +166,8 @@ public:
             {"$_NOR_", CELL::NOR},
             {"$_ORNOT_", CELL::ORNOT},
             {"$_DFF_P_", CELL::DFFP},
-            //{"$_SDFF_PP0_", CELL::SDFFPP0},
-            //{"$_SDFF_PP1_", CELL::SDFFPP1},
+            {"$_SDFF_PP0_", CELL::SDFFPP0},
+            {"$_SDFF_PP1_", CELL::SDFFPP1},
             {"$_MUX_", CELL::MUX},
         };
         std::vector<Cell> cellvec;
@@ -226,18 +226,16 @@ public:
                 cellvec.emplace_back(CELL::DFFP, id, get("D"));
                 bit = get("Q");
                 break;
-                /*
             case CELL::SDFFPP0:
-                id = builder.SDFF(Bit(false));
+                id = builder.SDFF0();
                 cellvec.emplace_back(CELL::DFFP, id, get("D"));
                 bit = get("Q");
                 break;
             case CELL::SDFFPP1:
-                id = builder.SDFF(Bit(true));
+                id = builder.SDFF1();
                 cellvec.emplace_back(CELL::DFFP, id, get("D"));
                 bit = get("Q");
                 break;
-                */
             case CELL::NOT:
                 id = builder.NOT();
                 cellvec.emplace_back(CELL::NOT, id, get("A"));
@@ -274,8 +272,8 @@ public:
                 builder.connect(bit2id.at(cell.bit1), cell.id);
                 break;
             case CELL::DFFP:
-            // case CELL::SDFFPP0:
-            // case CELL::SDFFPP1:
+            case CELL::SDFFPP0:
+            case CELL::SDFFPP1:
             case CELL::NOT:
                 builder.connect(bit2id.at(cell.bit0), cell.id);
                 break;
