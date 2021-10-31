@@ -361,11 +361,11 @@ void Frontend::readNetworkFromFile(const blueprint::File& file,
             << "[[file]] of type 'iyokanl1-json' is deprecated. You don't need "
                "to use Iyokan-L1. Use Yosys JSON directly by specifying type "
                "'yosys-json'.";
-        readIyokanL1JSONNetwork(ifs, nb);
+        readIyokanL1JSONNetwork(file.name, ifs, nb);
         break;
 
     case blueprint::File::TYPE::YOSYS_JSON:
-        readYosysJSONNetwork(ifs, nb);
+        readYosysJSONNetwork(file.name, ifs, nb);
         break;
     }
 }
@@ -518,6 +518,100 @@ void test0()
         runner.tick();
         runner.run();
         t1->getOutput(dh);
+        assert(dh.getBit() == 1_b);
+    }
+
+    {
+        Allocator alc;
+        NetworkBuilder nb{alc};
+
+        std::ifstream ifs{"test/yosys-json/addr-4bit-yosys.json"};
+        assert(ifs);
+        readYosysJSONNetwork("addr", ifs, nb);
+
+        std::vector<std::unique_ptr<nt::Worker>> workers;
+        workers.emplace_back(std::make_unique<Worker>());
+
+        NetworkRunner runner{nb.createNetwork(), std::move(workers)};
+        auto&& finder = runner.network().finder();
+        Task *tA0 = finder.findByConfigName({"addr", "io_inA", 0}),
+             *tA1 = finder.findByConfigName({"addr", "io_inA", 1}),
+             *tA2 = finder.findByConfigName({"addr", "io_inA", 2}),
+             *tA3 = finder.findByConfigName({"addr", "io_inA", 3});
+        Task *tB0 = finder.findByConfigName({"addr", "io_inB", 0}),
+             *tB1 = finder.findByConfigName({"addr", "io_inB", 1}),
+             *tB2 = finder.findByConfigName({"addr", "io_inB", 2}),
+             *tB3 = finder.findByConfigName({"addr", "io_inB", 3});
+        Task *tO0 = finder.findByConfigName({"addr", "io_out", 0}),
+             *tO1 = finder.findByConfigName({"addr", "io_out", 1}),
+             *tO2 = finder.findByConfigName({"addr", "io_out", 2}),
+             *tO3 = finder.findByConfigName({"addr", "io_out", 3});
+
+        tA0->setInput(&bit1);
+        tA1->setInput(&bit0);
+        tA2->setInput(&bit1);
+        tA3->setInput(&bit0);
+        tB0->setInput(&bit0);
+        tB1->setInput(&bit1);
+        tB2->setInput(&bit0);
+        tB3->setInput(&bit1);
+
+        runner.run();
+
+        tO0->getOutput(dh);
+        assert(dh.getBit() == 1_b);
+        tO1->getOutput(dh);
+        assert(dh.getBit() == 1_b);
+        tO2->getOutput(dh);
+        assert(dh.getBit() == 1_b);
+        tO3->getOutput(dh);
+        assert(dh.getBit() == 1_b);
+    }
+
+    {
+        Allocator alc;
+        NetworkBuilder nb{alc};
+
+        std::ifstream ifs{"test/iyokanl1-json/addr-4bit-iyokanl1.json"};
+        assert(ifs);
+        readIyokanL1JSONNetwork("addr", ifs, nb);
+
+        std::vector<std::unique_ptr<nt::Worker>> workers;
+        workers.emplace_back(std::make_unique<Worker>());
+
+        NetworkRunner runner{nb.createNetwork(), std::move(workers)};
+        auto&& finder = runner.network().finder();
+        Task *tA0 = finder.findByConfigName({"addr", "io_inA", 0}),
+             *tA1 = finder.findByConfigName({"addr", "io_inA", 1}),
+             *tA2 = finder.findByConfigName({"addr", "io_inA", 2}),
+             *tA3 = finder.findByConfigName({"addr", "io_inA", 3});
+        Task *tB0 = finder.findByConfigName({"addr", "io_inB", 0}),
+             *tB1 = finder.findByConfigName({"addr", "io_inB", 1}),
+             *tB2 = finder.findByConfigName({"addr", "io_inB", 2}),
+             *tB3 = finder.findByConfigName({"addr", "io_inB", 3});
+        Task *tO0 = finder.findByConfigName({"addr", "io_out", 0}),
+             *tO1 = finder.findByConfigName({"addr", "io_out", 1}),
+             *tO2 = finder.findByConfigName({"addr", "io_out", 2}),
+             *tO3 = finder.findByConfigName({"addr", "io_out", 3});
+
+        tA0->setInput(&bit1);
+        tA1->setInput(&bit0);
+        tA2->setInput(&bit0);
+        tA3->setInput(&bit0);
+        tB0->setInput(&bit0);
+        tB1->setInput(&bit1);
+        tB2->setInput(&bit0);
+        tB3->setInput(&bit1);
+
+        runner.run();
+
+        tO0->getOutput(dh);
+        assert(dh.getBit() == 1_b);
+        tO1->getOutput(dh);
+        assert(dh.getBit() == 1_b);
+        tO2->getOutput(dh);
+        assert(dh.getBit() == 0_b);
+        tO3->getOutput(dh);
         assert(dh.getBit() == 1_b);
     }
 }
