@@ -614,6 +614,50 @@ void test0()
         tO3->getOutput(dh);
         assert(dh.getBit() == 1_b);
     }
+
+    {
+        Allocator alc;
+        NetworkBuilder nb{alc};
+
+        std::ifstream ifs{"test/yosys-json/counter-4bit-yosys.json"};
+        assert(ifs);
+        readYosysJSONNetwork("counter", ifs, nb);
+
+        std::vector<std::unique_ptr<nt::Worker>> workers;
+        workers.emplace_back(std::make_unique<Worker>());
+
+        NetworkRunner runner{nb.createNetwork(), std::move(workers)};
+        auto&& finder = runner.network().finder();
+        Task *tRst = finder.findByConfigName({"counter", "reset", 0}),
+             *tOut0 = finder.findByConfigName({"counter", "io_out", 0}),
+             *tOut1 = finder.findByConfigName({"counter", "io_out", 1}),
+             *tOut2 = finder.findByConfigName({"counter", "io_out", 2}),
+             *tOut3 = finder.findByConfigName({"counter", "io_out", 3});
+
+        tRst->setInput(&bit1);
+        runner.run();
+        tRst->setInput(&bit0);
+
+        // Cycle #1
+        runner.tick();
+        runner.run();
+        // Cycle #2
+        runner.tick();
+        runner.run();
+        // Cycle #3
+        runner.tick();
+        runner.run();
+
+        // The output is 2, that is, '0b0010'
+        tOut0->getOutput(dh);
+        assert(dh.getBit() == 0_b);
+        tOut1->getOutput(dh);
+        assert(dh.getBit() == 1_b);
+        tOut2->getOutput(dh);
+        assert(dh.getBit() == 0_b);
+        tOut3->getOutput(dh);
+        assert(dh.getBit() == 0_b);
+    }
 }
 
 }  // namespace plain
