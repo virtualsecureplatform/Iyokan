@@ -354,10 +354,6 @@ private:
     int currentCycle_;
     nt::Blueprint bp_;
 
-private:
-    static void readNetworkFromFile(const blueprint::File& file,
-                                    nt::NetworkBuilder& nb);
-
 public:
     Frontend(const RunParameter& pr, Allocator& alc);
 };
@@ -417,41 +413,6 @@ Frontend::Frontend(const RunParameter& pr, Allocator& alc)
 
     // FIXME check if network is valid
 }
-
-void Frontend::readNetworkFromFile(const blueprint::File& file,
-                                   nt::NetworkBuilder& nb)
-{
-    std::ifstream ifs{file.path, std::ios::binary};
-    if (!ifs)
-        ERR_DIE("Invalid [[file]] path: " << file.path);
-
-    switch (file.type) {
-    case blueprint::File::TYPE::IYOKANL1_JSON:
-        LOG_S(WARNING)
-            << "[[file]] of type 'iyokanl1-json' is deprecated. You don't need "
-               "to use Iyokan-L1. Use Yosys JSON directly by specifying type "
-               "'yosys-json'.";
-        readIyokanL1JSONNetwork(file.name, ifs, nb);
-        break;
-
-    case blueprint::File::TYPE::YOSYS_JSON:
-        readYosysJSONNetwork(file.name, ifs, nb);
-        break;
-    }
-}
-
-/*
-void Frontend::makeRAM(const blueprint::BuiltinRAM& ram, nt::NetworkBuilder& nb)
-{
-    // FIXME: relax this constraint
-    if (ram.inWdataWidth != ram.outRdataWidth)
-        ERR_DIE(
-            "Invalid RAM size; RAM that has different sizes of "
-            "wdata and rdata is not implemented.");
-
-    // FIXME
-}
-*/
 
 /**************************************************/
 /***** TEST ***************************************/
@@ -563,9 +524,10 @@ void test0()
         Allocator alc;
         NetworkBuilder nb{alc};
 
-        std::ifstream ifs{"test/yosys-json/addr-4bit-yosys.json"};
-        assert(ifs);
-        readYosysJSONNetwork("addr", ifs, nb);
+        readNetworkFromFile(
+            blueprint::File{blueprint::File::TYPE::YOSYS_JSON,
+                            "test/yosys-json/addr-4bit-yosys.json", "addr"},
+            nb);
 
         std::vector<std::unique_ptr<nt::Worker>> workers;
         workers.emplace_back(std::make_unique<Worker>());
@@ -610,9 +572,11 @@ void test0()
         Allocator alc;
         NetworkBuilder nb{alc};
 
-        std::ifstream ifs{"test/iyokanl1-json/addr-4bit-iyokanl1.json"};
-        assert(ifs);
-        readIyokanL1JSONNetwork("addr", ifs, nb);
+        readNetworkFromFile(
+            blueprint::File{blueprint::File::TYPE::IYOKANL1_JSON,
+                            "test/iyokanl1-json/addr-4bit-iyokanl1.json",
+                            "addr"},
+            nb);
 
         std::vector<std::unique_ptr<nt::Worker>> workers;
         workers.emplace_back(std::make_unique<Worker>());
@@ -657,9 +621,11 @@ void test0()
         Allocator alc;
         NetworkBuilder nb{alc};
 
-        std::ifstream ifs{"test/yosys-json/counter-4bit-yosys.json"};
-        assert(ifs);
-        readYosysJSONNetwork("counter", ifs, nb);
+        readNetworkFromFile(
+            blueprint::File{blueprint::File::TYPE::YOSYS_JSON,
+                            "test/yosys-json/counter-4bit-yosys.json",
+                            "counter"},
+            nb);
 
         std::vector<std::unique_ptr<nt::Worker>> workers;
         workers.emplace_back(std::make_unique<Worker>());
@@ -701,9 +667,11 @@ void test0()
         Allocator alc;
         NetworkBuilder nb{alc};
 
-        std::ifstream ifs{"test/yosys-json/register-init-4bit-yosys.json"};
-        assert(ifs);
-        readYosysJSONNetwork("register_init", ifs, nb);
+        readNetworkFromFile(
+            blueprint::File{blueprint::File::TYPE::YOSYS_JSON,
+                            "test/yosys-json/register-init-4bit-yosys.json",
+                            "register_init"},
+            nb);
 
         std::vector<std::unique_ptr<nt::Worker>> workers;
         workers.emplace_back(std::make_unique<Worker>());

@@ -2,11 +2,11 @@
 
 #include <picojson.h>
 
-namespace nt {
-
-/* class YosysJSONReader */
+#include <fstream>
 
 namespace {
+
+/* class YosysJSONReader */
 
 class YosysJSONReader {
 private:
@@ -287,17 +287,7 @@ public:
     }
 };
 
-}  // namespace
-
-void readYosysJSONNetwork(const std::string& nodeName, std::istream& is,
-                          NetworkBuilder& nb)
-{
-    YosysJSONReader::read(nodeName, is, nb);
-}
-
 /* class IyokanL1JSONReader */
-
-namespace {
 
 class IyokanL1JSONReader {
 public:
@@ -433,10 +423,29 @@ public:
 
 }  // namespace
 
-void readIyokanL1JSONNetwork(const std::string& nodeName, std::istream& is,
-                             NetworkBuilder& nb)
+namespace nt {
+
+/* readNetworkFromFile */
+
+void readNetworkFromFile(const blueprint::File& file, nt::NetworkBuilder& nb)
 {
-    IyokanL1JSONReader::read(nodeName, is, nb);
+    std::ifstream ifs{file.path, std::ios::binary};
+    if (!ifs)
+        ERR_DIE("Invalid [[file]] path: " << file.path);
+
+    switch (file.type) {
+    case blueprint::File::TYPE::IYOKANL1_JSON:
+        LOG_S(WARNING)
+            << "[[file]] of type 'iyokanl1-json' is deprecated. You don't need "
+               "to use Iyokan-L1. Use Yosys JSON directly by specifying type "
+               "'yosys-json'.";
+        IyokanL1JSONReader::read(file.name, ifs, nb);
+        break;
+
+    case blueprint::File::TYPE::YOSYS_JSON:
+        YosysJSONReader::read(file.name, ifs, nb);
+        break;
+    }
 }
 
 }  // namespace nt

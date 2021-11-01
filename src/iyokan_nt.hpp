@@ -56,6 +56,9 @@ struct ConfigName {
     int portBit;
 };
 struct Label {
+    // String literals for member variable `kind`.
+    // If label is for inputs or outputs, these member variable must be used,
+    // that is, kind == INPUT or kind == OUTPUT.
     static inline const char* const INPUT = "Input";
     static inline const char* const OUTPUT = "Output";
 
@@ -453,10 +456,7 @@ public:
     const std::unordered_map<std::string, int>& atPortWidths() const;
 };
 
-void readYosysJSONNetwork(const std::string& nodeName, std::istream& is,
-                          NetworkBuilder& nb);
-void readIyokanL1JSONNetwork(const std::string& nodeName, std::istream& is,
-                             NetworkBuilder& nb);
+void readNetworkFromFile(const blueprint::File& file, NetworkBuilder& nb);
 void makeMUXROM(const blueprint::BuiltinROM& rom, NetworkBuilder& nb);
 void makeMUXRAM(const blueprint::BuiltinRAM& ram, NetworkBuilder& nb);
 
