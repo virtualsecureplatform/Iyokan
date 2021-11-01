@@ -1004,5 +1004,6 @@ int main()
     loguru::g_stderr_verbosity = loguru::Verbosity_1;
 
     nt::testAllocator();
+    nt::test0();
     nt::plain::test0();
 }

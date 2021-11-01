@@ -56,8 +56,9 @@ struct ConfigName {
     int portBit;
 
     // Although all member variables of ConfigName are public, we make
-    // operator<< its friend function for clarity.
+    // operator<< and operator< its friend function for clarity.
     friend std::ostream& operator<<(std::ostream& os, const ConfigName& c);
+    friend bool operator<(const ConfigName& lhs, const ConfigName& rhs);
 };
 
 struct Label {
@@ -116,8 +117,8 @@ public:
     // Set input value. Only available for input gates.
     virtual void setInput(const DataHolder&);
 
-    // onAfterFirstTick() will be called after the first tick.
-    virtual void onAfterFirstTick();
+    // onAfterTick() will be called after each tick.
+    virtual void onAfterTick(size_t currentCycle);
 
     // Return true iff this task can be run in plaintext mode.
     virtual bool canRunPlain() const;
@@ -395,7 +396,7 @@ public:
     bool isRunning() const;
     void run();
     void tick();
-    void onAfterFirstTick();
+    void onAfterTick(size_t currentCycle);
 };
 
 namespace blueprint {  // blueprint components
@@ -468,6 +469,8 @@ public:
 void readNetworkFromFile(const blueprint::File& file, NetworkBuilder& nb);
 void makeMUXROM(const blueprint::BuiltinROM& rom, NetworkBuilder& nb);
 void makeMUXRAM(const blueprint::BuiltinRAM& ram, NetworkBuilder& nb);
+
+void test0();
 
 }  // namespace nt
 

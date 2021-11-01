@@ -1,6 +1,8 @@
 #include "iyokan_nt.hpp"
 #include "error_nt.hpp"
 
+#include <cassert>
+
 #include <algorithm>
 
 namespace nt {
@@ -10,6 +12,15 @@ std::ostream& operator<<(std::ostream& os, const ConfigName& c)
 {
     os << c.nodeName << "/" << c.portName << "[" << c.portBit << "]";
     return os;
+}
+
+bool operator<(const ConfigName& lhs, const ConfigName& rhs)
+{
+    if (int res = lhs.nodeName.compare(rhs.nodeName); res != 0)
+        return res < 0;
+    if (int res = lhs.portName.compare(rhs.portName); res != 0)
+        return res < 0;
+    return lhs.portBit < rhs.portBit;
 }
 
 /* struct Label */
@@ -106,7 +117,7 @@ bool Task::canRunPlain() const
     return false;
 }
 
-void Task::onAfterFirstTick()
+void Task::onAfterTick(size_t)
 {
     // Do nothing by default.
 }
@@ -321,9 +332,9 @@ void NetworkRunner::tick()
     network_.eachTask([&](Task* task) { task->tick(); });
 }
 
-void NetworkRunner::onAfterFirstTick()
+void NetworkRunner::onAfterTick(size_t currentCycle)
 {
-    network_.eachTask([&](Task* task) { task->onAfterFirstTick(); });
+    network_.eachTask([&](Task* task) { task->onAfterTick(currentCycle); });
 }
 
 /* makeMUXROM */
@@ -577,6 +588,22 @@ void makeMUXRAM(const blueprint::BuiltinRAM& ram, NetworkBuilder& nb)
     // Create 1bitRAMs
     for (size_t i = 0; i < ram.outRdataWidth; i++) {
         make1bitRAMWithMUX(ram.name, addrInputs, wrenInput, i, nb);
+    }
+}
+
+void test0()
+{
+    // operator< for ConfigName
+    {
+        bool res = false;
+        res = ConfigName{"abc", "def", 0} < ConfigName{"abc", "dfe", 0};
+        assert(res);
+        res = ConfigName{"acc", "def", 0} < ConfigName{"abc", "dfe", 0};
+        assert(!res);
+        res = ConfigName{"abc", "def", 0} < ConfigName{"abc", "def", 0};
+        assert(!res);
+        res = ConfigName{"abc", "def", 0} < ConfigName{"abc", "def", 1};
+        assert(res);
     }
 }
 
