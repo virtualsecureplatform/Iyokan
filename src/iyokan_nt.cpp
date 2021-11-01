@@ -5,6 +5,18 @@
 
 namespace nt {
 
+/* struct ConfigName */
+std::ostream& operator<<(std::ostream& os, const ConfigName& c)
+{
+    os << c.nodeName << "/" << c.portName << "[" << c.portBit << "]";
+    return os;
+}
+
+/* struct Label */
+// Initialization of static variables.
+const char* const Label::INPUT = "Input";
+const char* const Label::OUTPUT = "Output";
+
 /* class Allocator */
 
 Allocator::Allocator()

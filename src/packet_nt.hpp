@@ -82,6 +82,7 @@ struct PlainPacket {
         ar(ram, rom, bits, numCycles);
     }
 
+    bool operator==(const PlainPacket& rhs) const;
     TFHEPacket encrypt(const TFHEpp::SecretKey& key) const;
 };
 
@@ -130,6 +131,7 @@ PlainPacket readPlainPacket(const std::string& path);
 TFHEPacket readTFHEPacket(std::istream& is);
 TFHEPacket readTFHEPacket(const std::string& path);
 void writePlainPacket(std::ostream& os, const PlainPacket& pkt);
+void writePlainPacket(const std::string& path, const PlainPacket& pkt);
 void writeTFHEPacket(std::ostream& os, const TFHEPacket& pkt);
 
 }  // namespace nt

@@ -6,7 +6,8 @@ DataHolder::DataHolder() : dataBit_(nullptr), type_(TYPE::UND)
 {
 }
 
-DataHolder::DataHolder(Bit *dataBit) : dataBit_(dataBit), type_(TYPE::BIT)
+DataHolder::DataHolder(const Bit *const dataBit)
+    : dataBit_(dataBit), type_(TYPE::BIT)
 {
 }
 
@@ -16,7 +17,7 @@ Bit DataHolder::getBit() const
     return *dataBit_;
 }
 
-void DataHolder::setBit(Bit *dataBit)
+void DataHolder::setBit(const Bit *const dataBit)
 {
     dataBit_ = dataBit;
     type_ = TYPE::BIT;

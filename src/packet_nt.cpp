@@ -222,6 +222,15 @@ std::vector<Bit> decryptROMInTLWE(const TFHEpp::SecretKey& key,
     return decryptBits(key, src);
 }
 
+bool PlainPacket::operator==(const PlainPacket& rhs) const
+{
+    // Check if member variables of *this and rhs are equal.
+    // If we used C++20, we could make C++ compilers derive this code by using
+    // '= default'!
+    return ram == rhs.ram && rom == rhs.rom && bits == rhs.bits &&
+           numCycles == rhs.numCycles;
+}
+
 TFHEPacket PlainPacket::encrypt(const TFHEpp::SecretKey& key) const
 {
     TFHEPacket tfhe{{}, {}, {}, {}, {}, numCycles};
@@ -307,6 +316,11 @@ TFHEPacket readTFHEPacket(const std::string& path)
 void writePlainPacket(std::ostream& os, const PlainPacket& pkt)
 {
     writeToArchive(os, pkt);
+}
+
+void writePlainPacket(const std::string& path, const PlainPacket& pkt)
+{
+    writeToArchive(path, pkt);
 }
 
 void writeTFHEPacket(std::ostream& os, const TFHEPacket& pkt)

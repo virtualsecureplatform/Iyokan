@@ -10,10 +10,14 @@ namespace nt {
 enum class Bit : bool;
 
 // DataHolder holds data using Task::setInput/Task::getOutput.
+// FIXME: The name "DataHolder" is misleading. Maybe "IODataPointer" or
+// something is more suitable, because we actually do not "hold" the data but
+// "point" them. DataHolder::setBit() does not set the bit itself but set the
+// pointer to a bit.
 class DataHolder {
 private:
     union {
-        Bit *dataBit_;
+        const Bit* dataBit_;
     };
 
     enum class TYPE {
@@ -23,10 +27,10 @@ private:
 
 public:
     DataHolder();
-    DataHolder(Bit *dataBit);
+    DataHolder(const Bit* const dataBit);
 
     Bit getBit() const;
-    void setBit(Bit *dataBit);
+    void setBit(const Bit* const dataBit);
 };
 
 }  // namespace nt

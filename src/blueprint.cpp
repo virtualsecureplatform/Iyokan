@@ -118,8 +118,8 @@ Blueprint::Blueprint(const std::string& fileName)
                         ERR_DIE("Invalid port name for TOGND: " << portStr);
                     auto ports = parsePortString(portStr, Label::OUTPUT);
                     for (auto&& port : ports) {  // @...[n]
-                        const std::string& name = port.portName;
-                        int bit = port.portBit;
+                        const std::string& name = port.cname.portName;
+                        int bit = port.cname.portBit;
                         auto [it, inserted] = atPortWidths_.emplace(name, 0);
                         it->second = std::max(it->second, bit + 1);
                     }
@@ -150,11 +150,12 @@ Blueprint::Blueprint(const std::string& fileName)
                 const blueprint::Port& from = portsFrom[i];
 
                 if (srcTo[0] == '@') {  // @... = ...
-                    if (!to.nodeName.empty() || from.nodeName.empty())
+                    if (!to.cname.nodeName.empty() ||
+                        from.cname.nodeName.empty())
                         ERR_DIE(errMsg);
 
-                    const std::string& name = to.portName;
-                    int bit = to.portBit;
+                    const std::string& name = to.cname.portName;
+                    int bit = to.cname.portBit;
 
                     {
                         auto [it, inserted] =
@@ -170,11 +171,12 @@ Blueprint::Blueprint(const std::string& fileName)
                     it->second = std::max(it->second, bit + 1);
                 }
                 else if (srcFrom[0] == '@') {  // ... = @...
-                    if (!from.nodeName.empty() || to.nodeName.empty())
+                    if (!from.cname.nodeName.empty() ||
+                        to.cname.nodeName.empty())
                         ERR_DIE(errMsg);
 
-                    const std::string& name = from.portName;
-                    int bit = from.portBit;
+                    const std::string& name = from.cname.portName;
+                    int bit = from.cname.portBit;
 
                     {
                         auto [it, inserted] =
@@ -227,7 +229,7 @@ std::vector<blueprint::Port> Blueprint::parsePortString(const std::string& src,
 
     std::vector<blueprint::Port> ret;
     for (int i = portBitFrom; i < portBitTo + 1; i++)
-        ret.push_back(blueprint::Port{kind, nodeName, portName, i});
+        ret.push_back(blueprint::Port{kind, {nodeName, portName, i}});
     return ret;
 }
 

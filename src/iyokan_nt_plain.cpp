@@ -270,7 +270,7 @@ public:
         UID uid = genUID();
         TaskInput* task = nullptr;
         task = emplaceTask<TaskInput>(
-            Label{uid, "Input", ConfigName{nodeName, portName, portBit}},
+            Label{uid, Label::INPUT, ConfigName{nodeName, portName, portBit}},
             currentAllocator());
         uid2common_.emplace(uid, task);
         return uid;
@@ -282,7 +282,7 @@ public:
         UID uid = genUID();
         TaskOutput* task = nullptr;
         task = emplaceTask<TaskOutput>(
-            Label{uid, "Output", ConfigName{nodeName, portName, portBit}},
+            Label{uid, Label::OUTPUT, ConfigName{nodeName, portName, portBit}},
             currentAllocator());
         uid2common_.emplace(uid, task);
         return uid;
@@ -349,18 +349,19 @@ struct RunParameter {
 class Frontend {
 private:
     RunParameter pr_;
-    std::unique_ptr<NetworkRunner> runner_;
+    std::optional<Network> network_;
     PlainPacket reqPacket_;
     int currentCycle_;
     nt::Blueprint bp_;
 
 public:
     Frontend(const RunParameter& pr, Allocator& alc);
+    void run();
 };
 
 Frontend::Frontend(const RunParameter& pr, Allocator& alc)
     : pr_(pr),
-      runner_(nullptr),
+      network_(std::nullopt),
       reqPacket_(readPlainPacket(pr_.inputFile)),
       currentCycle_(0),
       bp_(pr_.blueprintFile)
@@ -384,11 +385,9 @@ Frontend::Frontend(const RunParameter& pr, Allocator& alc)
     }
 
     auto get = [&](const blueprint::Port& port) -> Task* {
-        Task* task = nb.finder().findByConfigName(
-            {port.nodeName, port.portName, port.portBit});
+        Task* task = nb.finder().findByConfigName(port.cname);
         if (task->label().kind != port.kind)
-            ERR_DIE("Invalid port: " << port.nodeName << "/" << port.portName
-                                     << "[" << port.portBit << "] is "
+            ERR_DIE("Invalid port: " << port.cname << " is "
                                      << task->label().kind << ", not "
                                      << port.kind);
         return task;
@@ -411,7 +410,44 @@ Frontend::Frontend(const RunParameter& pr, Allocator& alc)
     // Set priority to each DepNode
     // FIXME
 
+    network_.emplace(nb.createNetwork());
     // FIXME check if network is valid
+}
+
+void Frontend::run()
+{
+    const Bit bit0 = 0_b, bit1 = 1_b;
+
+    // Create workers
+    std::vector<std::unique_ptr<nt::Worker>> workers;
+    for (size_t i = 0; i < pr_.numCPUWorkers; i++)
+        workers.emplace_back(std::make_unique<Worker>());
+
+    // Create runner and finder for the network
+    NetworkRunner runner{std::move(network_.value()), std::move(workers)};
+    network_ = std::nullopt;
+    const TaskFinder& finder = runner.network().finder();
+
+    // Process reset cycle if @reset is used
+    // FIXME: Add support for --skip-reset flag
+    if (auto reset = bp_.at("reset"); reset && reset->kind == Label::INPUT) {
+        Task* t = finder.findByConfigName(reset->cname);
+        t->setInput(&bit1);  // Set reset on
+        runner.run();
+        t->setInput(&bit0);  // Set reset off
+    }
+
+    // Process normal cycles
+    for (size_t i = 0; i < pr_.numCycles; i++) {
+        runner.tick();
+        if (i == 0)
+            // Set initial values of SDFF and RAM
+            runner.onAfterFirstTick();
+        // FIXME set (circular) inputs
+        runner.run();
+    }
+
+    // FIXME output result packet
 }
 
 /**************************************************/
@@ -809,6 +845,42 @@ void test0()
         assert(dh.getBit() == 1_b);
         tRdata1->getOutput(dh);
         assert(dh.getBit() == 1_b);
+    }
+
+    {
+        // Prepare the input packet
+        PlainPacket inPkt{
+            {},  // ram
+            {},  // rom
+            {    // bits
+             {"A", /* 0xc */ {0_b, 0_b, 1_b, 1_b}},
+             {"B", /* 0xa */ {0_b, 1_b, 0_b, 1_b}}},
+            std::nullopt,  // numCycles
+        };
+        writePlainPacket("_test_in", inPkt);
+
+        // Prepare the expected output packet
+        PlainPacket expectedOutPkt{
+            {},                                       // ram
+            {},                                       // rom
+            {{"out", /* 6 */ {0_b, 1_b, 1_b, 0_b}}},  // bits
+            1,                                        // numCycles
+        };
+
+        Allocator alc;
+        Frontend frontend{
+            RunParameter{
+                "test/config-toml/addr-4bit.toml",  // blueprintFile
+                "_test_in",                         // inputFile
+                "_test_out",                        // outputFile
+                2,                                  // numCPUWorkers
+                1,                                  // numCycles
+                SCHED::RANKU,                       // sched
+            },
+            alc};
+        frontend.run();
+        PlainPacket got = readPlainPacket("_test_out");
+        assert(got == expectedOutPkt);
     }
 }
 
