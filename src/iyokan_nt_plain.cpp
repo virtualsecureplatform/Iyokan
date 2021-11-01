@@ -390,8 +390,6 @@ Frontend::Frontend(const RunParameter& pr, Allocator& alc)
     auto get = [&](const blueprint::Port& port) -> Task* {
         Task* task = nb.finder().findByConfigName(
             {port.nodeName, port.portName, port.portBit});
-        // FIXME:
-        // ここで大文字小文字の不一致が発生する。そもそも文字列一致で行うべきではない処理。
         if (task->label().kind != port.kind)
             ERR_DIE("Invalid port: " << port.nodeName << "/" << port.portName
                                      << "[" << port.portBit << "] is "
@@ -409,8 +407,8 @@ Frontend::Frontend(const RunParameter& pr, Allocator& alc)
     }
     // Then, connect other ports. `get` checks if they also exist.
     for (auto&& [src, dst] : bp_.edges()) {
-        assert(src.kind == "output");
-        assert(dst.kind == "input");
+        assert(src.kind == Label::OUTPUT);
+        assert(dst.kind == Label::INPUT);
         nb.connect(get(src)->label().uid, get(dst)->label().uid);
     }
 

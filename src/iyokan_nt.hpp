@@ -56,9 +56,17 @@ struct ConfigName {
     int portBit;
 };
 struct Label {
+    static inline const char* const INPUT = "Input";
+    static inline const char* const OUTPUT = "Output";
+
     UID uid;
-    std::string kind;
+    const char* const kind;  // Stores a string literal
     std::optional<ConfigName> cname;
+
+    Label(UID uid, const char* const kind, std::optional<ConfigName> cname)
+        : uid(uid), kind(kind), cname(std::move(cname))
+    {
+    }
 };
 
 class Task {
@@ -405,7 +413,8 @@ struct BuiltinRAM {
 };
 
 struct Port {
-    std::string nodeName, kind, portName;
+    const char* kind;  // Store a string literal
+    std::string nodeName, portName;
     int portBit;
 };
 }  // namespace blueprint
@@ -424,7 +433,7 @@ private:
 
 private:
     std::vector<blueprint::Port> parsePortString(const std::string& src,
-                                                 const std::string& kind);
+                                                 const char* const kind);
 
 public:
     Blueprint(const std::string& fileName);

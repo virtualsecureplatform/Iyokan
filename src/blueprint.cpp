@@ -116,7 +116,7 @@ Blueprint::Blueprint(const std::string& fileName)
                 for (const auto& portStr : ary) {  // @...[n:m]
                     if (portStr.empty() || portStr.at(0) != '@')
                         ERR_DIE("Invalid port name for TOGND: " << portStr);
-                    auto ports = parsePortString(portStr, "output");
+                    auto ports = parsePortString(portStr, Label::OUTPUT);
                     for (auto&& port : ports) {  // @...[n]
                         const std::string& name = port.portName;
                         int bit = port.portBit;
@@ -138,10 +138,10 @@ Blueprint::Blueprint(const std::string& fileName)
                 ERR_DIE(errMsg);
 
             // Others.
-            std::vector<blueprint::Port> portsTo =
-                                             parsePortString(srcTo, "input"),
-                                         portsFrom =
-                                             parsePortString(srcFrom, "output");
+            std::vector<blueprint::Port> portsTo = parsePortString(
+                                             srcTo, Label::INPUT),
+                                         portsFrom = parsePortString(
+                                             srcFrom, Label::OUTPUT);
             if (portsTo.size() != portsFrom.size())
                 ERR_DIE(errMsg);
 
@@ -198,7 +198,7 @@ Blueprint::Blueprint(const std::string& fileName)
 }
 
 std::vector<blueprint::Port> Blueprint::parsePortString(const std::string& src,
-                                                        const std::string& kind)
+                                                        const char* const kind)
 {
     std::string nodeName, portName;
     int portBitFrom, portBitTo;
@@ -227,7 +227,7 @@ std::vector<blueprint::Port> Blueprint::parsePortString(const std::string& src,
 
     std::vector<blueprint::Port> ret;
     for (int i = portBitFrom; i < portBitTo + 1; i++)
-        ret.push_back(blueprint::Port{nodeName, kind, portName, i});
+        ret.push_back(blueprint::Port{kind, nodeName, portName, i});
     return ret;
 }
 
