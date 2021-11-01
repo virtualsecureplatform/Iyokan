@@ -214,7 +214,7 @@ private:
     std::unordered_map<UID, TaskCommon<Bit>*> uid2common_;
     UID nextUID_;
     const PlainPacket* const reqPacket_;
-    const std::map<ConfigName, InputSource>* const cname2source_;
+    const std::map<ConfigName, InputSource>* const cname2isource_;
 
 private:
     UID genUID()
@@ -223,13 +223,13 @@ private:
     }
 
 public:
-    NetworkBuilder(const std::map<ConfigName, InputSource>& cname2source,
+    NetworkBuilder(const std::map<ConfigName, InputSource>& cname2isource,
                    const PlainPacket& reqPacket, Allocator& alc)
         : nt::NetworkBuilder(alc),
           uid2common_(),
           nextUID_(0),
           reqPacket_(&reqPacket),
-          cname2source_(&cname2source)
+          cname2isource_(&cname2isource)
     {
     }
 
@@ -295,7 +295,7 @@ public:
         ConfigName cname = ConfigName{nodeName, portName, portBit};
         Label label{uid, Label::INPUT, cname};
         TaskInput* task = nullptr;
-        if (auto it = cname2source_->find(cname); it != cname2source_->end())
+        if (auto it = cname2isource_->find(cname); it != cname2isource_->end())
             task = emplaceTask<TaskInput>(it->second, label, alc);
         else
             task = emplaceTask<TaskInput>(label, alc);
@@ -313,8 +313,6 @@ public:
             currentAllocator());
         uid2common_.emplace(uid, task);
         return uid;
-
-        // FIXME: We need to memorize this task to make a response packet.
     }
 
     UID ROM(const std::string& nodeName, const std::string& portName,
@@ -396,7 +394,7 @@ Frontend::Frontend(const RunParameter& pr, Allocator& alc)
       bp_(pr_.blueprintFile)
 {
     // Create map from ConfigName to InputSource
-    std::map<ConfigName, InputSource> cname2source;
+    std::map<ConfigName, InputSource> cname2isource;
     for (auto&& [key, port] : bp_.atPorts()) {
         // Find only inputs, that is, "[connect] ... = @..."
         if (port.kind != Label::INPUT)
@@ -415,13 +413,13 @@ Frontend::Frontend(const RunParameter& pr, Allocator& alc)
         if (atPortName == "reset")
             ERR_DIE("@reset cannot be set by user's input");
 
-        // Add a new entry to cname2source
+        // Add a new entry to cname2isource
         InputSource s{bp_.atPortWidths().at(atPortName), atPortBit,
                       &it->second};
-        cname2source.emplace(port.cname, s);
+        cname2isource.emplace(port.cname, s);
     }
 
-    NetworkBuilder nb{cname2source, reqPacket_, alc};
+    NetworkBuilder nb{cname2isource, reqPacket_, alc};
 
     // [[file]]
     for (auto&& file : bp_.files())
@@ -512,7 +510,7 @@ void test0()
     DataHolder dh;
     Bit bit0 = 0_b, bit1 = 1_b;
     PlainPacket pkt;
-    std::map<ConfigName, InputSource> c2s;
+    std::map<ConfigName, InputSource> c2is;
 
     {
         Allocator alc;
@@ -547,7 +545,7 @@ void test0()
 
     {
         Allocator alc;
-        NetworkBuilder nb{c2s, pkt, alc};
+        NetworkBuilder nb{c2is, pkt, alc};
         UID id0 = nb.INPUT("", "A", 0), id1 = nb.INPUT("", "B", 0),
             id2 = nb.NAND(), id3 = nb.OUTPUT("", "C", 0);
         nb.connect(id0, id2);
@@ -579,7 +577,7 @@ void test0()
                                         A
         */
         Allocator alc;
-        NetworkBuilder nb{c2s, pkt, alc};
+        NetworkBuilder nb{c2is, pkt, alc};
         UID id0 = nb.INPUT("", "reset", 0), id1 = nb.OUTPUT("", "out", 0),
             id2 = nb.DFF(), id3 = nb.NOT(), id4 = nb.ANDNOT();
         nb.connect(id2, id1);
@@ -612,7 +610,7 @@ void test0()
 
     {
         Allocator alc;
-        NetworkBuilder nb{c2s, pkt, alc};
+        NetworkBuilder nb{c2is, pkt, alc};
 
         readNetworkFromFile(
             blueprint::File{blueprint::File::TYPE::YOSYS_JSON,
@@ -660,7 +658,7 @@ void test0()
 
     {
         Allocator alc;
-        NetworkBuilder nb{c2s, pkt, alc};
+        NetworkBuilder nb{c2is, pkt, alc};
 
         readNetworkFromFile(
             blueprint::File{blueprint::File::TYPE::IYOKANL1_JSON,
@@ -709,7 +707,7 @@ void test0()
 
     {
         Allocator alc;
-        NetworkBuilder nb{c2s, pkt, alc};
+        NetworkBuilder nb{c2is, pkt, alc};
 
         readNetworkFromFile(
             blueprint::File{blueprint::File::TYPE::YOSYS_JSON,
@@ -755,7 +753,7 @@ void test0()
 
     {
         Allocator alc;
-        NetworkBuilder nb{c2s, pkt, alc};
+        NetworkBuilder nb{c2is, pkt, alc};
 
         readNetworkFromFile(
             blueprint::File{blueprint::File::TYPE::YOSYS_JSON,
@@ -820,7 +818,7 @@ void test0()
         pkt.rom["rom"] = {0_b, 1_b, 0_b, 0_b, 1_b, 0_b, 1_b, 1_b};
 
         Allocator alc;
-        NetworkBuilder nb{c2s, pkt, alc};
+        NetworkBuilder nb{c2is, pkt, alc};
         makeMUXROM(blueprint::BuiltinROM{blueprint::BuiltinROM::TYPE::MUX,
                                          "rom", 2, 2},
                    nb);
@@ -850,7 +848,7 @@ void test0()
         pkt.ram["ram"] = {0_b, 1_b, 0_b, 0_b, 1_b, 0_b, 1_b, 1_b};
 
         Allocator alc;
-        NetworkBuilder nb{c2s, pkt, alc};
+        NetworkBuilder nb{c2is, pkt, alc};
         makeMUXRAM(blueprint::BuiltinRAM{blueprint::BuiltinRAM::TYPE::MUX,
                                          "ram", 2, 2, 2},
                    nb);
