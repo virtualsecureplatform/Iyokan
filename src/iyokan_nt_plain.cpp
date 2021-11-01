@@ -377,37 +377,21 @@ Frontend::Frontend(const RunParameter& pr, Allocator& alc)
 
     // [[builtin]] type = ram | type = mux-ram
     for (auto&& ram : bp_.builtinRAMs()) {
-        switch (ram.type) {
-        case blueprint::BuiltinRAM::TYPE::CMUX_MEMORY:
-            // FIXME
-            // makeRAM(ram, nb);
-            ERR_UNREACHABLE;
-            break;
-        case blueprint::BuiltinRAM::TYPE::MUX:
-            // FIXME
-            // makeMUXRAM(ram, nb);
-            ERR_UNREACHABLE;
-            break;
-        }
+        // We ignore ram.type and always use mux-ram in plaintext mode.
+        makeMUXRAM(ram, nb);
     }
 
     // [[builtin]] type = rom | type = mux-rom
     for (auto&& rom : bp_.builtinROMs()) {
-        switch (rom.type) {
-        case blueprint::BuiltinROM::TYPE::CMUX_MEMORY:
-            // FIXME
-            // makeROM(rom, nb);
-            ERR_UNREACHABLE;
-            break;
-        case blueprint::BuiltinROM::TYPE::MUX:
-            makeMUXROM(rom, nb);
-            break;
-        }
+        // We ignore rom.type and always use mux-rom in plaintext mode.
+        makeMUXROM(rom, nb);
     }
 
     auto get = [&](const blueprint::Port& port) -> Task* {
         Task* task = nb.finder().findByConfigName(
             {port.nodeName, port.portName, port.portBit});
+        // FIXME:
+        // ここで大文字小文字の不一致が発生する。そもそも文字列一致で行うべきではない処理。
         if (task->label().kind != port.kind)
             ERR_DIE("Invalid port: " << port.nodeName << "/" << port.portName
                                      << "[" << port.portBit << "] is "
