@@ -47,7 +47,8 @@ private:
     std::optional<InputSource> source_;
 
 public:
-    TaskInput(Label label, Allocator& alc) : TaskCommon<Bit>(label, alc, 0, 1)
+    TaskInput(Label label, Allocator& alc)
+        : TaskCommon<Bit>(label, alc, 0, 1), source_(std::nullopt)
     {
     }
     TaskInput(InputSource source, Label label, Allocator& alc)
@@ -312,6 +313,8 @@ public:
             currentAllocator());
         uid2common_.emplace(uid, task);
         return uid;
+
+        // FIXME: We need to memorize this task to make a response packet.
     }
 
     UID ROM(const std::string& nodeName, const std::string& portName,
@@ -395,17 +398,27 @@ Frontend::Frontend(const RunParameter& pr, Allocator& alc)
     // Create map from ConfigName to InputSource
     std::map<ConfigName, InputSource> cname2source;
     for (auto&& [key, port] : bp_.atPorts()) {
+        // Find only inputs, that is, "[connect] ... = @..."
         if (port.kind != Label::INPUT)
             continue;
+
+        // Get "@atPortName[atPortBit]"
         auto& [atPortName, atPortBit] = key;
+
+        // Check if reqPacket_ contains input data for @atPortName
         auto it = reqPacket_.bits.find(atPortName);
         if (it == reqPacket_.bits.end())
             continue;
+
+        // Die if users try to set the value of @reset[0] since it is set only
+        // by system
         if (atPortName == "reset")
             ERR_DIE("@reset cannot be set by user's input");
-        cname2source.emplace(port.cname,
-                             InputSource{bp_.atPortWidths().at(atPortName),
-                                         atPortBit, &it->second});
+
+        // Add a new entry to cname2source
+        InputSource s{bp_.atPortWidths().at(atPortName), atPortBit,
+                      &it->second};
+        cname2source.emplace(port.cname, s);
     }
 
     NetworkBuilder nb{cname2source, reqPacket_, alc};
@@ -888,41 +901,41 @@ void test0()
         assert(dh.getBit() == 1_b);
     }
 
-    //{
-    //    // Prepare the input packet
-    //    PlainPacket inPkt{
-    //        {},  // ram
-    //        {},  // rom
-    //        {    // bits
-    //         {"A", /* 0xc */ {0_b, 0_b, 1_b, 1_b}},
-    //         {"B", /* 0xa */ {0_b, 1_b, 0_b, 1_b}}},
-    //        std::nullopt,  // numCycles
-    //    };
-    //    writePlainPacket("_test_in", inPkt);
+    {
+        // Prepare the input packet
+        PlainPacket inPkt{
+            {},  // ram
+            {},  // rom
+            {    // bits
+             {"A", /* 0xc */ {0_b, 0_b, 1_b, 1_b}},
+             {"B", /* 0xa */ {0_b, 1_b, 0_b, 1_b}}},
+            std::nullopt,  // numCycles
+        };
+        writePlainPacket("_test_in", inPkt);
 
-    //    // Prepare the expected output packet
-    //    PlainPacket expectedOutPkt{
-    //        {},                                       // ram
-    //        {},                                       // rom
-    //        {{"out", /* 6 */ {0_b, 1_b, 1_b, 0_b}}},  // bits
-    //        1,                                        // numCycles
-    //    };
+        // Prepare the expected output packet
+        PlainPacket expectedOutPkt{
+            {},                                       // ram
+            {},                                       // rom
+            {{"out", /* 6 */ {0_b, 1_b, 1_b, 0_b}}},  // bits
+            1,                                        // numCycles
+        };
 
-    //    Allocator alc;
-    //    Frontend frontend{
-    //        RunParameter{
-    //            "test/config-toml/addr-4bit.toml",  // blueprintFile
-    //            "_test_in",                         // inputFile
-    //            "_test_out",                        // outputFile
-    //            2,                                  // numCPUWorkers
-    //            1,                                  // numCycles
-    //            SCHED::RANKU,                       // sched
-    //        },
-    //        alc};
-    //    frontend.run();
-    //    PlainPacket got = readPlainPacket("_test_out");
-    //    assert(got == expectedOutPkt);
-    //}
+        Allocator alc;
+        Frontend frontend{
+            RunParameter{
+                "test/config-toml/addr-4bit.toml",  // blueprintFile
+                "_test_in",                         // inputFile
+                "_test_out",                        // outputFile
+                2,                                  // numCPUWorkers
+                1,                                  // numCycles
+                SCHED::RANKU,                       // sched
+            },
+            alc};
+        frontend.run();
+        PlainPacket got = readPlainPacket("_test_out");
+        assert(got == expectedOutPkt);
+    }
 }
 
 }  // namespace plain
