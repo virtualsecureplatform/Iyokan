@@ -84,6 +84,8 @@ struct PlainPacket {
 
     bool operator==(const PlainPacket& rhs) const;
     TFHEPacket encrypt(const TFHEpp::SecretKey& key) const;
+
+    static PlainPacket fromTOML(const std::string& filepath);
 };
 
 struct TFHEPacket {

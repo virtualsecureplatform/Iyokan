@@ -7,6 +7,7 @@
 #include <cereal/types/optional.hpp>
 #include <cereal/types/unordered_map.hpp>
 #include <cereal/types/vector.hpp>
+#include <toml.hpp>
 
 #include <fstream>
 
@@ -265,6 +266,53 @@ TFHEPacket PlainPacket::encrypt(const TFHEpp::SecretKey& key) const
     }
 
     return tfhe;
+}
+
+PlainPacket PlainPacket::fromTOML(const std::string& filepath)
+{
+    // FIXME: iyokan-packet should use this function
+    const auto root = toml::parse(filepath);
+    int numCycles = toml::find_or<int>(root, "cycles", -1);
+    std::unordered_map<std::string, std::vector<Bit>> ram, rom, bits;
+
+    auto parseEntries = [&root](
+                            std::unordered_map<std::string, std::vector<Bit>>&
+                                name2bitvec,
+                            const std::string& entryName) {
+        if (!root.contains(entryName))
+            return;
+        const auto tables =
+            toml::find<std::vector<toml::value>>(root, entryName);
+        for (const auto& table : tables) {
+            const auto name = toml::find<std::string>(table, "name");
+            const auto size = toml::find<size_t>(table, "size");
+            const auto bytes =
+                toml::find<std::vector<uint64_t>>(table, "bytes");
+
+            std::vector<Bit>& v = name2bitvec[name];
+            v.resize(size, 0_b);
+            auto it = v.begin();
+            for (uint64_t byte : bytes) {
+                if (byte >= 0xffu)
+                    LOG_S(WARNING)
+                        << "'bytes' field expects only <256 unsinged integer, "
+                           "but got '"
+                        << byte << "'. Only the lower 8bits is used.";
+                for (int i = 0; i < 8; i++) {
+                    if (it == v.end())
+                        goto end;
+                    *it++ = ((byte >> i) & 1u) != 0 ? 1_b : 0_b;
+                }
+            }
+        end:;  // ';' is necessary since label is followed by expression.
+        }
+    };
+
+    parseEntries(ram, "ram");    // [[ram]]
+    parseEntries(rom, "rom");    // [[rom]]
+    parseEntries(bits, "bits");  // [[bits]]
+
+    return PlainPacket{ram, rom, bits, numCycles};
 }
 
 PlainPacket TFHEPacket::decrypt(const TFHEpp::SecretKey& key) const

@@ -956,24 +956,9 @@ void test0()
     }
 
     {
-        // Prepare the input packet
-        PlainPacket inPkt{
-            {},  // ram
-            {},  // rom
-            {    // bits
-             {"A", /* 0xc */ {0_b, 0_b, 1_b, 1_b}},
-             {"B", /* 0xa */ {0_b, 1_b, 0_b, 1_b}}},
-            std::nullopt,  // numCycles
-        };
+        auto inPkt = PlainPacket::fromTOML("test/in/test04.in"),
+             expectedOutPkt = PlainPacket::fromTOML("test/out/test04.out");
         writePlainPacket("_test_in", inPkt);
-
-        // Prepare the expected output packet
-        PlainPacket expectedOutPkt{
-            {},                                       // ram
-            {},                                       // rom
-            {{"out", /* 6 */ {0_b, 1_b, 1_b, 0_b}}},  // bits
-            1,                                        // numCycles
-        };
 
         Allocator alc;
         Frontend frontend{
@@ -992,22 +977,9 @@ void test0()
     }
 
     {
-        // Prepare the input packet
-        PlainPacket inPkt{
-            {},            // ram
-            {},            // rom
-            {},            // bits
-            std::nullopt,  // numCycles
-        };
+        auto inPkt = PlainPacket::fromTOML("test/in/test13.in"),
+             expectedOutPkt = PlainPacket::fromTOML("test/out/test13.out");
         writePlainPacket("_test_in", inPkt);
-
-        // Prepare the expected output packet
-        PlainPacket expectedOutPkt{
-            {},                                       // ram
-            {},                                       // rom
-            {{"out", /* 2 */ {0_b, 1_b, 0_b, 0_b}}},  // bits
-            3,                                        // numCycles
-        };
 
         Allocator alc;
         Frontend frontend{
@@ -1026,29 +998,9 @@ void test0()
     }
 
     {
-        std::vector<Bit> src(128, 0_b);
-        // 0x7 at byte 7
-        src.at(7 * 8 + 0) = 1_b;
-        src.at(7 * 8 + 1) = 1_b;
-        src.at(7 * 8 + 2) = 1_b;
-
-        // Prepare the input packet
-        PlainPacket inPkt{
-            {},                                // ram
-            {{"rom", src}},                    // rom
-            {{"addr", {1_b, 1_b, 1_b, 0_b}}},  // bits
-            std::nullopt,                      // numCycles
-        };
+        auto inPkt = PlainPacket::fromTOML("test/in/test15.in"),
+             expectedOutPkt = PlainPacket::fromTOML("test/out/test15.out");
         writePlainPacket("_test_in", inPkt);
-
-        // Prepare the expected output packet
-        PlainPacket expectedOutPkt{
-            {},  // ram
-            {},  // rom
-            {{"rdata",
-              /* 7 */ {1_b, 1_b, 1_b, 0_b, 0_b, 0_b, 0_b, 0_b}}},  // bits
-            1,                                                     // numCycles
-        };
 
         Allocator alc;
         Frontend frontend{RunParameter{
@@ -1064,6 +1016,29 @@ void test0()
         PlainPacket got = readPlainPacket("_test_out");
         assert(got == expectedOutPkt);
     }
+
+    /*
+        {
+            auto inPkt = PlainPacket::fromTOML("test/in/test08.in"),
+                 expectedOutPkt = PlainPacket::fromTOML("test/out/test08.out");
+            writePlainPacket("_test_in", inPkt);
+
+            Allocator alc;
+            Frontend frontend{
+                RunParameter{
+                    "test/config-toml/ram-8-16-16.toml",  // blueprintFile
+                    "_test_in",                           // inputFile
+                    "_test_out",                          // outputFile
+                    2,                                    // numCPUWorkers
+                    8,                                    // numCycles
+                    SCHED::RANKU,                         // sched
+                },
+                alc};
+            frontend.run();
+            PlainPacket got = readPlainPacket("_test_out");
+            assert(got == expectedOutPkt);
+        }
+        */
 }
 
 }  // namespace plain
