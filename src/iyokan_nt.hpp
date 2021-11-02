@@ -220,6 +220,12 @@ public:
 
         inputs_.push_back(newIn);
     }
+
+    // public output(). Debug purpose only.
+    T& DEBUG_output()
+    {
+        return output();
+    }
 };
 
 // class TaskDFF can be used as base class of DFF tasks.

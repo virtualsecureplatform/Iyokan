@@ -381,6 +381,10 @@ private:
     int currentCycle_;
     nt::Blueprint bp_;
 
+private:
+    void makeResPacket(PlainPacket& out, const TaskFinder& finder,
+                       int numCycles);
+
 public:
     Frontend(const RunParameter& pr, Allocator& alc);
     void run();
@@ -467,6 +471,34 @@ Frontend::Frontend(const RunParameter& pr, Allocator& alc)
     // FIXME check if network is valid
 }
 
+void Frontend::makeResPacket(PlainPacket& out, const TaskFinder& finder,
+                             int numCycles)
+{
+    DataHolder dh;
+
+    // Set the current number of cycles
+    out.numCycles = numCycles;
+
+    // Get values of output @port
+    out.bits.clear();
+    for (auto&& [key, port] : bp_.atPorts()) {
+        // Find "[connect] @atPortName[atPortBit] = ..."
+        if (port.kind != Label::OUTPUT)
+            continue;
+        auto& [atPortName, atPortBit] = key;
+
+        // Get the value
+        Task* t = finder.findByConfigName(port.cname);
+        t->getOutput(dh);
+
+        // Assign the value to the corresponding bit of the response packet
+        auto& bits = out.bits[atPortName];
+        if (bits.size() < atPortBit + 1)
+            bits.resize(atPortBit + 1);
+        bits.at(atPortBit) = dh.getBit();
+    }
+}
+
 void Frontend::run()
 {
     const Bit bit0 = 0_b, bit1 = 1_b;
@@ -492,12 +524,36 @@ void Frontend::run()
 
     // Process normal cycles
     for (size_t i = 0; i < pr_.numCycles; i++) {
+        // Mount new values to DFFs
         runner.tick();
+
+        // Set new input data. If i is equal to 0, it also mounts initial data
+        // to RAMs.
         runner.onAfterTick(i);
+
+        // Go computing of each gate
         runner.run();
+
+        /*
+        // Debug printing of all the gates
+        runner.network().eachTask([&](Task* t) {
+            TaskCommon<Bit>* p = dynamic_cast<TaskCommon<Bit>*>(t);
+            if (p == nullptr)
+                return;
+            const Label& l = t->label();
+            if (t->label().cname)
+                LOG_DBG << l.kind << "\t" << *l.cname << "\t"
+                        << p->DEBUG_output();
+            else
+                LOG_DBG << l.kind << "\t" << p->DEBUG_output();
+        });
+        */
     }
 
-    // FIXME output result packet
+    // Dump result packet
+    PlainPacket resPacket;
+    makeResPacket(resPacket, finder, pr_.numCycles);
+    writePlainPacket(pr_.outputFile, resPacket);
 }
 
 /**************************************************/
