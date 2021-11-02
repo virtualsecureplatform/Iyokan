@@ -1024,6 +1024,46 @@ void test0()
         PlainPacket got = readPlainPacket("_test_out");
         assert(got == expectedOutPkt);
     }
+
+    {
+        std::vector<Bit> src(128, 0_b);
+        // 0x7 at byte 7
+        src.at(7 * 8 + 0) = 1_b;
+        src.at(7 * 8 + 1) = 1_b;
+        src.at(7 * 8 + 2) = 1_b;
+
+        // Prepare the input packet
+        PlainPacket inPkt{
+            {},                                // ram
+            {{"rom", src}},                    // rom
+            {{"addr", {1_b, 1_b, 1_b, 0_b}}},  // bits
+            std::nullopt,                      // numCycles
+        };
+        writePlainPacket("_test_in", inPkt);
+
+        // Prepare the expected output packet
+        PlainPacket expectedOutPkt{
+            {},  // ram
+            {},  // rom
+            {{"rdata",
+              /* 7 */ {1_b, 1_b, 1_b, 0_b, 0_b, 0_b, 0_b, 0_b}}},  // bits
+            1,                                                     // numCycles
+        };
+
+        Allocator alc;
+        Frontend frontend{RunParameter{
+                              "test/config-toml/rom-4-8.toml",  // blueprintFile
+                              "_test_in",                       // inputFile
+                              "_test_out",                      // outputFile
+                              2,                                // numCPUWorkers
+                              1,                                // numCycles
+                              SCHED::RANKU,                     // sched
+                          },
+                          alc};
+        frontend.run();
+        PlainPacket got = readPlainPacket("_test_out");
+        assert(got == expectedOutPkt);
+    }
 }
 
 }  // namespace plain
