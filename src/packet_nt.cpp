@@ -293,7 +293,7 @@ PlainPacket PlainPacket::fromTOML(const std::string& filepath)
             v.resize(size, 0_b);
             auto it = v.begin();
             for (uint64_t byte : bytes) {
-                if (byte >= 0xffu)
+                if (byte > 0xffu)
                     LOG_S(WARNING)
                         << "'bytes' field expects only <256 unsinged integer, "
                            "but got '"

@@ -149,6 +149,11 @@ public:
         // Nothing to do, because the main process is done in
         // nt::TaskDFF<Bit>::tick().
     }
+
+    void getOutput(DataHolder& h) override
+    {
+        h.setBit(&output());
+    }
 };
 
 class TaskROM : public TaskCommon<Bit> {
@@ -496,6 +501,19 @@ void Frontend::makeResPacket(PlainPacket& out, const TaskFinder& finder,
         if (bits.size() < atPortBit + 1)
             bits.resize(atPortBit + 1);
         bits.at(atPortBit) = dh.getBit();
+    }
+
+    // Get values of RAM
+    for (auto&& ram : bp_.builtinRAMs()) {
+        std::vector<Bit>& dst = out.ram[ram.name];
+        dst.clear();
+        for (size_t i = 0; i < (1 << ram.inAddrWidth) * ram.outRdataWidth;
+             i++) {
+            ConfigName cname{ram.name, "ramdata", static_cast<int>(i)};
+            Task* t = finder.findByConfigName(cname);
+            t->getOutput(dh);
+            dst.push_back(dh.getBit());
+        }
     }
 }
 
@@ -1017,28 +1035,26 @@ void test0()
         assert(got == expectedOutPkt);
     }
 
-    /*
-        {
-            auto inPkt = PlainPacket::fromTOML("test/in/test08.in"),
-                 expectedOutPkt = PlainPacket::fromTOML("test/out/test08.out");
-            writePlainPacket("_test_in", inPkt);
+    {
+        auto inPkt = PlainPacket::fromTOML("test/in/test08.in"),
+             expectedOutPkt = PlainPacket::fromTOML("test/out/test08.out");
+        writePlainPacket("_test_in", inPkt);
 
-            Allocator alc;
-            Frontend frontend{
-                RunParameter{
-                    "test/config-toml/ram-8-16-16.toml",  // blueprintFile
-                    "_test_in",                           // inputFile
-                    "_test_out",                          // outputFile
-                    2,                                    // numCPUWorkers
-                    8,                                    // numCycles
-                    SCHED::RANKU,                         // sched
-                },
-                alc};
-            frontend.run();
-            PlainPacket got = readPlainPacket("_test_out");
-            assert(got == expectedOutPkt);
-        }
-        */
+        Allocator alc;
+        Frontend frontend{
+            RunParameter{
+                "test/config-toml/ram-8-16-16.toml",  // blueprintFile
+                "_test_in",                           // inputFile
+                "_test_out",                          // outputFile
+                2,                                    // numCPUWorkers
+                8,                                    // numCycles
+                SCHED::RANKU,                         // sched
+            },
+            alc};
+        frontend.run();
+        PlainPacket got = readPlainPacket("_test_out");
+        assert(got == expectedOutPkt);
+    }
 }
 
 }  // namespace plain

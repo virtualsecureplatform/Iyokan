@@ -111,7 +111,7 @@ public:
     // tick() resets the internal state of the task for the next cycle
     virtual void tick();
 
-    // Get output value. Only available for output gates.
+    // Get output value. Only available for output and DFF gates.
     virtual void getOutput(DataHolder&);
 
     // Set input value. Only available for input gates.

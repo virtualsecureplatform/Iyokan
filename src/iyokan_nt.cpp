@@ -420,7 +420,8 @@ namespace {
 
 void make1bitRAMWithMUX(const std::string& nodeName,
                         const std::vector<UID>& addrInputs, UID wrenInput,
-                        size_t indexWRdata, NetworkBuilder& nb)
+                        size_t dataWidth, size_t indexWRdata,
+                        NetworkBuilder& nb)
 {
     /*
         wdata[indexWRdata]
@@ -506,7 +507,7 @@ void make1bitRAMWithMUX(const std::string& nodeName,
                                    sel
          */
         UID sel = workingIds.at(addr), mux = nb.MUX(),
-            ram = nb.RAM(nodeName, "ramdata", addr * inAddrWidth + indexWRdata);
+            ram = nb.RAM(nodeName, "ramdata", addr * dataWidth + indexWRdata);
         nb.connect(ram, mux);
         nb.connect(wdataInput, mux);
         nb.connect(sel, mux);
@@ -587,7 +588,8 @@ void makeMUXRAM(const blueprint::BuiltinRAM& ram, NetworkBuilder& nb)
 
     // Create 1bitRAMs
     for (size_t i = 0; i < ram.outRdataWidth; i++) {
-        make1bitRAMWithMUX(ram.name, addrInputs, wrenInput, i, nb);
+        make1bitRAMWithMUX(ram.name, addrInputs, wrenInput, ram.outRdataWidth,
+                           i, nb);
     }
 }
 
