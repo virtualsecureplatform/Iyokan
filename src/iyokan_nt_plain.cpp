@@ -990,6 +990,40 @@ void test0()
         PlainPacket got = readPlainPacket("_test_out");
         assert(got == expectedOutPkt);
     }
+
+    {
+        // Prepare the input packet
+        PlainPacket inPkt{
+            {},            // ram
+            {},            // rom
+            {},            // bits
+            std::nullopt,  // numCycles
+        };
+        writePlainPacket("_test_in", inPkt);
+
+        // Prepare the expected output packet
+        PlainPacket expectedOutPkt{
+            {},                                       // ram
+            {},                                       // rom
+            {{"out", /* 2 */ {0_b, 1_b, 0_b, 0_b}}},  // bits
+            3,                                        // numCycles
+        };
+
+        Allocator alc;
+        Frontend frontend{
+            RunParameter{
+                "test/config-toml/counter-4bit.toml",  // blueprintFile
+                "_test_in",                            // inputFile
+                "_test_out",                           // outputFile
+                2,                                     // numCPUWorkers
+                3,                                     // numCycles
+                SCHED::RANKU,                          // sched
+            },
+            alc};
+        frontend.run();
+        PlainPacket got = readPlainPacket("_test_out");
+        assert(got == expectedOutPkt);
+    }
 }
 
 }  // namespace plain
