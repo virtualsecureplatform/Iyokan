@@ -354,57 +354,29 @@ public:
     }
 };
 
-enum class SCHED {
-    TOPO,
-    RANKU,
-};
-
-struct RunParameter {
-    std::string blueprintFile, inputFile, outputFile;
-    int numCPUWorkers, numCycles;
-    SCHED sched;
-
-    void print() const
-    {
-        LOG_S(INFO) << "Run parameters";
-        LOG_S(INFO) << "\tMode: plain";
-        LOG_S(INFO) << "\tBlueprint: " << blueprintFile;
-        LOG_S(INFO) << "\t# of CPU Workers: " << numCPUWorkers;
-        LOG_S(INFO) << "\t# of cycles: " << numCycles;
-        LOG_S(INFO) << "\tInput file (request packet): " << inputFile;
-        LOG_S(INFO) << "\tOutput file (result packet): " << outputFile;
-        LOG_S(INFO) << "\tSchedule: "
-                    << (sched == SCHED::TOPO ? "topo" : "ranku");
-    }
-};
-
-class Frontend {
+class Frontend : public nt::Frontend {
 private:
-    RunParameter pr_;
-    std::optional<Network> network_;
     PlainPacket reqPacket_;
-    int currentCycle_;
-    nt::Blueprint bp_;
 
 private:
-    void makeResPacket(PlainPacket& out, const TaskFinder& finder,
-                       int numCycles);
+    void setBit0(DataHolder& dh) override;
+    void setBit1(DataHolder& dh) override;
+    void dumpResPacket(const std::string& outpath, const TaskFinder& finder,
+                       int numCycles) override;
+    std::vector<std::unique_ptr<nt::Worker>> makeWorkers() override;
 
 public:
     Frontend(const RunParameter& pr, Allocator& alc);
-    void run();
 };
 
 Frontend::Frontend(const RunParameter& pr, Allocator& alc)
-    : pr_(pr),
-      network_(std::nullopt),
-      reqPacket_(readPlainPacket(pr_.inputFile)),
-      currentCycle_(0),
-      bp_(pr_.blueprintFile)
+    : nt::Frontend(pr), reqPacket_(readPlainPacket(pr.inputFile))
 {
+    const Blueprint& bp = blueprint();
+
     // Create map from ConfigName to InputSource
     std::map<ConfigName, InputSource> cname2isource;
-    for (auto&& [key, port] : bp_.atPorts()) {
+    for (auto&& [key, port] : bp.atPorts()) {
         // Find only inputs, that is, "[connect] ... = @..."
         if (port.kind != Label::INPUT)
             continue;
@@ -423,70 +395,40 @@ Frontend::Frontend(const RunParameter& pr, Allocator& alc)
             ERR_DIE("@reset cannot be set by user's input");
 
         // Add a new entry to cname2isource
-        InputSource s{bp_.atPortWidths().at(atPortName), atPortBit,
-                      &it->second};
+        InputSource s{bp.atPortWidths().at(atPortName), atPortBit, &it->second};
         cname2isource.emplace(port.cname, s);
     }
 
+    // Build the network. The instance is in nt::Frontend
     NetworkBuilder nb{cname2isource, reqPacket_, alc};
-
-    // [[file]]
-    for (auto&& file : bp_.files())
-        readNetworkFromFile(file, nb);
-
-    // [[builtin]] type = ram | type = mux-ram
-    for (auto&& ram : bp_.builtinRAMs()) {
-        // We ignore ram.type and always use mux-ram in plaintext mode.
-        makeMUXRAM(ram, nb);
-    }
-
-    // [[builtin]] type = rom | type = mux-rom
-    for (auto&& rom : bp_.builtinROMs()) {
-        // We ignore rom.type and always use mux-rom in plaintext mode.
-        makeMUXROM(rom, nb);
-    }
-
-    auto get = [&](const blueprint::Port& port) -> Task* {
-        Task* task = nb.finder().findByConfigName(port.cname);
-        if (task->label().kind != port.kind)
-            ERR_DIE("Invalid port: " << port.cname << " is "
-                                     << task->label().kind << ", not "
-                                     << port.kind);
-        return task;
-    };
-
-    // [connect]
-    // We need to treat "... = @..." and "@... = ..." differently from
-    // "..." = ...".
-    // First, check if ports that are connected to or from "@..." exist.
-    for (auto&& [key, port] : bp_.atPorts()) {
-        get(port);  // Only checks if port exists
-    }
-    // Then, connect other ports. `get` checks if they also exist.
-    for (auto&& [src, dst] : bp_.edges()) {
-        assert(src.kind == Label::OUTPUT);
-        assert(dst.kind == Label::INPUT);
-        nb.connect(get(src)->label().uid, get(dst)->label().uid);
-    }
-
-    // Set priority to each DepNode
-    // FIXME
-
-    network_.emplace(nb.createNetwork());
-    // FIXME check if network is valid
+    buildNetwork(nb);
 }
 
-void Frontend::makeResPacket(PlainPacket& out, const TaskFinder& finder,
-                             int numCycles)
+void Frontend::setBit0(DataHolder& dh)
+{
+    static const Bit bit0 = 0_b;
+    dh.setBit(&bit0);
+}
+
+void Frontend::setBit1(DataHolder& dh)
+{
+    static const Bit bit1 = 1_b;
+    dh.setBit(&bit1);
+}
+
+void Frontend::dumpResPacket(const std::string& outpath,
+                             const TaskFinder& finder, int numCycles)
 {
     DataHolder dh;
+    PlainPacket out;
+    const Blueprint& bp = blueprint();
 
     // Set the current number of cycles
     out.numCycles = numCycles;
 
     // Get values of output @port
     out.bits.clear();
-    for (auto&& [key, port] : bp_.atPorts()) {
+    for (auto&& [key, port] : bp.atPorts()) {
         // Find "[connect] @atPortName[atPortBit] = ..."
         if (port.kind != Label::OUTPUT)
             continue;
@@ -504,7 +446,7 @@ void Frontend::makeResPacket(PlainPacket& out, const TaskFinder& finder,
     }
 
     // Get values of RAM
-    for (auto&& ram : bp_.builtinRAMs()) {
+    for (auto&& ram : bp.builtinRAMs()) {
         std::vector<Bit>& dst = out.ram[ram.name];
         dst.clear();
         for (size_t i = 0; i < (1 << ram.inAddrWidth) * ram.outRdataWidth;
@@ -515,63 +457,18 @@ void Frontend::makeResPacket(PlainPacket& out, const TaskFinder& finder,
             dst.push_back(dh.getBit());
         }
     }
+
+    // Dump the result packet
+    writePlainPacket(outpath, out);
 }
 
-void Frontend::run()
+std::vector<std::unique_ptr<nt::Worker>> Frontend::makeWorkers()
 {
-    const Bit bit0 = 0_b, bit1 = 1_b;
-
-    // Create workers
+    const RunParameter& pr = runParam();
     std::vector<std::unique_ptr<nt::Worker>> workers;
-    for (size_t i = 0; i < pr_.numCPUWorkers; i++)
+    for (size_t i = 0; i < pr.numCPUWorkers; i++)
         workers.emplace_back(std::make_unique<Worker>());
-
-    // Create runner and finder for the network
-    NetworkRunner runner{std::move(network_.value()), std::move(workers)};
-    network_ = std::nullopt;
-    const TaskFinder& finder = runner.network().finder();
-
-    // Process reset cycle if @reset is used
-    // FIXME: Add support for --skip-reset flag
-    if (auto reset = bp_.at("reset"); reset && reset->kind == Label::INPUT) {
-        Task* t = finder.findByConfigName(reset->cname);
-        t->setInput(&bit1);  // Set reset on
-        runner.run();
-        t->setInput(&bit0);  // Set reset off
-    }
-
-    // Process normal cycles
-    for (size_t i = 0; i < pr_.numCycles; i++) {
-        // Mount new values to DFFs
-        runner.tick();
-
-        // Set new input data. If i is equal to 0, it also mounts initial data
-        // to RAMs.
-        runner.onAfterTick(i);
-
-        // Go computing of each gate
-        runner.run();
-
-        /*
-        // Debug printing of all the gates
-        runner.network().eachTask([&](Task* t) {
-            TaskCommon<Bit>* p = dynamic_cast<TaskCommon<Bit>*>(t);
-            if (p == nullptr)
-                return;
-            const Label& l = t->label();
-            if (t->label().cname)
-                LOG_DBG << l.kind << "\t" << *l.cname << "\t"
-                        << p->DEBUG_output();
-            else
-                LOG_DBG << l.kind << "\t" << p->DEBUG_output();
-        });
-        */
-    }
-
-    // Dump result packet
-    PlainPacket resPacket;
-    makeResPacket(resPacket, finder, pr_.numCycles);
-    writePlainPacket(pr_.outputFile, resPacket);
+    return workers;
 }
 
 /**************************************************/

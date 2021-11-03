@@ -472,6 +472,50 @@ public:
     const std::unordered_map<std::string, int>& atPortWidths() const;
 };
 
+enum class SCHED {
+    TOPO,
+    RANKU,
+};
+
+struct RunParameter {
+    std::string blueprintFile, inputFile, outputFile;
+    int numCPUWorkers, numCycles;
+    SCHED sched;
+
+    void print() const;
+};
+
+class Frontend {
+private:
+    RunParameter pr_;
+    std::optional<Network> network_;
+    int currentCycle_;
+    Blueprint bp_;
+
+protected:
+    virtual void setBit0(DataHolder& dh) = 0;
+    virtual void setBit1(DataHolder& dh) = 0;
+    virtual void dumpResPacket(const std::string& outpath,
+                               const TaskFinder& finder, int numCycles) = 0;
+    virtual std::vector<std::unique_ptr<nt::Worker>> makeWorkers() = 0;
+
+    void buildNetwork(NetworkBuilder& nb);
+    const RunParameter& runParam() const
+    {
+        return pr_;
+    }
+    const Blueprint& blueprint() const
+    {
+        return bp_;
+    }
+
+public:
+    Frontend(const RunParameter& pr);
+    virtual ~Frontend();
+
+    void run();
+};
+
 void readNetworkFromFile(const blueprint::File& file, NetworkBuilder& nb);
 void makeMUXROM(const blueprint::BuiltinROM& rom, NetworkBuilder& nb);
 void makeMUXRAM(const blueprint::BuiltinRAM& ram, NetworkBuilder& nb);

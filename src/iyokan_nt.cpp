@@ -1,4 +1,5 @@
 #include "iyokan_nt.hpp"
+#include "dataholder_nt.hpp"
 #include "error_nt.hpp"
 
 #include <cassert>
@@ -335,6 +336,134 @@ void NetworkRunner::tick()
 void NetworkRunner::onAfterTick(size_t currentCycle)
 {
     network_.eachTask([&](Task* task) { task->onAfterTick(currentCycle); });
+}
+
+/* struct RunParameter */
+
+void RunParameter::print() const
+{
+    LOG_S(INFO) << "Run parameters";
+    LOG_S(INFO) << "\tMode: plain";
+    LOG_S(INFO) << "\tBlueprint: " << blueprintFile;
+    LOG_S(INFO) << "\t# of CPU Workers: " << numCPUWorkers;
+    LOG_S(INFO) << "\t# of cycles: " << numCycles;
+    LOG_S(INFO) << "\tInput file (request packet): " << inputFile;
+    LOG_S(INFO) << "\tOutput file (result packet): " << outputFile;
+    LOG_S(INFO) << "\tSchedule: " << (sched == SCHED::TOPO ? "topo" : "ranku");
+}
+
+/* class Frontend */
+
+Frontend::Frontend(const RunParameter& pr)
+    : pr_(pr), network_(std::nullopt), currentCycle_(0), bp_(pr_.blueprintFile)
+{
+}
+
+void Frontend::buildNetwork(NetworkBuilder& nb)
+{
+    // [[file]]
+    for (auto&& file : bp_.files())
+        readNetworkFromFile(file, nb);
+
+    // [[builtin]] type = ram | type = mux-ram
+    for (auto&& ram : bp_.builtinRAMs()) {
+        // We ignore ram.type and always use mux-ram in plaintext mode.
+        makeMUXRAM(ram, nb);
+    }
+
+    // [[builtin]] type = rom | type = mux-rom
+    for (auto&& rom : bp_.builtinROMs()) {
+        // We ignore rom.type and always use mux-rom in plaintext mode.
+        makeMUXROM(rom, nb);
+    }
+
+    auto get = [&](const blueprint::Port& port) -> Task* {
+        Task* task = nb.finder().findByConfigName(port.cname);
+        if (task->label().kind != port.kind)
+            ERR_DIE("Invalid port: " << port.cname << " is "
+                                     << task->label().kind << ", not "
+                                     << port.kind);
+        return task;
+    };
+
+    // [connect]
+    // We need to treat "... = @..." and "@... = ..." differently from
+    // "..." = ...".
+    // First, check if ports that are connected to or from "@..." exist.
+    for (auto&& [key, port] : bp_.atPorts()) {
+        get(port);  // Only checks if port exists
+    }
+    // Then, connect other ports. `get` checks if they also exist.
+    for (auto&& [src, dst] : bp_.edges()) {
+        assert(src.kind == Label::OUTPUT);
+        assert(dst.kind == Label::INPUT);
+        nb.connect(get(src)->label().uid, get(dst)->label().uid);
+    }
+
+    // Set priority to each DepNode
+    // FIXME
+
+    network_.emplace(nb.createNetwork());
+    // FIXME check if network is valid
+}
+
+Frontend::~Frontend()
+{
+}
+
+void Frontend::run()
+{
+    DataHolder bit0, bit1;
+    setBit0(bit0);
+    setBit1(bit1);
+
+    // Create workers
+    std::vector<std::unique_ptr<nt::Worker>> workers = makeWorkers();
+
+    // Create runner and finder for the network
+    NetworkRunner runner{std::move(network_.value()), std::move(workers)};
+    network_ = std::nullopt;
+    const TaskFinder& finder = runner.network().finder();
+
+    // Process reset cycle if @reset is used
+    // FIXME: Add support for --skip-reset flag
+    if (auto reset = bp_.at("reset"); reset && reset->kind == Label::INPUT) {
+        Task* t = finder.findByConfigName(reset->cname);
+        t->setInput(bit1);  // Set reset on
+        runner.run();
+        t->setInput(bit0);  // Set reset off
+    }
+
+    // Process normal cycles
+    for (size_t i = 0; i < pr_.numCycles; i++) {
+        // Mount new values to DFFs
+        runner.tick();
+
+        // Set new input data. If i is equal to 0, it also mounts initial data
+        // to RAMs.
+        runner.onAfterTick(i);
+
+        // Go computing of each gate
+        runner.run();
+
+        /*
+        // Debug printing of all the gates
+        runner.network().eachTask([&](Task* t) {
+            TaskCommon<Bit>* p = dynamic_cast<TaskCommon<Bit>*>(t);
+            if (p == nullptr)
+                return;
+            const Label& l = t->label();
+            if (t->label().cname)
+                LOG_DBG << l.kind << "\t" << *l.cname << "\t"
+                        << p->DEBUG_output();
+            else
+                LOG_DBG << l.kind << "\t" << p->DEBUG_output();
+        });
+        */
+    }
+
+    // Dump result packet
+    dumpResPacket(pr_.outputFile, finder, pr_.numCycles);
 }
 
 /* makeMUXROM */
