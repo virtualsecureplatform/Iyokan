@@ -973,9 +973,9 @@ void test0()
         assert(dh.getBit() == 1_b);
     }
 
-    auto go = [&](const std::string& inPktPath,
-                  const std::string& expectedOutPktPath,
-                  const std::string& blueprintPath, int numCycles) {
+    auto go = [&](const std::string& blueprintPath,
+                  const std::string& inPktPath,
+                  const std::string& expectedOutPktPath, int numCycles) {
         const char* const reqPktPath = "_test_in";
         const char* const resPktPath = "_test_out";
 
@@ -998,14 +998,28 @@ void test0()
         assert(got == expectedOutPkt);
     };
 
-    go("test/in/test04.in", "test/out/test04.out",
-       "test/config-toml/addr-4bit.toml", 1);
-    go("test/in/test13.in", "test/out/test13.out",
-       "test/config-toml/counter-4bit.toml", 3);
-    go("test/in/test15.in", "test/out/test15.out",
-       "test/config-toml/rom-4-8.toml", 1);
-    go("test/in/test08.in", "test/out/test08.out",
-       "test/config-toml/ram-8-16-16.toml", 8);
+    go("test/config-toml/const-4bit.toml", "test/in/test22.in",
+       "test/out/test22.out", 1);
+    go("test/config-toml/addr-4bit.toml", "test/in/test04.in",
+       "test/out/test04.out", 1);
+    go("test/config-toml/pass-addr-pass-4bit.toml", "test/in/test04.in",
+       "test/out/test04.out", 1);
+    go("test/config-toml/addr-register-4bit.toml", "test/in/test16.in",
+       "test/out/test16.out", 3);
+    go("test/config-toml/div-8bit.toml", "test/in/test05.in",
+       "test/out/test05.out", 1);
+    go("test/config-toml/ram-addr8bit.toml", "test/in/test06.in",
+       "test/out/test06.out", 16);
+    go("test/config-toml/ram-addr9bit.toml", "test/in/test07.in",
+       "test/out/test07.out", 16);
+    go("test/config-toml/ram-8-16-16.toml", "test/in/test08.in",
+       "test/out/test08.out", 8);
+    go("test/config-toml/rom-4-8.toml", "test/in/test15.in",
+       "test/out/test15.out", 1);
+    go("test/config-toml/counter-4bit.toml", "test/in/test13.in",
+       "test/out/test13.out", 3);
+    go("test/config-toml/cahp-ruby.toml", "test/in/test09.in",
+       "test/out/test09-ruby.out", 7);
 }
 
 }  // namespace plain
