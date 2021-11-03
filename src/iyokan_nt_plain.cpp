@@ -5,14 +5,6 @@
 
 #include <fstream>
 
-template <class T1, class T2>
-std::string fok2(T1 t1, T2 t2)
-{
-    std::stringstream ss;
-    ss << t1 << t2;
-    return ss.str();
-}
-
 namespace nt {
 namespace plain {
 
