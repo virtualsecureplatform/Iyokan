@@ -973,88 +973,39 @@ void test0()
         assert(dh.getBit() == 1_b);
     }
 
-    {
-        auto inPkt = PlainPacket::fromTOML("test/in/test04.in"),
-             expectedOutPkt = PlainPacket::fromTOML("test/out/test04.out");
-        writePlainPacket("_test_in", inPkt);
+    auto go = [&](const std::string& inPktPath,
+                  const std::string& expectedOutPktPath,
+                  const std::string& blueprintPath, int numCycles) {
+        const char* const reqPktPath = "_test_in";
+        const char* const resPktPath = "_test_out";
 
-        Allocator alc;
-        Frontend frontend{
-            RunParameter{
-                "test/config-toml/addr-4bit.toml",  // blueprintFile
-                "_test_in",                         // inputFile
-                "_test_out",                        // outputFile
-                2,                                  // numCPUWorkers
-                1,                                  // numCycles
-                SCHED::RANKU,                       // sched
-            },
-            alc};
-        frontend.run();
-        PlainPacket got = readPlainPacket("_test_out");
-        assert(got == expectedOutPkt);
-    }
-
-    {
-        auto inPkt = PlainPacket::fromTOML("test/in/test13.in"),
-             expectedOutPkt = PlainPacket::fromTOML("test/out/test13.out");
-        writePlainPacket("_test_in", inPkt);
-
-        Allocator alc;
-        Frontend frontend{
-            RunParameter{
-                "test/config-toml/counter-4bit.toml",  // blueprintFile
-                "_test_in",                            // inputFile
-                "_test_out",                           // outputFile
-                2,                                     // numCPUWorkers
-                3,                                     // numCycles
-                SCHED::RANKU,                          // sched
-            },
-            alc};
-        frontend.run();
-        PlainPacket got = readPlainPacket("_test_out");
-        assert(got == expectedOutPkt);
-    }
-
-    {
-        auto inPkt = PlainPacket::fromTOML("test/in/test15.in"),
-             expectedOutPkt = PlainPacket::fromTOML("test/out/test15.out");
-        writePlainPacket("_test_in", inPkt);
+        auto inPkt = PlainPacket::fromTOML(inPktPath),
+             expectedOutPkt = PlainPacket::fromTOML(expectedOutPktPath);
+        writePlainPacket(reqPktPath, inPkt);
 
         Allocator alc;
         Frontend frontend{RunParameter{
-                              "test/config-toml/rom-4-8.toml",  // blueprintFile
-                              "_test_in",                       // inputFile
-                              "_test_out",                      // outputFile
-                              2,                                // numCPUWorkers
-                              1,                                // numCycles
-                              SCHED::RANKU,                     // sched
+                              blueprintPath,  // blueprintFile
+                              reqPktPath,     // inputFile
+                              resPktPath,     // outputFile
+                              2,              // numCPUWorkers
+                              numCycles,      // numCycles
+                              SCHED::RANKU,   // sched
                           },
                           alc};
         frontend.run();
-        PlainPacket got = readPlainPacket("_test_out");
+        PlainPacket got = readPlainPacket(resPktPath);
         assert(got == expectedOutPkt);
-    }
+    };
 
-    {
-        auto inPkt = PlainPacket::fromTOML("test/in/test08.in"),
-             expectedOutPkt = PlainPacket::fromTOML("test/out/test08.out");
-        writePlainPacket("_test_in", inPkt);
-
-        Allocator alc;
-        Frontend frontend{
-            RunParameter{
-                "test/config-toml/ram-8-16-16.toml",  // blueprintFile
-                "_test_in",                           // inputFile
-                "_test_out",                          // outputFile
-                2,                                    // numCPUWorkers
-                8,                                    // numCycles
-                SCHED::RANKU,                         // sched
-            },
-            alc};
-        frontend.run();
-        PlainPacket got = readPlainPacket("_test_out");
-        assert(got == expectedOutPkt);
-    }
+    go("test/in/test04.in", "test/out/test04.out",
+       "test/config-toml/addr-4bit.toml", 1);
+    go("test/in/test13.in", "test/out/test13.out",
+       "test/config-toml/counter-4bit.toml", 3);
+    go("test/in/test15.in", "test/out/test15.out",
+       "test/config-toml/rom-4-8.toml", 1);
+    go("test/in/test08.in", "test/out/test08.out",
+       "test/config-toml/ram-8-16-16.toml", 8);
 }
 
 }  // namespace plain
