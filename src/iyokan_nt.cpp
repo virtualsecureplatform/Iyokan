@@ -1,4 +1,5 @@
 #include "iyokan_nt.hpp"
+#include "blueprint.hpp"
 #include "dataholder_nt.hpp"
 #include "error_nt.hpp"
 
@@ -7,27 +8,6 @@
 #include <algorithm>
 
 namespace nt {
-
-/* struct ConfigName */
-std::ostream& operator<<(std::ostream& os, const ConfigName& c)
-{
-    os << c.nodeName << "/" << c.portName << "[" << c.portBit << "]";
-    return os;
-}
-
-bool operator<(const ConfigName& lhs, const ConfigName& rhs)
-{
-    if (int res = lhs.nodeName.compare(rhs.nodeName); res != 0)
-        return res < 0;
-    if (int res = lhs.portName.compare(rhs.portName); res != 0)
-        return res < 0;
-    return lhs.portBit < rhs.portBit;
-}
-
-/* struct Label */
-// Initialization of static variables.
-const char* const Label::INPUT = "Input";
-const char* const Label::OUTPUT = "Output";
 
 /* class Allocator */
 
@@ -355,24 +335,29 @@ void RunParameter::print() const
 /* class Frontend */
 
 Frontend::Frontend(const RunParameter& pr)
-    : pr_(pr), network_(std::nullopt), currentCycle_(0), bp_(pr_.blueprintFile)
+    : pr_(pr),
+      network_(std::nullopt),
+      currentCycle_(0),
+      bp_(std::make_unique<Blueprint>(pr_.blueprintFile))
 {
 }
 
 void Frontend::buildNetwork(NetworkBuilder& nb)
 {
+    const Blueprint& bp = blueprint();
+
     // [[file]]
-    for (auto&& file : bp_.files())
+    for (auto&& file : bp.files())
         readNetworkFromFile(file, nb);
 
     // [[builtin]] type = ram | type = mux-ram
-    for (auto&& ram : bp_.builtinRAMs()) {
+    for (auto&& ram : bp.builtinRAMs()) {
         // We ignore ram.type and always use mux-ram in plaintext mode.
         makeMUXRAM(ram, nb);
     }
 
     // [[builtin]] type = rom | type = mux-rom
-    for (auto&& rom : bp_.builtinROMs()) {
+    for (auto&& rom : bp.builtinROMs()) {
         // We ignore rom.type and always use mux-rom in plaintext mode.
         makeMUXROM(rom, nb);
     }
@@ -390,11 +375,11 @@ void Frontend::buildNetwork(NetworkBuilder& nb)
     // We need to treat "... = @..." and "@... = ..." differently from
     // "..." = ...".
     // First, check if ports that are connected to or from "@..." exist.
-    for (auto&& [key, port] : bp_.atPorts()) {
+    for (auto&& [key, port] : bp.atPorts()) {
         get(port);  // Only checks if port exists
     }
     // Then, connect other ports. `get` checks if they also exist.
-    for (auto&& [src, dst] : bp_.edges()) {
+    for (auto&& [src, dst] : bp.edges()) {
         assert(src.kind == Label::OUTPUT);
         assert(dst.kind == Label::INPUT);
         nb.connect(get(src)->label().uid, get(dst)->label().uid);
@@ -413,6 +398,8 @@ Frontend::~Frontend()
 
 void Frontend::run()
 {
+    const Blueprint& bp = blueprint();
+
     DataHolder bit0, bit1;
     setBit0(bit0);
     setBit1(bit1);
@@ -427,7 +414,7 @@ void Frontend::run()
 
     // Process reset cycle if @reset is used
     // FIXME: Add support for --skip-reset flag
-    if (auto reset = bp_.at("reset"); reset && reset->kind == Label::INPUT) {
+    if (auto reset = bp.at("reset"); reset && reset->kind == Label::INPUT) {
         Task* t = finder.findByConfigName(reset->cname);
         t->setInput(bit1);  // Set reset on
         runner.run();

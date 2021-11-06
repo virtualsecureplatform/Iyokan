@@ -1,4 +1,5 @@
 #include "iyokan_nt_plain.hpp"
+#include "blueprint.hpp"
 #include "dataholder_nt.hpp"
 #include "iyokan_nt.hpp"
 #include "packet_nt.hpp"

@@ -13,6 +13,7 @@
 #include <vector>
 
 #include "error_nt.hpp"
+#include "label.hpp"
 
 namespace nt {
 
@@ -21,6 +22,12 @@ namespace plain {
 class WorkerInfo;
 }
 class DataHolder;
+class Blueprint;
+namespace blueprint {
+class File;
+class BuiltinROM;
+class BuiltinRAM;
+}  // namespace blueprint
 
 class Allocator {
 public:
@@ -47,39 +54,6 @@ public:
         T* ret = std::any_cast<T>(data_.at(index).get());
         assert(ret != nullptr);
         return ret;
-    }
-};
-
-using UID = uint64_t;
-struct ConfigName {
-    std::string nodeName, portName;
-    int portBit;
-
-    // Although all member variables of ConfigName are public, we make
-    // operator<< and operator< its friend function for clarity.
-    friend std::ostream& operator<<(std::ostream& os, const ConfigName& c);
-    friend bool operator<(const ConfigName& lhs, const ConfigName& rhs);
-};
-
-struct Label {
-    // String literals for member variable `kind`.
-    // If label is for inputs or outputs, these member variable must be used,
-    // that is, kind == Label::INPUT or kind == Label::OUTPUT.
-    // The instances of these variables exist in iyokan_nt.cpp.
-    // We CANNOT use (C++17) `inline` here, because `inline` does NOT guarantee
-    // that these variables have the same value in different compilation units
-    // (FIXME: This behaviour is confirmed only on g++-10. We need to check the
-    // C++ standard).
-    static const char* const INPUT;
-    static const char* const OUTPUT;
-
-    UID uid;
-    const char* const kind;  // Stores a string literal
-    std::optional<ConfigName> cname;
-
-    Label(UID uid, const char* const kind, std::optional<ConfigName> cname)
-        : uid(uid), kind(kind), cname(std::move(cname))
-    {
     }
 };
 
@@ -405,73 +379,6 @@ public:
     void onAfterTick(size_t currentCycle);
 };
 
-namespace blueprint {  // blueprint components
-struct File {
-    enum class TYPE {
-        IYOKANL1_JSON,
-        YOSYS_JSON,
-    } type;
-    std::string path, name;
-};
-
-struct BuiltinROM {
-    enum class TYPE {
-        CMUX_MEMORY,
-        MUX,
-    } type;
-    std::string name;
-    size_t inAddrWidth, outRdataWidth;
-};
-
-struct BuiltinRAM {
-    enum class TYPE {
-        CMUX_MEMORY,
-        MUX,
-    } type;
-    std::string name;
-    size_t inAddrWidth, inWdataWidth, outRdataWidth;
-};
-
-struct Port {
-    const char* kind;  // Store a string literal
-    ConfigName cname;
-};
-}  // namespace blueprint
-
-class Blueprint {
-private:
-    std::string sourceFile_, source_;
-
-    std::vector<blueprint::File> files_;
-    std::vector<blueprint::BuiltinROM> builtinROMs_;
-    std::vector<blueprint::BuiltinRAM> builtinRAMs_;
-    std::vector<std::pair<blueprint::Port, blueprint::Port>> edges_;
-
-    std::map<std::tuple<std::string, int>, blueprint::Port> atPorts_;
-    std::unordered_map<std::string, int> atPortWidths_;
-
-private:
-    std::vector<blueprint::Port> parsePortString(const std::string& src,
-                                                 const char* const kind);
-
-public:
-    Blueprint(const std::string& fileName);
-
-    bool needsCircuitKey() const;
-    const std::string& sourceFile() const;
-    const std::string& source() const;
-    const std::vector<blueprint::File>& files() const;
-    const std::vector<blueprint::BuiltinROM>& builtinROMs() const;
-    const std::vector<blueprint::BuiltinRAM>& builtinRAMs() const;
-    const std::vector<std::pair<blueprint::Port, blueprint::Port>>& edges()
-        const;
-    const std::map<std::tuple<std::string, int>, blueprint::Port>& atPorts()
-        const;
-    std::optional<blueprint::Port> at(const std::string& portName,
-                                      int portBit = 0) const;
-    const std::unordered_map<std::string, int>& atPortWidths() const;
-};
-
 enum class SCHED {
     TOPO,
     RANKU,
@@ -490,7 +397,7 @@ private:
     RunParameter pr_;
     std::optional<Network> network_;
     int currentCycle_;
-    Blueprint bp_;
+    std::unique_ptr<Blueprint> bp_;
 
 protected:
     virtual void setBit0(DataHolder& dh) = 0;
@@ -506,7 +413,7 @@ protected:
     }
     const Blueprint& blueprint() const
     {
-        return bp_;
+        return *bp_;
     }
 
 public:

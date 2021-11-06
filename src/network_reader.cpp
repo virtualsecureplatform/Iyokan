@@ -1,3 +1,4 @@
+#include "blueprint.hpp"
 #include "iyokan_nt.hpp"
 
 #include <picojson.h>
