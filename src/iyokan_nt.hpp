@@ -35,28 +35,49 @@ public:
     using Index = size_t;
 
 private:
+    // Allocator can be constructed in 2 ways:
+    // - With no arguments. In this case, Allocator has empty data at first, and
+    //   make() really makes a new object. The member variable
+    //   hasLoadedFromIStream_ is false, and indexToBeMade_ is not used.
+    // - With snapshot file path. In this case, Allocator reads data from the
+    //   snapshot file, and make() returns data_[indexToBeMade_++]. The member
+    //   variable hasLoadedFromIStream_ is true, and indexToBeMade_ indicates
+    //   the next index of the data returned by make().
+    bool hasLoadedFromIStream_;
+    size_t indexToBeMade_;
+
+    // data_ has all the allocated objects in std::any.
     // We use std::deque here since push_back/emplace_back of std::deque do
     // not invalidate the address of its element, while ones of std::vector
     // do.
     std::deque<std::any> data_;
 
 public:
-    Allocator(/* optional snapshot file */);
+    Allocator();
+    Allocator(std::istream& is);
 
-    template <class T>
-    T* make()
-    {
-        std::any& v = data_.emplace_back();
-        return &v.emplace<T>();
-    }
+    void dumpSnapshot(std::ostream& os);
 
     template <class T>
     T* get(Index index)
     {
         assert(index < data_.size());
+        assert(!hasLoadedFromIStream_ || index < indexToBeMade_);
         T* ret = std::any_cast<T>(&data_.at(index));
         assert(ret != nullptr);
         return ret;
+    }
+
+    template <class T>
+    T* make()
+    {
+        if (hasLoadedFromIStream_) {
+            return std::any_cast<T>(&data_.at(indexToBeMade_++));
+        }
+        else {
+            std::any& v = data_.emplace_back();
+            return &v.emplace<T>();
+        }
     }
 };
 

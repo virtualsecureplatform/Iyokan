@@ -9,12 +9,6 @@
 
 namespace nt {
 
-/* class Allocator */
-
-Allocator::Allocator()
-{
-}
-
 /* class Task */
 
 Task::Task(Label label)

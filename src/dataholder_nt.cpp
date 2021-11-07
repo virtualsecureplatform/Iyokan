@@ -2,11 +2,12 @@
 
 namespace nt {
 
+/* class DataHolder */
 DataHolder::DataHolder() : dataBit_(nullptr), type_(TYPE::UND)
 {
 }
 
-DataHolder::DataHolder(const Bit *const dataBit)
+DataHolder::DataHolder(const Bit* const dataBit)
     : dataBit_(dataBit), type_(TYPE::BIT)
 {
 }
@@ -17,7 +18,7 @@ Bit DataHolder::getBit() const
     return *dataBit_;
 }
 
-void DataHolder::setBit(const Bit *const dataBit)
+void DataHolder::setBit(const Bit* const dataBit)
 {
     dataBit_ = dataBit;
     type_ = TYPE::BIT;

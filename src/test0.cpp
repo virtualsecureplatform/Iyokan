@@ -858,7 +858,10 @@
 
 #include "iyokan_nt.hpp"
 #include "iyokan_nt_plain.hpp"
+#include "packet_nt.hpp"
 #include "tfhepp_cufhe_wrapper.hpp"
+
+#include <fstream>
 
 class TFHEppTestHelper {
 private:
@@ -910,6 +913,7 @@ public:
 };
 
 namespace nt {
+
 void testAllocator()
 {
     {
@@ -941,6 +945,28 @@ void testAllocator()
             assert(*zero == TFHEppTestHelper::instance().zero());
             assert(*one == TFHEppTestHelper::instance().one());
         }
+    }
+}
+
+void testSnapshot()
+{
+    {
+        Allocator alc;
+        Bit* b0 = alc.make<Bit>();
+        *b0 = 0_b;
+        Bit* b1 = alc.make<Bit>();
+        *b1 = 1_b;
+
+        std::ofstream ofs{"_test_snapshot"};
+        assert(ofs);
+        alc.dumpSnapshot(ofs);
+    }
+    {
+        std::ifstream ifs{"_test_snapshot"};
+        assert(ifs);
+        Allocator alc{ifs};
+        assert(*alc.make<Bit>() == 0_b);
+        assert(*alc.make<Bit>() == 1_b);
     }
 }
 
