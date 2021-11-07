@@ -31,7 +31,7 @@ endif(IYOKAN_ENABLE_CUDA)
 
 ##### test0
 add_executable(test0
-    test0.cpp iyokan.cpp iyokan_plain.cpp iyokan_tfhepp.cpp error.cpp
+    test0.cpp
     iyokan_nt.cpp iyokan_nt_plain.cpp error_nt.cpp packet_nt.cpp dataholder_nt.cpp
     network_reader.cpp blueprint.cpp label.cpp
     ${CMAKE_CURRENT_BINARY_DIR}/mux-ram-8-8-8.o
@@ -43,11 +43,11 @@ target_compile_options(test0 PUBLIC "$<$<CONFIG:RELEASE>:${IYOKAN_CXXFLAGS_RELEA
 target_link_libraries(test0 ${IYOKAN_LIBS})
 target_include_directories(test0 PRIVATE ${IYOKAN_INCLUDE_DIRS})
 target_compile_definitions(test0 PRIVATE ${IYOKAN_COMPILE_DEFINITIONS})
-if (IYOKAN_ENABLE_CUDA)
-    target_sources(test0 PRIVATE iyokan_cufhe.cpp)
-    target_link_libraries(test0 cufhe_gpu ${CUDA_LIBRARIES})
-    target_compile_definitions(test0 PRIVATE IYOKAN_CUDA_ENABLED)
-endif(IYOKAN_ENABLE_CUDA)
+#if (IYOKAN_ENABLE_CUDA)
+#    target_sources(test0 PRIVATE iyokan_cufhe.cpp)
+#    target_link_libraries(test0 cufhe_gpu ${CUDA_LIBRARIES})
+#    target_compile_definitions(test0 PRIVATE IYOKAN_CUDA_ENABLED)
+#endif(IYOKAN_ENABLE_CUDA)
 
 ##### iyokan-packet
 add_executable(iyokan-packet iyokan-packet.cpp error.cpp)

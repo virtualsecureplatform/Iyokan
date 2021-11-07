@@ -5,6 +5,7 @@
 #include <cstdint>
 
 #include <any>
+#include <deque>
 #include <map>
 #include <memory>
 #include <queue>
@@ -34,7 +35,10 @@ public:
     using Index = size_t;
 
 private:
-    std::vector<std::unique_ptr<std::any>> data_;
+    // We use std::deque here since push_back/emplace_back of std::deque do
+    // not invalidate the address of its element, while ones of std::vector
+    // do.
+    std::deque<std::any> data_;
 
 public:
     Allocator(/* optional snapshot file */);
@@ -42,8 +46,7 @@ public:
     template <class T>
     T* make()
     {
-        data_.emplace_back(std::make_unique<std::any>());
-        std::any& v = *data_.back();
+        std::any& v = data_.emplace_back();
         return &v.emplace<T>();
     }
 
@@ -51,7 +54,7 @@ public:
     T* get(Index index)
     {
         assert(index < data_.size());
-        T* ret = std::any_cast<T>(data_.at(index).get());
+        T* ret = std::any_cast<T>(&data_.at(index));
         assert(ret != nullptr);
         return ret;
     }

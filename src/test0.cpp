@@ -1006,4 +1006,6 @@ int main()
     nt::testAllocator();
     nt::test0();
     nt::plain::test0();
+
+    return 0;
 }
