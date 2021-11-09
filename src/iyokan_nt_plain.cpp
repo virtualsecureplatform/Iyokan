@@ -358,12 +358,27 @@ private:
                        int numCycles) override;
     std::vector<std::unique_ptr<nt::Worker>> makeWorkers() override;
 
+    // Actual constructor.
+    void doConstruct();
+
 public:
     Frontend(const RunParameter& pr);
+    Frontend(const Snapshot& ss);
 };
 
 Frontend::Frontend(const RunParameter& pr)
     : nt::Frontend(pr), reqPacket_(readPlainPacket(runParam().inputFile))
+{
+    doConstruct();
+}
+
+Frontend::Frontend(const Snapshot& ss)
+    : nt::Frontend(ss), reqPacket_(readPlainPacket(runParam().inputFile))
+{
+    doConstruct();
+}
+
+void Frontend::doConstruct()
 {
     const Blueprint& bp = blueprint();
 
@@ -873,7 +888,7 @@ void test0()
              expectedOutPkt = PlainPacket::fromTOML(expectedOutPktPath);
         writePlainPacket(reqPktPath, inPkt);
 
-        Allocator alc;
+        LOG_DBG_SCOPE("go");
         Frontend frontend{RunParameter{
             blueprintPath,  // blueprintFile
             reqPktPath,     // inputFile
@@ -882,6 +897,7 @@ void test0()
             numCycles,      // numCycles
             0,              // currentCycle
             SCHED::RANKU,   // sched
+            std::nullopt,   // snapshotFile
         }};
         frontend.run();
         PlainPacket got = readPlainPacket(resPktPath);
@@ -911,100 +927,47 @@ void test0()
     go("test/config-toml/cahp-ruby.toml", "test/in/test09.in",
        "test/out/test09-ruby.out", 7);
 
-    {
-        Allocator alc;
-        NetworkBuilder nb{c2is, pkt, alc};
+    auto go_ss = [&](const std::string& blueprintPath,
+                     const std::string& inPktPath,
+                     const std::string& expectedOutPktPath, int numCycles) {
+        const char* const reqPktPath = "_test_in";
+        const char* const resPktPath = "_test_out";
+        const char* const snapshotPath = "_test_snapshot";
 
-        readNetworkFromFile(
-            blueprint::File{blueprint::File::TYPE::YOSYS_JSON,
-                            "test/yosys-json/counter-4bit-yosys.json",
-                            "counter"},
-            nb);
+        auto inPkt = PlainPacket::fromTOML(inPktPath),
+             expectedOutPkt = PlainPacket::fromTOML(expectedOutPktPath);
+        writePlainPacket(reqPktPath, inPkt);
 
-        std::vector<std::unique_ptr<nt::Worker>> workers;
-        workers.emplace_back(std::make_unique<Worker>());
+        int secondNumCycles = numCycles / 2,
+            firstNumCycles = numCycles - secondNumCycles;
 
-        NetworkRunner runner{nb.createNetwork(), std::move(workers)};
-        auto&& finder = runner.network().finder();
-        Task *tRst = finder.findByConfigName({"counter", "reset", 0}),
-             *tOut0 = finder.findByConfigName({"counter", "io_out", 0}),
-             *tOut1 = finder.findByConfigName({"counter", "io_out", 1}),
-             *tOut2 = finder.findByConfigName({"counter", "io_out", 2}),
-             *tOut3 = finder.findByConfigName({"counter", "io_out", 3});
+        {
+            LOG_DBG_SCOPE("go_ss 1st");
+            Frontend frontend{RunParameter{
+                blueprintPath,   // blueprintFile
+                reqPktPath,      // inputFile
+                resPktPath,      // outputFile
+                2,               // numCPUWorkers
+                firstNumCycles,  // numCycles
+                0,               // currentCycle
+                SCHED::RANKU,    // sched
+                snapshotPath,    // snapshotFile
+            }};
+            frontend.run();
+        }
+        {
+            LOG_DBG_SCOPE("go_ss 2nd");
+            Snapshot ss{snapshotPath};
+            ss.updateNumCycles(secondNumCycles);
+            Frontend frontend{ss};
+            frontend.run();
 
-        tRst->setInput(&bit1);
-        runner.run();
-        tRst->setInput(&bit0);
-
-        // Cycle #1
-        runner.tick();
-        runner.run();
-        // Cycle #2
-        runner.tick();
-        runner.run();
-        // Cycle #3
-        runner.tick();
-        runner.run();
-
-        // The output is 2, that is, '0b0010'
-        tOut0->getOutput(dh);
-        assert(dh.getBit() == 0_b);
-        tOut1->getOutput(dh);
-        assert(dh.getBit() == 1_b);
-        tOut2->getOutput(dh);
-        assert(dh.getBit() == 0_b);
-        tOut3->getOutput(dh);
-        assert(dh.getBit() == 0_b);
-
-        // Dump the snapshot
-        std::ofstream ofs{"_test_snapshot"};
-        assert(ofs);
-        alc.dumpAllocatedData(ofs);
-    }
-    {
-        // Load from the snapshot
-        std::ifstream ifs{"_test_snapshot"};
-        assert(ifs);
-        Allocator alc{ifs};
-
-        NetworkBuilder nb{c2is, pkt, alc};
-
-        readNetworkFromFile(
-            blueprint::File{blueprint::File::TYPE::YOSYS_JSON,
-                            "test/yosys-json/counter-4bit-yosys.json",
-                            "counter"},
-            nb);
-
-        std::vector<std::unique_ptr<nt::Worker>> workers;
-        workers.emplace_back(std::make_unique<Worker>());
-
-        NetworkRunner runner{nb.createNetwork(), std::move(workers)};
-        auto&& finder = runner.network().finder();
-        Task *tOut0 = finder.findByConfigName({"counter", "io_out", 0}),
-             *tOut1 = finder.findByConfigName({"counter", "io_out", 1}),
-             *tOut2 = finder.findByConfigName({"counter", "io_out", 2}),
-             *tOut3 = finder.findByConfigName({"counter", "io_out", 3});
-
-        // Cycle #4
-        runner.tick();
-        runner.run();
-        // Cycle #5
-        runner.tick();
-        runner.run();
-        // Cycle #6
-        runner.tick();
-        runner.run();
-
-        // The output is 5, that is, '0b0101'
-        tOut0->getOutput(dh);
-        assert(dh.getBit() == 1_b);
-        tOut1->getOutput(dh);
-        assert(dh.getBit() == 0_b);
-        tOut2->getOutput(dh);
-        assert(dh.getBit() == 1_b);
-        tOut3->getOutput(dh);
-        assert(dh.getBit() == 0_b);
-    }
+            PlainPacket got = readPlainPacket(resPktPath);
+            assert(got == expectedOutPkt);
+        }
+    };
+    go_ss("test/config-toml/counter-4bit.toml", "test/in/test13.in",
+          "test/out/test13.out", 3);
 }
 
 }  // namespace plain

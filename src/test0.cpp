@@ -861,6 +861,9 @@
 #include "packet_nt.hpp"
 #include "tfhepp_cufhe_wrapper.hpp"
 
+#include <cereal/archives/portable_binary.hpp>
+#include <cereal/cereal.hpp>
+
 #include <fstream>
 
 class TFHEppTestHelper {
@@ -959,12 +962,14 @@ void testSnapshot()
 
         std::ofstream ofs{"_test_snapshot"};
         assert(ofs);
-        alc.dumpAllocatedData(ofs);
+        cereal::PortableBinaryOutputArchive ar{ofs};
+        alc.dumpAllocatedData(ar);
     }
     {
         std::ifstream ifs{"_test_snapshot"};
         assert(ifs);
-        Allocator alc{ifs};
+        cereal::PortableBinaryInputArchive ar{ifs};
+        Allocator alc{ar};
         assert(*alc.make<Bit>() == 0_b);
         assert(*alc.make<Bit>() == 1_b);
     }

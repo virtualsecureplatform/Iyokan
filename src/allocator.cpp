@@ -57,11 +57,10 @@ Allocator::Allocator()
 {
 }
 
-Allocator::Allocator(std::istream& is)
+Allocator::Allocator(cereal::PortableBinaryInputArchive& ar)
     : hasLoadedFromIStream_(true), indexToBeMade_(0), data_()
 {
     // Read and de-serialize data from the snapshot file
-    cereal::PortableBinaryInputArchive ar{is};
     size_t size;
     Serializable buf;
 
@@ -81,12 +80,11 @@ Allocator::Allocator(std::istream& is)
     }
 }
 
-void Allocator::dumpAllocatedData(std::ostream& os) const
+void Allocator::dumpAllocatedData(cereal::PortableBinaryOutputArchive& ar) const
 {
     // FIXME: WE KNOW the code in this function is TREMENDOUSLY UGLY (and
     // inefficient). We need to find some more sophisticated ways to do this.
 
-    cereal::PortableBinaryOutputArchive ar{os};
     Serializable buf;
 
     // Serialization process for each type

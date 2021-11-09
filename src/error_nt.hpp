@@ -19,4 +19,6 @@ void initialize();
 
 #define ERR_UNREACHABLE ERR_DIE("Internal error: unreachable here")
 
+#define LOG_DBG_SCOPE(...) LOG_SCOPE_F(1, __VA_ARGS__);
+
 #endif

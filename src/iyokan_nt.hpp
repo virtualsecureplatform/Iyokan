@@ -16,9 +16,8 @@
 #include "error_nt.hpp"
 #include "label.hpp"
 
-namespace nt {
-
 // Forward declarations
+namespace nt {
 namespace plain {
 class WorkerInfo;
 }
@@ -29,6 +28,13 @@ class File;
 class BuiltinROM;
 class BuiltinRAM;
 }  // namespace blueprint
+}  // namespace nt
+namespace cereal {
+class PortableBinaryOutputArchive;
+class PortableBinaryInputArchive;
+}  // namespace cereal
+
+namespace nt {
 
 class Allocator {
 private:
@@ -59,9 +65,9 @@ private:
 
 public:
     Allocator();
-    Allocator(std::istream& is);
+    Allocator(cereal::PortableBinaryInputArchive& ar);
 
-    void dumpAllocatedData(std::ostream& os) const;
+    void dumpAllocatedData(cereal::PortableBinaryOutputArchive& ar) const;
 
     template <class T>
     T* get(Index index)
@@ -418,6 +424,8 @@ struct RunParameter {
     int numCPUWorkers, numCycles, currentCycle;
     SCHED sched;
 
+    std::optional<std::string> snapshotFile;
+
     void print() const;
 };
 
@@ -432,8 +440,9 @@ public:
 
     const RunParameter& getRunParam() const;
     const std::shared_ptr<Allocator>& getAllocator() const;
-    void dump(std::ostream& os) const;
+    void updateCurrentCycle(int currentCycle);
     void updateNumCycles(int numCycles);
+    void dump(const std::string& snapshotFile) const;
 };
 
 class Frontend {
@@ -468,6 +477,10 @@ protected:
     Allocator& allocator()
     {
         return *alc_;
+    }
+    const std::shared_ptr<Allocator>& allocatorPtr() const
+    {
+        return alc_;
     }
 
 public:

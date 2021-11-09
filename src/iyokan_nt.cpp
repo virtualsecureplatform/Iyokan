@@ -327,39 +327,6 @@ void RunParameter::print() const
     LOG_S(INFO) << "\tSchedule: " << (sched == SCHED::TOPO ? "topo" : "ranku");
 }
 
-/* class Snapshot */
-
-Snapshot::Snapshot(const RunParameter& pr,
-                   const std::shared_ptr<Allocator>& alc)
-    : pr_(pr), alc_(alc)
-{
-}
-
-Snapshot::Snapshot(const std::string& snapshotFile)
-{
-    // FIXME
-}
-
-const RunParameter& Snapshot::getRunParam() const
-{
-    return pr_;
-}
-
-const std::shared_ptr<Allocator>& Snapshot::getAllocator() const
-{
-    return alc_;
-}
-
-void Snapshot::dump(std::ostream& os) const
-{
-    // FIXME
-}
-
-void Snapshot::updateNumCycles(int numCycles)
-{
-    pr_.numCycles = numCycles;
-}
-
 /* class Frontend */
 
 Frontend::Frontend(const RunParameter& pr)
@@ -445,32 +412,43 @@ void Frontend::run()
     setBit1(bit1);
 
     // Create workers
+    LOG_DBG << "CREATE WORKERS";
     std::vector<std::unique_ptr<nt::Worker>> workers = makeWorkers();
 
     // Create runner and finder for the network
+    LOG_DBG << "CREATE RUNNER";
     NetworkRunner runner{std::move(network_.value()), std::move(workers)};
     network_ = std::nullopt;
     const TaskFinder& finder = runner.network().finder();
 
     // Process reset cycle if @reset is used
     // FIXME: Add support for --skip-reset flag
-    if (auto reset = bp.at("reset"); reset && reset->kind == Label::INPUT) {
-        Task* t = finder.findByConfigName(reset->cname);
-        t->setInput(bit1);  // Set reset on
-        runner.run();
-        t->setInput(bit0);  // Set reset off
+    if (currentCycle_ == 0) {
+        auto reset = bp.at("reset");
+        if (reset && reset->kind == Label::INPUT) {
+            LOG_DBG << "RESET";
+            Task* t = finder.findByConfigName(reset->cname);
+            t->setInput(bit1);  // Set reset on
+            runner.run();
+            t->setInput(bit0);  // Set reset off
+        }
     }
 
     // Process normal cycles
-    for (size_t i = 0; i < pr_.numCycles; i++) {
+    for (int i = 0; i < pr_.numCycles; i++, currentCycle_++) {
+        LOG_DBG_SCOPE("Cycle #%d (i = %d)", currentCycle_, i);
+
         // Mount new values to DFFs
+        LOG_DBG << "TICK";
         runner.tick();
 
         // Set new input data. If i is equal to 0, it also mounts initial data
         // to RAMs.
+        LOG_DBG << "ON AFTER TICK";
         runner.onAfterTick(i);
 
         // Go computing of each gate
+        LOG_DBG << "RUN";
         runner.run();
 
         /*
@@ -490,7 +468,16 @@ void Frontend::run()
     }
 
     // Dump result packet
-    dumpResPacket(pr_.outputFile, finder, pr_.numCycles);
+    LOG_DBG << "DUMP RES PACKET";
+    dumpResPacket(pr_.outputFile, finder, currentCycle_);
+
+    // Dump snapshot
+    if (pr_.snapshotFile) {
+        LOG_DBG << "DUMP SNAPSHOT";
+        Snapshot ss{pr_, allocatorPtr()};
+        ss.updateCurrentCycle(currentCycle_);
+        ss.dump(pr_.snapshotFile.value());
+    }
 }
 
 /* makeMUXROM */
