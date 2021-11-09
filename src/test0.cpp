@@ -959,7 +959,7 @@ void testSnapshot()
 
         std::ofstream ofs{"_test_snapshot"};
         assert(ofs);
-        alc.dumpSnapshot(ofs);
+        alc.dumpAllocatedData(ofs);
     }
     {
         std::ifstream ifs{"_test_snapshot"};

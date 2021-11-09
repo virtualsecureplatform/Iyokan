@@ -359,11 +359,11 @@ private:
     std::vector<std::unique_ptr<nt::Worker>> makeWorkers() override;
 
 public:
-    Frontend(const RunParameter& pr, Allocator& alc);
+    Frontend(const RunParameter& pr);
 };
 
-Frontend::Frontend(const RunParameter& pr, Allocator& alc)
-    : nt::Frontend(pr), reqPacket_(readPlainPacket(pr.inputFile))
+Frontend::Frontend(const RunParameter& pr)
+    : nt::Frontend(pr), reqPacket_(readPlainPacket(runParam().inputFile))
 {
     const Blueprint& bp = blueprint();
 
@@ -393,7 +393,7 @@ Frontend::Frontend(const RunParameter& pr, Allocator& alc)
     }
 
     // Build the network. The instance is in nt::Frontend
-    NetworkBuilder nb{cname2isource, reqPacket_, alc};
+    NetworkBuilder nb{cname2isource, reqPacket_, allocator()};
     buildNetwork(nb);
 }
 
@@ -875,14 +875,14 @@ void test0()
 
         Allocator alc;
         Frontend frontend{RunParameter{
-                              blueprintPath,  // blueprintFile
-                              reqPktPath,     // inputFile
-                              resPktPath,     // outputFile
-                              2,              // numCPUWorkers
-                              numCycles,      // numCycles
-                              SCHED::RANKU,   // sched
-                          },
-                          alc};
+            blueprintPath,  // blueprintFile
+            reqPktPath,     // inputFile
+            resPktPath,     // outputFile
+            2,              // numCPUWorkers
+            numCycles,      // numCycles
+            0,              // currentCycle
+            SCHED::RANKU,   // sched
+        }};
         frontend.run();
         PlainPacket got = readPlainPacket(resPktPath);
         assert(got == expectedOutPkt);
@@ -910,6 +910,101 @@ void test0()
        "test/out/test13.out", 3);
     go("test/config-toml/cahp-ruby.toml", "test/in/test09.in",
        "test/out/test09-ruby.out", 7);
+
+    {
+        Allocator alc;
+        NetworkBuilder nb{c2is, pkt, alc};
+
+        readNetworkFromFile(
+            blueprint::File{blueprint::File::TYPE::YOSYS_JSON,
+                            "test/yosys-json/counter-4bit-yosys.json",
+                            "counter"},
+            nb);
+
+        std::vector<std::unique_ptr<nt::Worker>> workers;
+        workers.emplace_back(std::make_unique<Worker>());
+
+        NetworkRunner runner{nb.createNetwork(), std::move(workers)};
+        auto&& finder = runner.network().finder();
+        Task *tRst = finder.findByConfigName({"counter", "reset", 0}),
+             *tOut0 = finder.findByConfigName({"counter", "io_out", 0}),
+             *tOut1 = finder.findByConfigName({"counter", "io_out", 1}),
+             *tOut2 = finder.findByConfigName({"counter", "io_out", 2}),
+             *tOut3 = finder.findByConfigName({"counter", "io_out", 3});
+
+        tRst->setInput(&bit1);
+        runner.run();
+        tRst->setInput(&bit0);
+
+        // Cycle #1
+        runner.tick();
+        runner.run();
+        // Cycle #2
+        runner.tick();
+        runner.run();
+        // Cycle #3
+        runner.tick();
+        runner.run();
+
+        // The output is 2, that is, '0b0010'
+        tOut0->getOutput(dh);
+        assert(dh.getBit() == 0_b);
+        tOut1->getOutput(dh);
+        assert(dh.getBit() == 1_b);
+        tOut2->getOutput(dh);
+        assert(dh.getBit() == 0_b);
+        tOut3->getOutput(dh);
+        assert(dh.getBit() == 0_b);
+
+        // Dump the snapshot
+        std::ofstream ofs{"_test_snapshot"};
+        assert(ofs);
+        alc.dumpAllocatedData(ofs);
+    }
+    {
+        // Load from the snapshot
+        std::ifstream ifs{"_test_snapshot"};
+        assert(ifs);
+        Allocator alc{ifs};
+
+        NetworkBuilder nb{c2is, pkt, alc};
+
+        readNetworkFromFile(
+            blueprint::File{blueprint::File::TYPE::YOSYS_JSON,
+                            "test/yosys-json/counter-4bit-yosys.json",
+                            "counter"},
+            nb);
+
+        std::vector<std::unique_ptr<nt::Worker>> workers;
+        workers.emplace_back(std::make_unique<Worker>());
+
+        NetworkRunner runner{nb.createNetwork(), std::move(workers)};
+        auto&& finder = runner.network().finder();
+        Task *tOut0 = finder.findByConfigName({"counter", "io_out", 0}),
+             *tOut1 = finder.findByConfigName({"counter", "io_out", 1}),
+             *tOut2 = finder.findByConfigName({"counter", "io_out", 2}),
+             *tOut3 = finder.findByConfigName({"counter", "io_out", 3});
+
+        // Cycle #4
+        runner.tick();
+        runner.run();
+        // Cycle #5
+        runner.tick();
+        runner.run();
+        // Cycle #6
+        runner.tick();
+        runner.run();
+
+        // The output is 5, that is, '0b0101'
+        tOut0->getOutput(dh);
+        assert(dh.getBit() == 1_b);
+        tOut1->getOutput(dh);
+        assert(dh.getBit() == 0_b);
+        tOut2->getOutput(dh);
+        assert(dh.getBit() == 1_b);
+        tOut3->getOutput(dh);
+        assert(dh.getBit() == 0_b);
+    }
 }
 
 }  // namespace plain

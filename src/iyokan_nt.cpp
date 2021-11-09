@@ -321,9 +321,43 @@ void RunParameter::print() const
     LOG_S(INFO) << "\tBlueprint: " << blueprintFile;
     LOG_S(INFO) << "\t# of CPU Workers: " << numCPUWorkers;
     LOG_S(INFO) << "\t# of cycles: " << numCycles;
+    LOG_S(INFO) << "\tCurrent cycle #: " << currentCycle;
     LOG_S(INFO) << "\tInput file (request packet): " << inputFile;
     LOG_S(INFO) << "\tOutput file (result packet): " << outputFile;
     LOG_S(INFO) << "\tSchedule: " << (sched == SCHED::TOPO ? "topo" : "ranku");
+}
+
+/* class Snapshot */
+
+Snapshot::Snapshot(const RunParameter& pr,
+                   const std::shared_ptr<Allocator>& alc)
+    : pr_(pr), alc_(alc)
+{
+}
+
+Snapshot::Snapshot(const std::string& snapshotFile)
+{
+    // FIXME
+}
+
+const RunParameter& Snapshot::getRunParam() const
+{
+    return pr_;
+}
+
+const std::shared_ptr<Allocator>& Snapshot::getAllocator() const
+{
+    return alc_;
+}
+
+void Snapshot::dump(std::ostream& os) const
+{
+    // FIXME
+}
+
+void Snapshot::updateNumCycles(int numCycles)
+{
+    pr_.numCycles = numCycles;
 }
 
 /* class Frontend */
@@ -331,9 +365,21 @@ void RunParameter::print() const
 Frontend::Frontend(const RunParameter& pr)
     : pr_(pr),
       network_(std::nullopt),
-      currentCycle_(0),
-      bp_(std::make_unique<Blueprint>(pr_.blueprintFile))
+      currentCycle_(pr.currentCycle),
+      bp_(std::make_unique<Blueprint>(pr_.blueprintFile)),
+      alc_(std::make_shared<Allocator>())
 {
+    assert(alc_);
+}
+
+Frontend::Frontend(const Snapshot& ss)
+    : pr_(ss.getRunParam()),
+      network_(std::nullopt),
+      currentCycle_(pr_.currentCycle),
+      bp_(std::make_unique<Blueprint>(pr_.blueprintFile)),
+      alc_(ss.getAllocator())
+{
+    assert(alc_);
 }
 
 void Frontend::buildNetwork(NetworkBuilder& nb)

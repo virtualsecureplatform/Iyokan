@@ -31,6 +31,11 @@ class BuiltinRAM;
 }  // namespace blueprint
 
 class Allocator {
+private:
+    // Prohibit copying Allcator. Probably moving it is not a problem.
+    Allocator(const Allocator&) = delete;
+    Allocator& operator=(const Allocator&) = delete;
+
 public:
     using Index = size_t;
 
@@ -56,7 +61,7 @@ public:
     Allocator();
     Allocator(std::istream& is);
 
-    void dumpSnapshot(std::ostream& os);
+    void dumpAllocatedData(std::ostream& os) const;
 
     template <class T>
     T* get(Index index)
@@ -410,18 +415,39 @@ enum class SCHED {
 
 struct RunParameter {
     std::string blueprintFile, inputFile, outputFile;
-    int numCPUWorkers, numCycles;
+    int numCPUWorkers, numCycles, currentCycle;
     SCHED sched;
 
     void print() const;
 };
 
+class Snapshot {
+private:
+    RunParameter pr_;
+    std::shared_ptr<Allocator> alc_;
+
+public:
+    Snapshot(const RunParameter& pr, const std::shared_ptr<Allocator>& alc);
+    Snapshot(const std::string& snapshotFile);
+
+    const RunParameter& getRunParam() const;
+    const std::shared_ptr<Allocator>& getAllocator() const;
+    void dump(std::ostream& os) const;
+    void updateNumCycles(int numCycles);
+};
+
 class Frontend {
+private:
+    // Prohibit copying Frontend.
+    Frontend(const Frontend&) = delete;
+    Frontend& operator=(const Frontend&) = delete;
+
 private:
     RunParameter pr_;
     std::optional<Network> network_;
     int currentCycle_;
     std::unique_ptr<Blueprint> bp_;
+    std::shared_ptr<Allocator> alc_;
 
 protected:
     virtual void setBit0(DataHolder& dh) = 0;
@@ -439,9 +465,14 @@ protected:
     {
         return *bp_;
     }
+    Allocator& allocator()
+    {
+        return *alc_;
+    }
 
 public:
     Frontend(const RunParameter& pr);
+    Frontend(const Snapshot& snapshot);
     virtual ~Frontend();
 
     void run();
