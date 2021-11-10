@@ -452,7 +452,7 @@ private:
     Frontend& operator=(const Frontend&) = delete;
 
 private:
-    RunParameter pr_;
+    const RunParameter pr_;
     std::optional<Network> network_;
     int currentCycle_;
     std::unique_ptr<Blueprint> bp_;
