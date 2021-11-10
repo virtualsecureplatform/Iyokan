@@ -445,7 +445,7 @@ void Frontend::run()
         // Set new input data. If i is equal to 0, it also mounts initial data
         // to RAMs.
         LOG_DBG << "ON AFTER TICK";
-        runner.onAfterTick(i);
+        runner.onAfterTick(currentCycle_);
 
         // Go computing of each gate
         LOG_DBG << "RUN";
