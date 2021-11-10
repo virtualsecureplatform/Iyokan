@@ -143,9 +143,17 @@ private:
     std::map<std::tuple<std::string, std::string, int>, Task*> byConfigName_;
 
 public:
+    size_t size() const;
     void add(Task* task);
     Task* findByUID(UID uid) const;
     Task* findByConfigName(const ConfigName& cname) const;
+
+    template <class F>
+    void eachTask(F f) const
+    {
+        for (auto&& [uid, task] : byUID_)
+            f(uid, task);
+    }
 };
 
 // TaskCommon can be used as base class of many "common" tasks.

@@ -241,15 +241,15 @@ public:
         to->addInput(from);
     }
 
-#define DEF_COMMON_TASK(CAPName, CamelName)                            \
-    UID CAPName() override                                             \
-    {                                                                  \
-        UID uid = genUID();                                            \
-        Task##CamelName* task = nullptr;                               \
-        task = emplaceTask<Task##CamelName>(                           \
-            Label{uid, #CamelName, std::nullopt}, currentAllocator()); \
-        uid2common_.emplace(uid, task);                                \
-        return uid;                                                    \
+#define DEF_COMMON_TASK(CAPName, CamelName)                          \
+    UID CAPName() override                                           \
+    {                                                                \
+        UID uid = genUID();                                          \
+        Task##CamelName* task = nullptr;                             \
+        task = emplaceTask<Task##CamelName>(                         \
+            Label{uid, #CAPName, std::nullopt}, currentAllocator()); \
+        uid2common_.emplace(uid, task);                              \
+        return uid;                                                  \
     }
     DEF_COMMON_TASK(AND, And);
     DEF_COMMON_TASK(ANDNOT, Andnot);

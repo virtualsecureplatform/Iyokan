@@ -7,6 +7,94 @@
 
 #include <algorithm>
 
+namespace {
+void prioritizeTaskByRanku(const nt::TaskFinder& finder)
+{
+    // c.f. https://en.wikipedia.org/wiki/Heterogeneous_Earliest_Finish_Time
+    // FIXME: Take communication costs into account
+    // FIXME: Tune computation costs by dynamic measurements
+
+    using namespace nt;
+
+    std::unordered_map<std::string, int> compCost = {
+        {"DFF", 0},          {"WIRE", 0},     {"INPUT", 0},
+        {"OUTPUT", 0},       {"AND", 10},     {"NAND", 10},
+        {"ANDNOT", 10},      {"OR", 10},      {"NOR", 10},
+        {"ORNOT", 10},       {"XOR", 10},     {"XNOR", 10},
+        {"MUX", 20},         {"NOT", 0},      {"CONSTONE", 0},
+        {"CONSTZERO", 0},    {"CB", 100},     {"CBInv", 100},
+        {"CBWithInv", 100},  {"MUXWoSE", 20}, {"CMUXs", 10},
+        {"SEI", 0},          {"GB", 10},      {"ROMUX", 10},
+        {"RAMUX", 10},       {"SEI&KS", 5},   {"cufhe2tfhepp", 0},
+        {"tfhepp2cufhe", 0}, {"bridge", 0},   {"RAMWriter", 0},
+        {"RAMReader", 0},    {"ROM", 0},      {"SDFF", 0},
+        {"RAM", 0},
+    };
+
+    std::unordered_map<Task*, int>
+        numReadyChildren;   // task |-> # of ready children
+    std::queue<Task*> que;  // Initial tasks to be visited
+    finder.eachTask([&](UID, Task* task) {
+        const std::vector<Task*>& children = task->children();
+
+        // Count the children that have no inputs to wait for
+        size_t n = std::count_if(
+            children.begin(), children.end(),
+            [&](Task* child) { return child->areAllInputsReady(); });
+        numReadyChildren.emplace(task, n);
+
+        // Initial nodes should be "terminals", that is,
+        // they have no children OR all of their children has no inputs to wait
+        // for.
+        if (children.size() == n)
+            que.push(task);
+    });
+    assert(!que.empty());
+
+    size_t numPrioritizedTasks = 0;
+    while (!que.empty()) {
+        Task* task = que.front();
+        que.pop();
+
+        // Calculate and set the priority for the task
+        int pri = 0;
+        for (Task* child : task->children())
+            // Only take valid children (i.e., ones that have no some inputs to
+            // wait for) into account
+            if (!child->areAllInputsReady())
+                pri = std::max(pri, child->priority());
+        auto it = compCost.find(task->label().kind);
+        if (it == compCost.end())
+            ERR_DIE("Internal error: compCost does not have key: "
+                    << task->label().kind);
+        task->setPriority(pri + it->second);
+        numPrioritizedTasks++;
+
+        if (task->areAllInputsReady())  // The end of the travel
+            continue;
+
+        // Push parents into the queue if all of their children are ready
+        for (Task* parent : task->parents()) {
+            numReadyChildren.at(parent)++;
+            assert(parent->children().size() >= numReadyChildren.at(parent));
+            if (parent->children().size() == numReadyChildren.at(parent))
+                que.push(parent);
+        }
+    }
+    if (finder.size() > numPrioritizedTasks) {
+        LOG_DBG << "finder.size() " << finder.size()
+                << " != numPrioritizedTasks " << numPrioritizedTasks;
+        finder.eachTask([&](UID, Task* task) {
+            const Label& l = task->label();
+            if (task->priority() == -1)
+                LOG_DBG << "\t" << l.uid << " " << l.kind << " ";
+        });
+        ERR_DIE("Invalid network; some nodes will not be executed.");
+    }
+    assert(finder.size() == numPrioritizedTasks);
+}
+}  // namespace
+
 namespace nt {
 
 /* class Task */
@@ -15,7 +103,7 @@ Task::Task(Label label)
     : label_(std::move(label)),
       parents_(),
       children_(),
-      priority_(0),
+      priority_(-1),
       hasQueued_(false)
 {
 }
@@ -103,6 +191,11 @@ void Task::startAsynchronously(plain::WorkerInfo&)
 }
 
 /* class TaskFinder */
+
+size_t TaskFinder::size() const
+{
+    return byUID_.size();
+}
 
 void TaskFinder::add(Task* task)
 {
@@ -352,6 +445,7 @@ Frontend::Frontend(const Snapshot& ss)
 void Frontend::buildNetwork(NetworkBuilder& nb)
 {
     const Blueprint& bp = blueprint();
+    const TaskFinder& finder = nb.finder();
 
     // [[file]]
     for (auto&& file : bp.files())
@@ -370,7 +464,7 @@ void Frontend::buildNetwork(NetworkBuilder& nb)
     }
 
     auto get = [&](const blueprint::Port& port) -> Task* {
-        Task* task = nb.finder().findByConfigName(port.cname);
+        Task* task = finder.findByConfigName(port.cname);
         if (task->label().kind != port.kind)
             ERR_DIE("Invalid port: " << port.cname << " is "
                                      << task->label().kind << ", not "
@@ -392,11 +486,20 @@ void Frontend::buildNetwork(NetworkBuilder& nb)
         nb.connect(get(src)->label().uid, get(dst)->label().uid);
     }
 
-    // Set priority to each DepNode
-    // FIXME
-
+    // Create the network from the builder
     network_.emplace(nb.createNetwork());
     // FIXME check if network is valid
+
+    // Set priority to each task
+    switch (pr_.sched) {
+    case SCHED::TOPO:
+        ERR_DIE("Scheduling topo is not supported anymore");  // FIXME
+        break;
+
+    case SCHED::RANKU:
+        prioritizeTaskByRanku(network_->finder());
+        break;
+    }
 }
 
 Frontend::~Frontend()

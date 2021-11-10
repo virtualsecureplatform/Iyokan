@@ -20,5 +20,5 @@ bool operator<(const ConfigName& lhs, const ConfigName& rhs)
 
 /* struct Label */
 // Initialization of static variables.
-const char* const Label::INPUT = "Input";
-const char* const Label::OUTPUT = "Output";
+const char* const Label::INPUT = "INPUT";
+const char* const Label::OUTPUT = "OUTPUT";
