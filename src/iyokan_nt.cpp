@@ -16,21 +16,6 @@ void prioritizeTaskByRanku(const nt::TaskFinder& finder)
 
     using namespace nt;
 
-    std::unordered_map<std::string, int> compCost = {
-        {"DFF", 0},          {"WIRE", 0},     {"INPUT", 0},
-        {"OUTPUT", 0},       {"AND", 10},     {"NAND", 10},
-        {"ANDNOT", 10},      {"OR", 10},      {"NOR", 10},
-        {"ORNOT", 10},       {"XOR", 10},     {"XNOR", 10},
-        {"MUX", 20},         {"NOT", 0},      {"CONSTONE", 0},
-        {"CONSTZERO", 0},    {"CB", 100},     {"CBInv", 100},
-        {"CBWithInv", 100},  {"MUXWoSE", 20}, {"CMUXs", 10},
-        {"SEI", 0},          {"GB", 10},      {"ROMUX", 10},
-        {"RAMUX", 10},       {"SEI&KS", 5},   {"cufhe2tfhepp", 0},
-        {"tfhepp2cufhe", 0}, {"bridge", 0},   {"RAMWriter", 0},
-        {"RAMReader", 0},    {"ROM", 0},      {"SDFF", 0},
-        {"RAM", 0},
-    };
-
     std::unordered_map<Task*, int>
         numReadyChildren;   // task |-> # of ready children
     std::queue<Task*> que;  // Initial tasks to be visited
@@ -63,11 +48,7 @@ void prioritizeTaskByRanku(const nt::TaskFinder& finder)
             // wait for) into account
             if (!child->areAllInputsReady())
                 pri = std::max(pri, child->priority());
-        auto it = compCost.find(task->label().kind);
-        if (it == compCost.end())
-            ERR_DIE("Internal error: compCost does not have key: "
-                    << task->label().kind);
-        task->setPriority(pri + it->second);
+        task->setPriority(pri + task->getComputationCost());
         numPrioritizedTasks++;
 
         if (task->areAllInputsReady())  // The end of the travel
@@ -158,6 +139,11 @@ void Task::setQueued()
 {
     assert(!hasQueued_);
     hasQueued_ = true;
+}
+
+int Task::getComputationCost() const
+{
+    return 0;
 }
 
 void Task::tick()

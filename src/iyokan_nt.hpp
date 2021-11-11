@@ -113,6 +113,9 @@ public:
     void setPriority(int newPri);
     void setQueued();
 
+    // Get computation cost of this task. Used for scheduling of tasks.
+    virtual int getComputationCost() const;
+
     virtual void notifyOneInputReady() = 0;
     virtual bool areAllInputsReady() const = 0;
     virtual bool hasFinished() const = 0;
