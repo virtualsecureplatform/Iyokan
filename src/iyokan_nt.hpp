@@ -116,6 +116,9 @@ public:
     // Get computation cost of this task. Used for scheduling of tasks.
     virtual int getComputationCost() const;
 
+    // Check if the task is valid. Returns true iff it is valid.
+    virtual bool checkIfValid() const = 0;
+
     virtual void notifyOneInputReady() = 0;
     virtual bool areAllInputsReady() const = 0;
     virtual bool hasFinished() const = 0;
@@ -205,6 +208,30 @@ public:
 
     virtual ~TaskCommon()
     {
+    }
+
+    virtual bool checkIfValid() const override
+    {
+        assert(output_);
+
+        bool valid = true;
+        if (getInputSize() < numMinExpectedInputs_) {
+            LOG_S(ERROR) << "Input size < min. expected size: "
+                         << getInputSize() << " < " << numMinExpectedInputs_;
+            valid = false;
+        }
+        if (getInputSize() > numMaxExpectedInputs_) {
+            LOG_S(ERROR) << "Input size > max. expected size: "
+                         << getInputSize() << " > " << numMaxExpectedInputs_;
+            valid = false;
+        }
+        if (getInputSize() != parents().size()) {
+            LOG_S(ERROR) << "Input size != parents size: " << getInputSize()
+                         << " != " << parents().size();
+            valid = false;
+        }
+
+        return valid;
     }
 
     virtual void notifyOneInputReady() override
@@ -310,6 +337,10 @@ public:
 
     size_t size() const;
     const TaskFinder& finder() const;
+
+    // Check if the network is valid. Print error messages if necessary. Returns
+    // true iff it is valid.
+    bool checkIfValid() const;
 
     template <class F>
     void eachTask(F f) const

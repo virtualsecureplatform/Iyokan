@@ -8,18 +8,45 @@
 #include <algorithm>
 
 namespace {
-void prioritizeTaskByRanku(const nt::TaskFinder& finder)
-{
-    // c.f. https://en.wikipedia.org/wiki/Heterogeneous_Earliest_Finish_Time
-    // FIXME: Take communication costs into account
-    // FIXME: Tune computation costs by dynamic measurements
 
+// Visit tasks in the network in topological order.
+template <class F>
+void visitTaskTopo(const nt::Network& net, F f)
+{
+    using namespace nt;
+
+    std::unordered_map<Task*, size_t> numReadyParents;
+    std::queue<Task*> que;
+    net.eachTask([&](Task* task) {
+        numReadyParents.emplace(task, 0);
+        if (task->areAllInputsReady())
+            que.push(task);
+    });
+    while (!que.empty()) {
+        Task* task = que.front();
+        que.pop();
+        f(task);
+        for (Task* child : task->children()) {
+            if (child->areAllInputsReady())  // false parent-child relationship
+                continue;
+            numReadyParents.at(child)++;
+            assert(child->parents().size() >= numReadyParents.at(child));
+            if (child->parents().size() == numReadyParents.at(child))
+                que.push(child);
+        }
+    }
+}
+
+// Visit tasks in the network in reversed topological order
+template <class F>
+void visitTaskRevTopo(const nt::Network& net, F f)
+{
     using namespace nt;
 
     std::unordered_map<Task*, int>
         numReadyChildren;   // task |-> # of ready children
     std::queue<Task*> que;  // Initial tasks to be visited
-    finder.eachTask([&](UID, Task* task) {
+    net.eachTask([&](Task* task) {
         const std::vector<Task*>& children = task->children();
 
         // Count the children that have no inputs to wait for
@@ -36,11 +63,60 @@ void prioritizeTaskByRanku(const nt::TaskFinder& finder)
     });
     assert(!que.empty());
 
-    size_t numPrioritizedTasks = 0;
     while (!que.empty()) {
         Task* task = que.front();
         que.pop();
+        f(task);
+        if (task->areAllInputsReady())  // The end of the travel
+            continue;
+        // Push parents into the queue if all of their children are ready
+        for (Task* parent : task->parents()) {
+            numReadyChildren.at(parent)++;
+            assert(parent->children().size() >= numReadyChildren.at(parent));
+            if (parent->children().size() == numReadyChildren.at(parent))
+                que.push(parent);
+        }
+    }
+}
 
+void prioritizeTaskByTopo(const nt::Network& net)
+{
+    using namespace nt;
+
+    size_t numPrioritizedTasks = 0;
+    visitTaskTopo(net, [&](Task* task) {
+        // Calculate and set the priority for the task
+        int pri = -1;
+        if (!task->areAllInputsReady())
+            for (Task* parent : task->parents())
+                pri = std::max(pri, parent->priority());
+        task->setPriority(pri + 1);
+        numPrioritizedTasks++;
+    });
+
+    if (net.size() > numPrioritizedTasks) {
+        LOG_DBG << "net.size() " << net.size() << " != numPrioritizedTasks "
+                << numPrioritizedTasks;
+        net.eachTask([&](Task* task) {
+            const Label& l = task->label();
+            if (task->priority() == -1)
+                LOG_DBG << "\t" << l.uid << " " << l.kind << " ";
+        });
+        ERR_DIE("Invalid network; some nodes will not be executed.");
+    }
+    assert(net.size() == numPrioritizedTasks);
+}
+
+void prioritizeTaskByRanku(const nt::Network& net)
+{
+    // c.f. https://en.wikipedia.org/wiki/Heterogeneous_Earliest_Finish_Time
+    // FIXME: Take communication costs into account
+    // FIXME: Tune computation costs by dynamic measurements
+
+    using namespace nt;
+
+    size_t numPrioritizedTasks = 0;
+    visitTaskRevTopo(net, [&](Task* task) {
         // Calculate and set the priority for the task
         int pri = 0;
         for (Task* child : task->children())
@@ -50,30 +126,21 @@ void prioritizeTaskByRanku(const nt::TaskFinder& finder)
                 pri = std::max(pri, child->priority());
         task->setPriority(pri + task->getComputationCost());
         numPrioritizedTasks++;
+    });
 
-        if (task->areAllInputsReady())  // The end of the travel
-            continue;
-
-        // Push parents into the queue if all of their children are ready
-        for (Task* parent : task->parents()) {
-            numReadyChildren.at(parent)++;
-            assert(parent->children().size() >= numReadyChildren.at(parent));
-            if (parent->children().size() == numReadyChildren.at(parent))
-                que.push(parent);
-        }
-    }
-    if (finder.size() > numPrioritizedTasks) {
-        LOG_DBG << "finder.size() " << finder.size()
-                << " != numPrioritizedTasks " << numPrioritizedTasks;
-        finder.eachTask([&](UID, Task* task) {
+    if (net.size() > numPrioritizedTasks) {
+        LOG_DBG << "net.size() " << net.size() << " != numPrioritizedTasks "
+                << numPrioritizedTasks;
+        net.eachTask([&](Task* task) {
             const Label& l = task->label();
             if (task->priority() == -1)
                 LOG_DBG << "\t" << l.uid << " " << l.kind << " ";
         });
         ERR_DIE("Invalid network; some nodes will not be executed.");
     }
-    assert(finder.size() == numPrioritizedTasks);
+    assert(net.size() == numPrioritizedTasks);
 }
+
 }  // namespace
 
 namespace nt {
@@ -250,6 +317,27 @@ size_t Network::size() const
 const TaskFinder& Network::finder() const
 {
     return finder_;
+}
+
+bool Network::checkIfValid() const
+{
+    bool valid = true;
+    eachTask([&](Task* task) {
+        if (!task->checkIfValid())
+            valid = false;
+    });
+
+    // Check if the network is weekly connected
+    size_t numConnectedTasks = 0;
+    visitTaskTopo(*this, [&](Task*) { numConnectedTasks++; });
+    if (numConnectedTasks != size()) {
+        LOG_S(ERROR) << "The network is not weekly connected i.e., there are "
+                        "some nodes that cannot be visited; numConnectedTasks "
+                     << numConnectedTasks << " != size " << size();
+        valid = false;
+    }
+
+    return valid;
 }
 
 /* class NetworkBuilder */
@@ -474,16 +562,19 @@ void Frontend::buildNetwork(NetworkBuilder& nb)
 
     // Create the network from the builder
     network_.emplace(nb.createNetwork());
-    // FIXME check if network is valid
+
+    // Check if network is valid
+    if (!network_->checkIfValid())
+        ERR_DIE("Network is not valid");
 
     // Set priority to each task
     switch (pr_.sched) {
     case SCHED::TOPO:
-        ERR_DIE("Scheduling topo is not supported anymore");  // FIXME
+        prioritizeTaskByTopo(network_.value());
         break;
 
     case SCHED::RANKU:
-        prioritizeTaskByRanku(network_->finder());
+        prioritizeTaskByRanku(network_.value());
         break;
     }
 }
