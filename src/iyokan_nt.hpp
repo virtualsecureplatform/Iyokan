@@ -24,9 +24,9 @@ class WorkerInfo;
 class DataHolder;
 class Blueprint;
 namespace blueprint {
-class File;
-class BuiltinROM;
-class BuiltinRAM;
+struct File;
+struct BuiltinROM;
+struct BuiltinRAM;
 }  // namespace blueprint
 }  // namespace nt
 namespace cereal {
@@ -533,6 +533,9 @@ public:
     void run();
 };
 
+void readPrecompiledRAMNetworkFromFile(const std::string& name,
+                                       std::istream& is, nt::NetworkBuilder& nb,
+                                       int ramDataWidth);
 void readNetworkFromFile(const blueprint::File& file, NetworkBuilder& nb);
 void makeMUXROM(const blueprint::BuiltinROM& rom, NetworkBuilder& nb);
 void makeMUXRAM(const blueprint::BuiltinRAM& ram, NetworkBuilder& nb);

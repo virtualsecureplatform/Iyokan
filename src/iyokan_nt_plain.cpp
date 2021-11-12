@@ -341,8 +341,6 @@ public:
             currentAllocator());
         uid2common_.emplace(uid, task);
 
-        // FIXME: We need to memorize this task to make a response packet.
-
         return uid;
     }
 };

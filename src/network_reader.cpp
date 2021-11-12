@@ -294,7 +294,7 @@ class IyokanL1JSONReader {
 public:
     template <class NetworkBuilder>
     static void read(const std::string& nodeName, std::istream& is,
-                     NetworkBuilder& builder)
+                     NetworkBuilder& builder, std::optional<int> ramDataWidth)
     {
         std::unordered_map<int, int> id2taskId;
         auto addId = [&](int id, int taskId) { id2taskId.emplace(id, taskId); };
@@ -355,18 +355,13 @@ public:
                 addId(id, builder.MUX());
             else {
                 bool valid = false;
-                /* FIXME
-                // If builder.RAM() exists
-                if constexpr (detail::hasMethodFuncRAM<NetworkBuilder>) {
-                    if (type == "RAM") {
-                        int addr = cell.at("ramAddress").get<double>(),
-                            bit = cell.at("ramBit").get<double>();
-                        addId(id, builder.RAM(addr, bit));
-                        valid = true;
-                    }
+                if (type == "RAM" && ramDataWidth) {
+                    valid = true;
+                    int addr = cell.at("ramAddress").get<double>(),
+                        bit = cell.at("ramBit").get<double>();
+                    addId(id, builder.RAM(nodeName, "ramdata",
+                                          addr * ramDataWidth.value() + bit));
                 }
-                */
-
                 if (!valid)
                     ERR_DIE("Invalid JSON of network. Invalid type: " << type);
             }
@@ -426,7 +421,12 @@ public:
 
 namespace nt {
 
-/* readNetworkFromFile */
+void readPrecompiledRAMNetworkFromFile(const std::string& name,
+                                       std::istream& is, nt::NetworkBuilder& nb,
+                                       int ramDataWidth)
+{
+    IyokanL1JSONReader::read(name, is, nb, ramDataWidth);
+}
 
 void readNetworkFromFile(const blueprint::File& file, nt::NetworkBuilder& nb)
 {
@@ -440,7 +440,7 @@ void readNetworkFromFile(const blueprint::File& file, nt::NetworkBuilder& nb)
             << "[[file]] of type 'iyokanl1-json' is deprecated. You don't need "
                "to use Iyokan-L1. Use Yosys JSON directly by specifying type "
                "'yosys-json'.";
-        IyokanL1JSONReader::read(file.name, ifs, nb);
+        IyokanL1JSONReader::read(file.name, ifs, nb, std::nullopt);
         break;
 
     case blueprint::File::TYPE::YOSYS_JSON:

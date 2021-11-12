@@ -518,20 +518,25 @@ Frontend::Frontend(const Snapshot& ss)
 
 void Frontend::buildNetwork(NetworkBuilder& nb)
 {
+    LOG_DBG_SCOPE("FRONTEND BUILD NETWORK");
+
     const Blueprint& bp = blueprint();
     const TaskFinder& finder = nb.finder();
 
     // [[file]]
+    LOG_DBG << "BUILD NETWORK FROM FILE";
     for (auto&& file : bp.files())
         readNetworkFromFile(file, nb);
 
     // [[builtin]] type = ram | type = mux-ram
+    LOG_DBG << "BUILD BUILTIN RAM";
     for (auto&& ram : bp.builtinRAMs()) {
         // We ignore ram.type and always use mux-ram in plaintext mode.
         makeMUXRAM(ram, nb);
     }
 
     // [[builtin]] type = rom | type = mux-rom
+    LOG_DBG << "BUILD BUILTIN ROM";
     for (auto&& rom : bp.builtinROMs()) {
         // We ignore rom.type and always use mux-rom in plaintext mode.
         makeMUXROM(rom, nb);
@@ -547,6 +552,7 @@ void Frontend::buildNetwork(NetworkBuilder& nb)
     };
 
     // [connect]
+    LOG_DBG << "CONNECT";
     // We need to treat "... = @..." and "@... = ..." differently from
     // "..." = ...".
     // First, check if ports that are connected to or from "@..." exist.
@@ -561,13 +567,16 @@ void Frontend::buildNetwork(NetworkBuilder& nb)
     }
 
     // Create the network from the builder
+    LOG_DBG << "CREATE NETWORK FROM BUILDER";
     network_.emplace(nb.createNetwork());
 
     // Check if network is valid
+    LOG_DBG << "CHECK IF NETWORK IS VALID";
     if (!network_->checkIfValid())
         ERR_DIE("Network is not valid");
 
     // Set priority to each task
+    LOG_DBG << "PRIORITIZE TASKS IN NETWORK";
     switch (pr_.sched) {
     case SCHED::TOPO:
         prioritizeTaskByTopo(network_.value());
@@ -862,8 +871,8 @@ void make1bitRAMWithMUX(const std::string& nodeName,
 
 }  // namespace
 
-/*
-   // Iyokan-L1 JSON of MUX RAM pre-compiled (and optimized) by Yosys
+extern "C" {
+// Iyokan-L1 JSON of MUX RAM pre-compiled (and optimized) by Yosys
 extern char _binary_mux_ram_8_8_8_min_json_start[];
 extern char _binary_mux_ram_8_8_8_min_json_end[];
 extern char _binary_mux_ram_8_8_8_min_json_size[];
@@ -873,33 +882,24 @@ extern char _binary_mux_ram_8_16_16_min_json_size[];
 extern char _binary_mux_ram_9_16_16_min_json_start[];
 extern char _binary_mux_ram_9_16_16_min_json_end[];
 extern char _binary_mux_ram_9_16_16_min_json_size[];
-*/
+}
 
 void makeMUXRAM(const blueprint::BuiltinRAM& ram, NetworkBuilder& nb)
 {
     assert(ram.inWdataWidth == ram.outRdataWidth);
 
-    /*
-#define USE_PRECOMPILED_BINARY(addrW, dataW)                               \
-    if (inAddrWidth == addrW && dataWidth == dataW) {                      \
-        std::stringstream ss{std::string{                                  \
-            _binary_mux_ram_##addrW##_##dataW##_##dataW##_min_json_start,  \
-            _binary_mux_ram_##addrW##_##dataW##_##dataW##_min_json_end}};  \
-        IyokanL1JSONReader::read(b, ss);                                   \
-        auto net = std::make_shared<typename NetworkBuilder::NetworkType>( \
-            std::move(b));                                                 \
-                                                                           \
-        error::Stack err;                                                  \
-        net->checkValid(err);                                              \
-        assert(err.empty());                                               \
-                                                                           \
-        return net;                                                        \
+#define USE_PRECOMPILED_BINARY(addrW, dataW)                              \
+    if (ram.inAddrWidth == addrW && ram.outRdataWidth == dataW) {         \
+        std::stringstream ss{std::string{                                 \
+            _binary_mux_ram_##addrW##_##dataW##_##dataW##_min_json_start, \
+            _binary_mux_ram_##addrW##_##dataW##_##dataW##_min_json_end}}; \
+        readPrecompiledRAMNetworkFromFile(ram.name, ss, nb, dataW);       \
+        return;                                                           \
     }
     USE_PRECOMPILED_BINARY(8, 8);
     USE_PRECOMPILED_BINARY(8, 16);
     USE_PRECOMPILED_BINARY(9, 16);
 #undef USE_PRECOMPILED_BINARY
-*/
 
     // Create inputs
     std::vector<UID> addrInputs;
