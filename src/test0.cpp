@@ -1032,7 +1032,9 @@ int main()
     // testProgressGraphMaker();
     // testBlueprint();
 
-    loguru::g_stderr_verbosity = loguru::Verbosity_1;
+    using namespace nt;
+
+    nt::error::initialize();
 
     nt::testAllocator();
     nt::test0();

@@ -7,7 +7,13 @@
 namespace nt::error {
 void initialize()
 {
+#ifdef NDEBUG
+    // Release
     loguru::g_stderr_verbosity = loguru::Verbosity_INFO;
+#else
+    // Debug
+    loguru::g_stderr_verbosity = loguru::Verbosity_1;  // Show LOG_DBG messages
+#endif
 }
 
 void abortWithBacktrace()
