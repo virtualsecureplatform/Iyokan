@@ -247,8 +247,7 @@ public:
         void startAsynchronously(WorkerInfo& wi) override            \
         {                                                            \
             thr_ = [&]() {                                           \
-                const GateKeyFFT& gk = *wi.bkey.gk;                  \
-                (void)gk; /* Suppress warning 'unused variable' */   \
+                [[maybe_unused]] const GateKeyFFT& gk = *wi.bkey.gk; \
                 (expr);                                              \
             };                                                       \
         }                                                            \
@@ -530,21 +529,18 @@ void Frontend::dumpResPacket(const std::string& outpath,
         dh.getTLWELvl0(bits.at(atPortBit));
     }
 
-    /*
-       FIXME
     // Get values of RAM
     for (auto&& ram : bp.builtinRAMs()) {
-        std::vector<Bit>& dst = out.ram[ram.name];
-        dst.clear();
-        for (size_t i = 0; i < (1 << ram.inAddrWidth) * ram.outRdataWidth;
-             i++) {
+        std::vector<TLWELvl0>& dst = out.ramInTLWE[ram.name];
+        size_t size = (1 << ram.inAddrWidth) * ram.outRdataWidth;
+        dst.resize(size);
+        for (size_t i = 0; i < size; i++) {
             ConfigName cname{ram.name, "ramdata", static_cast<int>(i)};
             Task* t = finder.findByConfigName(cname);
             t->getOutput(dh);
-            dst.push_back(dh.getBit());
+            dh.getTLWELvl0(dst.at(i));
         }
     }
-    */
 
     // Dump the result packet
     writeTFHEPacket(outpath, out);
