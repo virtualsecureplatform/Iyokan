@@ -234,7 +234,7 @@ public:
     }
 };
 
-#define DEF_TASK(CamelName, inputSize, expr)                         \
+#define DEF_TASK(CamelName, inputSize, compCost, expr)               \
     class Task##CamelName : public TaskCommon<TLWELvl0> {            \
     private:                                                         \
         Thread thr_;                                                 \
@@ -259,20 +259,26 @@ public:
         {                                                            \
             return true;                                             \
         }                                                            \
+        int getComputationCost() const override                      \
+        {                                                            \
+            return compCost;                                         \
+        }                                                            \
     };
-DEF_TASK(And, 2, TFHEpp::HomAND(output(), input(0), input(1), gk));
-DEF_TASK(Andnot, 2, TFHEpp::HomANDYN(output(), input(0), input(1), gk));
-DEF_TASK(ConstOne, 0, TFHEpp::HomCONSTANTONE(output()));
-DEF_TASK(ConstZero, 0, TFHEpp::HomCONSTANTZERO(output()));
-DEF_TASK(Mux, 3, TFHEpp::HomMUX(output(), input(2), input(1), input(0), gk));
-DEF_TASK(Nand, 2, TFHEpp::HomNAND(output(), input(0), input(1), gk));
-DEF_TASK(Nmux, 3, TFHEpp::HomNMUX(output(), input(2), input(1), input(0), gk));
-DEF_TASK(Nor, 2, TFHEpp::HomNOR(output(), input(0), input(1), gk));
-DEF_TASK(Not, 1, TFHEpp::HomNOT(output(), input(0)));
-DEF_TASK(Or, 2, TFHEpp::HomOR(output(), input(0), input(1), gk));
-DEF_TASK(Ornot, 2, TFHEpp::HomORYN(output(), input(0), input(1), gk));
-DEF_TASK(Xnor, 2, TFHEpp::HomXNOR(output(), input(0), input(1), gk));
-DEF_TASK(Xor, 2, TFHEpp::HomXOR(output(), input(0), input(1), gk));
+DEF_TASK(And, 2, 10, TFHEpp::HomAND(output(), input(0), input(1), gk));
+DEF_TASK(Andnot, 2, 10, TFHEpp::HomANDYN(output(), input(0), input(1), gk));
+DEF_TASK(ConstOne, 0, 0, TFHEpp::HomCONSTANTONE(output()));
+DEF_TASK(ConstZero, 0, 0, TFHEpp::HomCONSTANTZERO(output()));
+DEF_TASK(Mux, 3, 20,
+         TFHEpp::HomMUX(output(), input(2), input(1), input(0), gk));
+DEF_TASK(Nand, 2, 10, TFHEpp::HomNAND(output(), input(0), input(1), gk));
+DEF_TASK(Nmux, 3, 20,
+         TFHEpp::HomNMUX(output(), input(2), input(1), input(0), gk));
+DEF_TASK(Nor, 2, 10, TFHEpp::HomNOR(output(), input(0), input(1), gk));
+DEF_TASK(Not, 1, 0, TFHEpp::HomNOT(output(), input(0)));
+DEF_TASK(Or, 2, 10, TFHEpp::HomOR(output(), input(0), input(1), gk));
+DEF_TASK(Ornot, 2, 10, TFHEpp::HomORYN(output(), input(0), input(1), gk));
+DEF_TASK(Xnor, 2, 10, TFHEpp::HomXNOR(output(), input(0), input(1), gk));
+DEF_TASK(Xor, 2, 10, TFHEpp::HomXOR(output(), input(0), input(1), gk));
 #undef DEF_TASK
 
 class NetworkBuilder : public nt::NetworkBuilder {
