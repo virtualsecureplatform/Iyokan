@@ -132,9 +132,12 @@ PlainPacket readPlainPacket(std::istream& is);
 PlainPacket readPlainPacket(const std::string& path);
 TFHEPacket readTFHEPacket(std::istream& is);
 TFHEPacket readTFHEPacket(const std::string& path);
+void readTFHEppBKey(TFHEppBKey& out, const std::string& path);
 void writePlainPacket(std::ostream& os, const PlainPacket& pkt);
 void writePlainPacket(const std::string& path, const PlainPacket& pkt);
 void writeTFHEPacket(std::ostream& os, const TFHEPacket& pkt);
+void writeTFHEPacket(const std::string& path, const TFHEPacket& pkt);
+void writeTFHEppBKey(const std::string& path, const TFHEppBKey& bkey);
 
 }  // namespace nt
 

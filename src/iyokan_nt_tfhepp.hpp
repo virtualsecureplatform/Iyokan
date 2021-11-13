@@ -1,0 +1,8 @@
+#ifndef VIRTUALSECUREPLATFORM_IYOKAN_NT_TFHEPP_HPP
+#define VIRTUALSECUREPLATFORM_IYOKAN_NT_TFHEPP_HPP
+
+namespace nt::tfhepp {
+void test0();
+}
+
+#endif

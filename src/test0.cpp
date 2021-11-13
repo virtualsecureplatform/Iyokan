@@ -858,6 +858,7 @@
 
 #include "iyokan_nt.hpp"
 #include "iyokan_nt_plain.hpp"
+#include "iyokan_nt_tfhepp.hpp"
 #include "packet_nt.hpp"
 #include "tfhepp_cufhe_wrapper.hpp"
 
@@ -1038,7 +1039,8 @@ int main()
 
     nt::testAllocator();
     nt::test0();
-    nt::plain::test0();
+    // nt::plain::test0();
+    nt::tfhepp::test0();
 
     return 0;
 }

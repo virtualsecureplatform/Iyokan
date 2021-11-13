@@ -19,8 +19,11 @@
 // Forward declarations
 namespace nt {
 namespace plain {
-class WorkerInfo;
+struct WorkerInfo;
 }
+namespace tfhepp {
+struct WorkerInfo;
+};
 class DataHolder;
 class Blueprint;
 namespace blueprint {
@@ -138,9 +141,16 @@ public:
     // Return true iff this task can be run in plaintext mode.
     virtual bool canRunPlain() const;
 
+    // Return true iff this task can be run in TFHEpp mode.
+    virtual bool canRunTFHEpp() const;
+
     // Start this task asynchronously in plaintext mode.
     // Only available when canRunPlain() returns true.
     virtual void startAsynchronously(plain::WorkerInfo&);
+
+    // Start this task asynchronously in TFHEpp mode.
+    // Only available when canRunTFHEpp() returns true.
+    virtual void startAsynchronously(tfhepp::WorkerInfo&);
 };
 
 class TaskFinder {
@@ -462,7 +472,7 @@ enum class SCHED {
 };
 
 struct RunParameter {
-    std::string blueprintFile, inputFile, outputFile;
+    std::string blueprintFile, inputFile, outputFile, bkeyFile;
     int numCPUWorkers, numCycles, currentCycle;
     SCHED sched;
 

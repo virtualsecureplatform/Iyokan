@@ -233,12 +233,22 @@ bool Task::canRunPlain() const
     return false;
 }
 
+bool Task::canRunTFHEpp() const
+{
+    return false;
+}
+
 void Task::onAfterTick(size_t)
 {
     // Do nothing by default.
 }
 
 void Task::startAsynchronously(plain::WorkerInfo&)
+{
+    ERR_UNREACHABLE;
+}
+
+void Task::startAsynchronously(tfhepp::WorkerInfo&)
 {
     ERR_UNREACHABLE;
 }

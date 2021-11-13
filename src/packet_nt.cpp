@@ -361,6 +361,11 @@ TFHEPacket readTFHEPacket(const std::string& path)
     return readFromArchive<TFHEPacket>(path);
 }
 
+void readTFHEppBKey(TFHEppBKey& out, const std::string& path)
+{
+    out = readFromArchive<TFHEppBKey>(path);
+}
+
 void writePlainPacket(std::ostream& os, const PlainPacket& pkt)
 {
     writeToArchive(os, pkt);
@@ -374,6 +379,16 @@ void writePlainPacket(const std::string& path, const PlainPacket& pkt)
 void writeTFHEPacket(std::ostream& os, const TFHEPacket& pkt)
 {
     writeToArchive(os, pkt);
+}
+
+void writeTFHEPacket(const std::string& path, const TFHEPacket& pkt)
+{
+    writeToArchive(path, pkt);
+}
+
+void writeTFHEppBKey(const std::string& path, const TFHEppBKey& bkey)
+{
+    writeToArchive(path, bkey);
 }
 
 }  // namespace nt

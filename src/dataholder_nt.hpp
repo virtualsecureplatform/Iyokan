@@ -1,6 +1,8 @@
 #ifndef VIRTUALSECUREPLATFORM_DATAHOLDER_NT_HPP
 #define VIRTUALSECUREPLATFORM_DATAHOLDER_NT_HPP
 
+#include "tfhepp_cufhe_wrapper.hpp"
+
 #include <cassert>
 
 #include <optional>
@@ -18,19 +20,25 @@ class DataHolder {
 private:
     union {
         const Bit* dataBit_;
+        const TLWELvl0* dataTLWELvl0_;
     };
 
     enum class TYPE {
         UND,
         BIT,
+        TLWE_LVL0,
     } type_;
 
 public:
     DataHolder();
     DataHolder(const Bit* const dataBit);
+    DataHolder(const TLWELvl0* const dataTLWELvl0);
 
     Bit getBit() const;
     void setBit(const Bit* const dataBit);
+
+    void getTLWELvl0(TLWELvl0& out) const;
+    void setTLWELvl0(const TLWELvl0* const dataTLWELvl0);
 };
 
 }  // namespace nt

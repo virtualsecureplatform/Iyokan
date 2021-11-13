@@ -4,12 +4,10 @@
 #include "iyokan_nt.hpp"
 #include "packet_nt.hpp"
 
-#include <fstream>
-
 namespace nt {
 namespace plain {
 
-class WorkerInfo {
+struct WorkerInfo {
 };
 
 class Worker : public nt::Worker {
@@ -891,6 +889,7 @@ void test0()
             blueprintPath,  // blueprintFile
             reqPktPath,     // inputFile
             resPktPath,     // outputFile
+            "",             // bkeyFile
             2,              // numCPUWorkers
             numCycles,      // numCycles
             0,              // currentCycle
@@ -945,6 +944,7 @@ void test0()
                 blueprintPath,   // blueprintFile
                 reqPktPath,      // inputFile
                 resPktPath,      // outputFile
+                "",              // bkeyFile
                 2,               // numCPUWorkers
                 firstNumCycles,  // numCycles
                 0,               // currentCycle
