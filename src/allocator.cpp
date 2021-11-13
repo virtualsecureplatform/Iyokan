@@ -33,7 +33,7 @@ void load(Archive& ar, Bit& b, const std::uint32_t version)
 }
 
 struct Serializable {
-    std::variant<Bit> data;
+    std::variant<Bit, TLWELvl0> data;
 
     template <class Archive>
     void serialize(Archive& ar, const std::uint32_t version)
@@ -74,6 +74,12 @@ Allocator::Allocator(cereal::PortableBinaryInputArchive& ar)
             break;
         }
 
+        case 1: {  // TLWELvl0
+            const TLWELvl0& tlwe = std::get<1>(buf.data);
+            data_.emplace_back(tlwe);
+            break;
+        }
+
         default:
             ERR_UNREACHABLE;
         }
@@ -92,6 +98,11 @@ void Allocator::dumpAllocatedData(cereal::PortableBinaryOutputArchive& ar) const
         tyHandlers;
     tyHandlers[typeid(Bit)] = [&](const std::any& any) {
         const Bit* src = std::any_cast<Bit>(&any);
+        buf.data = *src;
+        ar(buf);
+    };
+    tyHandlers[typeid(TLWELvl0)] = [&](const std::any& any) {
+        const TLWELvl0* src = std::any_cast<TLWELvl0>(&any);
         buf.data = *src;
         ar(buf);
     };

@@ -2,6 +2,7 @@
 
 #include <cereal/archives/portable_binary.hpp>
 #include <cereal/cereal.hpp>
+#include <cereal/types/optional.hpp>
 #include <cereal/types/string.hpp>
 
 #include <fstream>
@@ -36,8 +37,7 @@ Snapshot::Snapshot(const std::string& snapshotFile) : pr_(), alc_(nullptr)
 
     // Read run parameters
     LOG_DBG << "READ RUN PARAMS";
-    ar(pr_.blueprintFile, pr_.inputFile, pr_.outputFile, pr_.numCPUWorkers,
-       pr_.numCycles, pr_.currentCycle, pr_.sched);
+    ar(pr_);
 
     // Read allocator
     LOG_DBG << "READ ALLOCATOR";
@@ -66,8 +66,7 @@ void Snapshot::dump(const std::string& snapshotFile) const
     ar(std::string{"IYSS"});  // IYokan SnapShot
 
     // Serialize pr_ of class RunParameter
-    ar(pr_.blueprintFile, pr_.inputFile, pr_.outputFile, pr_.numCPUWorkers,
-       pr_.numCycles, pr_.currentCycle, pr_.sched);
+    ar(pr_);
 
     // Serialize alc_ of class Allocator
     alc_->dumpAllocatedData(ar);

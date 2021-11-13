@@ -626,8 +626,8 @@ void test0()
     //   "test/out/test06.out", 16);
     // go("test/config-toml/ram-addr9bit.toml", "test/in/test07.in",
     //   "test/out/test07.out", 16);
-    go("test/config-toml/ram-8-16-16.toml", "test/in/test08.in",
-       "test/out/test08.out", 8);
+    // go("test/config-toml/ram-8-16-16.toml", "test/in/test08.in",
+    //   "test/out/test08.out", 8);
     // go("test/config-toml/rom-4-8.toml", "test/in/test15.in",
     //   "test/out/test15.out", 1);
     // go("test/config-toml/counter-4bit.toml", "test/in/test13.in",
@@ -635,7 +635,6 @@ void test0()
     // go("test/config-toml/cahp-ruby.toml", "test/in/test09.in",
     //   "test/out/test09-ruby.out", 7);
 
-    /*
     auto go_ss = [&](const std::string& blueprintPath,
                      const std::string& inPktPath,
                      const std::string& expectedOutPktPath, int numCycles) {
@@ -643,9 +642,10 @@ void test0()
         const char* const resPktPath = "_test_out";
         const char* const snapshotPath = "_test_snapshot";
 
-        auto inPkt = PlainPacket::fromTOML(inPktPath),
-             expectedOutPkt = PlainPacket::fromTOML(expectedOutPktPath);
-        writePlainPacket(reqPktPath, inPkt);
+        auto inPlainPkt = PlainPacket::fromTOML(inPktPath),
+             expectedOutPlainPkt = PlainPacket::fromTOML(expectedOutPktPath);
+        auto inPkt = inPlainPkt.encrypt(*sk);
+        writeTFHEPacket(reqPktPath, inPkt);
 
         int secondNumCycles = numCycles / 2,
             firstNumCycles = numCycles - secondNumCycles;
@@ -656,7 +656,8 @@ void test0()
                 blueprintPath,   // blueprintFile
                 reqPktPath,      // inputFile
                 resPktPath,      // outputFile
-                2,               // numCPUWorkers
+                bkeyPath,        // bkeyFile
+                numCPUCores,     // numCPUWorkers
                 firstNumCycles,  // numCycles
                 0,               // currentCycle
                 SCHED::RANKU,    // sched
@@ -671,23 +672,23 @@ void test0()
             Frontend frontend{ss};
             frontend.run();
 
-            PlainPacket got = readPlainPacket(resPktPath);
-            assert(got == expectedOutPkt);
+            TFHEPacket got = readTFHEPacket(resPktPath);
+            PlainPacket gotPlain = got.decrypt(*sk);
+            assert(gotPlain == expectedOutPlainPkt);
         }
     };
-    go_ss("test/config-toml/addr-register-4bit.toml", "test/in/test16.in",
-          "test/out/test16.out", 3);
-    go_ss("test/config-toml/ram-addr8bit.toml", "test/in/test06.in",
-          "test/out/test06.out", 16);
-    go_ss("test/config-toml/ram-addr9bit.toml", "test/in/test07.in",
-          "test/out/test07.out", 16);
-    go_ss("test/config-toml/ram-8-16-16.toml", "test/in/test08.in",
-          "test/out/test08.out", 8);
+    // go_ss("test/config-toml/addr-register-4bit.toml", "test/in/test16.in",
+    //      "test/out/test16.out", 3);
+    // go_ss("test/config-toml/ram-addr8bit.toml", "test/in/test06.in",
+    //      "test/out/test06.out", 16);
+    // go_ss("test/config-toml/ram-addr9bit.toml", "test/in/test07.in",
+    //      "test/out/test07.out", 16);
+    // go_ss("test/config-toml/ram-8-16-16.toml", "test/in/test08.in",
+    //      "test/out/test08.out", 8);
     go_ss("test/config-toml/counter-4bit.toml", "test/in/test13.in",
           "test/out/test13.out", 3);
     go_ss("test/config-toml/cahp-ruby.toml", "test/in/test09.in",
           "test/out/test09-ruby.out", 7);
-          */
 }
 
 }  // namespace nt::tfhepp

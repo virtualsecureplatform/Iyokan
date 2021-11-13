@@ -479,6 +479,14 @@ struct RunParameter {
     std::optional<std::string> snapshotFile;
 
     void print() const;
+
+    // For cereal
+    template <class Archive>
+    void serialize(Archive& ar)
+    {
+        ar(blueprintFile, inputFile, outputFile, bkeyFile, numCPUWorkers,
+           numCycles, currentCycle, sched, snapshotFile);
+    }
 };
 
 class Snapshot {
