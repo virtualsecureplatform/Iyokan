@@ -356,13 +356,12 @@ CEREAL_REGISTER_TYPE(TaskTFHEpp2CUFHE);
 
 class TaskTFHEppRAMCMUXsForCUFHE : public TaskBase<TFHEppWorkerInfo> {
 private:
-    size_t numReadyInputs_, memFirstIndex_;
-    std::shared_ptr<std::vector<std::shared_ptr<cufhe::cuFHETRLWElvl1>>>
-        outputs_;
+    size_t numReadyInputs_, memIndex_;
+    std::shared_ptr<cufhe::cuFHETRLWElvl1> output_;
     std::vector<std::weak_ptr<const TRGSWLvl1FFTPair>> inputAddrs_;
     std::weak_ptr<const TRLWELvl1> inputWritten_;
 
-    std::vector<std::weak_ptr<cufhe::cuFHETRLWElvl1>> mem_;
+    std::weak_ptr<cufhe::cuFHETRLWElvl1> mem_;
 
     AsyncThread thr_;
 
@@ -371,21 +370,15 @@ public:
     {
     }
 
-    TaskTFHEppRAMCMUXsForCUFHE(
-        size_t addressWidth,
-        std::vector<std::weak_ptr<cufhe::cuFHETRLWElvl1>> mem,
-        size_t memFirstIndex, size_t blockSize)
+    TaskTFHEppRAMCMUXsForCUFHE(size_t addressWidth,
+                               std::weak_ptr<cufhe::cuFHETRLWElvl1> mem,
+                               size_t memIndex)
         : numReadyInputs_(0),
-          memFirstIndex_(memFirstIndex),
+          memIndex_(memIndex),
+          output_(std::make_shared<cufhe::cuFHETRLWElvl1>()),
           inputAddrs_(addressWidth),
           mem_(std::move(mem))
     {
-        assert(mem_.size() == blockSize);
-
-        outputs_ = std::make_shared<
-            std::vector<std::shared_ptr<cufhe::cuFHETRLWElvl1>>>();
-        for (size_t i = 0; i < blockSize; i++)
-            outputs_->push_back(std::make_shared<cufhe::cuFHETRLWElvl1>());
     }
 
     virtual ~TaskTFHEppRAMCMUXsForCUFHE()
@@ -448,32 +441,23 @@ public:
         inputWritten_ = input;
     }
 
-    std::shared_ptr<const std::vector<std::shared_ptr<cufhe::cuFHETRLWElvl1>>>
-    getOutputPtr() const
+    std::shared_ptr<const cufhe::cuFHETRLWElvl1> getOutputPtr() const
     {
-        return outputs_;
+        return output_;
     }
 
     void startAsync(TFHEppWorkerInfo, ProgressGraphMaker* graph) override
     {
-        thr_ = [this, graph] {
-            if (graph)
-                graph->startNode(this->depnode()->label());
+        thr_ = [this] {
+            output_->trlwehost = *inputWritten_.lock();
+            for (size_t j = 0; j < getAddressWidth(); j++) {
+                const TRGSWLvl1FFT& in = (memIndex_ >> j) & 1u
+                                             ? inputAddrs_[j].lock()->normal
+                                             : inputAddrs_[j].lock()->inverted;
 
-            assert(outputs_);
-            for (size_t i = 0; i < outputs_->size(); i++) {
-                auto& output = *(*outputs_)[i];
-                output.trlwehost = *inputWritten_.lock();
-                auto& mem = mem_[i];
-                for (size_t j = 0; j < getAddressWidth(); j++) {
-                    const TRGSWLvl1FFT& in =
-                        ((memFirstIndex_ + i) >> j) & 1u
-                            ? inputAddrs_[j].lock()->normal
-                            : inputAddrs_[j].lock()->inverted;
-                    TFHEpp::CMUXFFT<Lvl1>(output.trlwehost, in,
-                                          output.trlwehost,
-                                          mem.lock()->trlwehost);
-                }
+                TFHEpp::CMUXFFT<Lvl1>(output_->trlwehost, in,
+                                      output_->trlwehost,
+                                      mem_.lock()->trlwehost);
             }
         };
     }
@@ -482,8 +466,8 @@ public:
     void serialize(Archive& ar)
     {
         ar(cereal::base_class<TaskBase<TFHEppWorkerInfo>>(this),
-           numReadyInputs_, memFirstIndex_, outputs_, inputAddrs_,
-           inputWritten_, mem_);
+           numReadyInputs_, memIndex_, output_, inputAddrs_, inputWritten_,
+           mem_);
     }
 };
 CEREAL_REGISTER_TYPE(TaskTFHEppRAMCMUXsForCUFHE);
@@ -605,29 +589,20 @@ public:
 CEREAL_REGISTER_TYPE(TaskCUFHERAMUX);
 
 class TaskCUFHERAMSEIAndKS
-    : public Task<std::vector<std::shared_ptr<cufhe::cuFHETRLWElvl1>>,
-                  cufhe::Ctxt, CUFHEWorkerInfo> {
+    : public Task<cufhe::cuFHETRLWElvl1, cufhe::Ctxt, CUFHEWorkerInfo> {
 private:
     CUFHEWorkerInfo wi_;
-    size_t targetIndex_;
 
 private:
     void startAsyncImpl(CUFHEWorkerInfo wi) override
     {
         wi_ = std::move(wi);
-        cufhe::SampleExtractAndKeySwitch(
-            this->output(), *this->input(0).at(targetIndex_), *wi_.stream);
+        cufhe::SampleExtractAndKeySwitch(output(), input(0), *wi_.stream);
     }
 
 public:
     TaskCUFHERAMSEIAndKS()
-    {
-    }
-
-    TaskCUFHERAMSEIAndKS(size_t targetIndex)
-        : Task<std::vector<std::shared_ptr<cufhe::cuFHETRLWElvl1>>, cufhe::Ctxt,
-               CUFHEWorkerInfo>(1),
-          targetIndex_(targetIndex)
+        : Task<cufhe::cuFHETRLWElvl1, cufhe::Ctxt, CUFHEWorkerInfo>(1)
     {
     }
 
@@ -640,9 +615,7 @@ public:
     void serialize(Archive& ar)
     {
         ar(cereal::base_class<
-               Task<std::vector<std::shared_ptr<cufhe::cuFHETRLWElvl1>>,
-                    cufhe::Ctxt, CUFHEWorkerInfo>>(this),
-           targetIndex_);
+            Task<cufhe::cuFHETRLWElvl1, cufhe::Ctxt, CUFHEWorkerInfo>>(this));
     }
 };
 CEREAL_REGISTER_TYPE(TaskCUFHERAMSEIAndKS);
