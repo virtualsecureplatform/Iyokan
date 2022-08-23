@@ -1,0 +1,8 @@
+[[file]]
+type = "yosys-json"
+path = "../yosys-json/dff-reset.json"
+name = "core"
+
+[connect]
+"core/reset" = "@reset"
+"@out" = "core/io_out"

@@ -752,14 +752,17 @@ public:
             runner.addBridge(bridge1);
 
         // Reset
+        auto reset = maybeGetAt("input", "reset");
+        bool shouldNegateReset = false;
         if (currentCycle_ == 0 && !opt.skipReset) {
             if (auto reset = maybeGetAt("input", "reset"); reset) {
-                TLWELvl0 one, zero;
+                TLWELvl0 one;
                 setTLWELvl0Trivial1(one);
-                setTLWELvl0Trivial0(zero);
                 reset->set(one);
                 runner.run(opt.showCombinationalProgress);
-                reset->set(zero);
+                // NOTE: Don't negate reset here. It makes
+                // test "dff-reset-23" fail.
+                shouldNegateReset = true;
             }
         }
 
@@ -778,6 +781,12 @@ public:
             auto duration = timeit([&] {
                 // Tick
                 runner.tick();
+
+                if (i == 0 && shouldNegateReset) {
+                    TLWELvl0 zero;
+                    setTLWELvl0Trivial0(zero);
+                    reset->set(zero);
+                }
 
                 // Set values to RAM and input ports if necessary
                 if (currentCycle_ == 0)

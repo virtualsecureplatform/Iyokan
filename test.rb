@@ -544,6 +544,9 @@ reg.add("tfhe-addr-addr-4bit-20", [:tfhe]) do
   assert_equal_packet got, expected
 end
 
+reg.add_in_out "dff-reset-23", "test/config-toml/dff-reset.toml",
+               "test/in/test23.in", "test/out/test23.out", ncycles: 1, set_plain_ncycles: true
+
 ##### Run
 runner = reg.get_runner(tags: ARGV.map(&:to_sym))
 runner.run

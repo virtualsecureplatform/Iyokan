@@ -464,11 +464,15 @@ public:
             runner.addNetwork(p.second);
 
         // Reset
+        auto reset = maybeGetAt("input", "reset");
+        bool shouldNegateReset = false;
         if (currentCycle_ == 0 && !opt.skipReset) {
-            if (auto reset = maybeGetAt("input", "reset"); reset) {
+            if (reset) {
                 reset->set(1_b);
                 runner.run(opt.showCombinationalProgress);
-                reset->set(0_b);
+                // NOTE: Don't negate reset here. It makes
+                // test "dff-reset-23" fail.
+                shouldNegateReset = true;
             }
         }
 
@@ -495,6 +499,9 @@ public:
                 auto duration = timeit([&] {
                     // Tick
                     runner.tick();
+
+                    if (i == 0 && shouldNegateReset)
+                        reset->set(0_b);
 
                     // Set values to RAM and input ports if necessary
                     if (currentCycle_ == 0)
