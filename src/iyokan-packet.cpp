@@ -206,7 +206,7 @@ void doToml2Packet(const std::string& in, const std::string& out)
                 v.resize(size, 0_b);
                 auto it = v.begin();
                 for (uint64_t byte : bytes) {
-                    if (byte >= 0xffu)
+                    if (byte >= 256)
                         spdlog::warn(
                             "'bytes' field expects only <256 unsinged integer, "
                             "but got '{}'. Only the lower 8bits is used.",
