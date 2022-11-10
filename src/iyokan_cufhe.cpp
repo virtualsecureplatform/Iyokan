@@ -73,13 +73,15 @@ void capTFHEppNetWithCUFHEWIRE(CUFHENetworkWithTFHEpp& net)
 void makeTFHEppRAMNetworkForCUFHEImpl(
     NetworkBuilderBase<CUFHEWorkerInfo>& bc,
     NetworkBuilderBase<TFHEppWorkerInfo>& bt,
-    std::vector<std::shared_ptr<
-        BridgeDepNode<CUFHEWorkerInfo, TFHEppWorkerInfo>>>& /* bridge0 */,
+    std::vector<
+        std::shared_ptr<BridgeDepNode<CUFHEWorkerInfo, TFHEppWorkerInfo>>>&
+        bridge0,
     std::vector<
         std::shared_ptr<BridgeDepNode<TFHEppWorkerInfo, CUFHEWorkerInfo>>>&
         bridge1,
     size_t addressWidth, const std::string& ramPortName,
-    const std::vector<std::shared_ptr<TaskTFHEppCBWithInv>>& cbs, int indexBit)
+    const std::vector<std::shared_ptr<TaskTFHEppCBWithInv>>& cbs, int indexBit,
+    size_t dataWidth)
 {
     /*
                    +------+
@@ -96,6 +98,19 @@ void makeTFHEppRAMNetworkForCUFHEImpl(
                                   | |
             ...
 
+            +------+              | |
+            | GB   |              | |
+            | Src  |--------------| |
+            | [0]  |              | |
+            +------+              | |
+                                  | |
+            +------+              | |
+            | GB   |              | |
+            | Src  |--------------| |
+            | [1]  |              | |
+            +------+              | |
+
+            ...
 
         ===========================================================================
 
@@ -111,18 +126,18 @@ void makeTFHEppRAMNetworkForCUFHEImpl(
 
         ===========================================================================
 
-               +-------+   B          +-----------+
-        B-> ---+ CMUXs |   r          | Gate      |
-               |  [0]  +-- i -- SEI --| Boot-     |
-        A-> ---+       |   d          | strapping |
-               +-------+   g          +-----------+
+               +-------+   B          +------+
+        B-> ---+ CMUXs |   r          | GB   |
+               |  [0]  +-- i -- SEI --| Sink |
+        A-> ---+       |   d          | [0]  |
+               +-------+   g          +------+
                            e
 
-               +-------+   B          +-----------+
-        B-> ---+ CMUXs |   r          | Gate      |
-               |  [1]  +-- i -- SEI --| Boot-     |
-        A-> ---+       |   d          | strapping |
-               +-------+   g          +-----------+
+               +-------+   B          +------+
+        B-> ---+ CMUXs |   r          | GB   |
+               |  [1]  +-- i -- SEI --| Sink |
+        A-> ---+       |   d          | [1]  |
+               +-------+   g          +------+
                            e
 
                   ...
@@ -132,11 +147,25 @@ void makeTFHEppRAMNetworkForCUFHEImpl(
     // Create RAMUX.
     auto taskRAMUX =
         bt.emplaceTask<TaskCUFHERAMUX>(NodeLabel{"RAMUX", ""}, addressWidth);
-    bt.registerTask("ram", ramPortName, indexBit, taskRAMUX);
 
     // Connect CBs and RAMUX.
     for (auto&& cb : cbs)
         connectTasks(cb, taskRAMUX);
+
+    // Create GBSources and connect them with RAMUX.
+    std::vector<std::shared_ptr<TaskCUFHERAMGateBootstrappingSink>> sinks;
+    for (int i = 0; i < (1 << addressWidth); i++) {
+        auto src = std::make_shared<cufhe::Ctxt>();
+        auto taskGBSrc = bc.emplaceTask<TaskCUFHERAMGateBootstrappingSource>(
+            NodeLabel{"GBSrc", utility::fok("[", i, "]")}, taskRAMUX->get(i),
+            src);
+        auto taskGBSink = bc.emplaceTask<TaskCUFHERAMGateBootstrappingSink>(
+            NodeLabel{"GBSink", utility::fok("[", i, "]")}, src);
+        bc.registerTask("ram", ramPortName, i * dataWidth + indexBit,
+                        taskGBSrc);
+        bridge0.push_back(connectWithBridge(taskGBSrc, taskRAMUX));
+        sinks.push_back(taskGBSink);
+    }
 
     // Create SEIs and connect with CBs.
     auto taskSEI0 = std::make_shared<TaskTFHEppSEI>(0);
@@ -161,7 +190,7 @@ void makeTFHEppRAMNetworkForCUFHEImpl(
     connectTasks(taskInputWriteData, taskMUXWoSE);
     connectTasks(taskInputWriteEnabled, taskMUXWoSE);
 
-    // Create links of CMUXs -> SEI -> GateBootstrapping.
+    // Create links of CMUXs -> SEI -> GateBootstrappingSink.
     for (int i = 0; i < (1 << addressWidth); i++) {
         // Create components...
         auto taskCMUXs = bt.emplaceTask<TaskTFHEppRAMCMUXsForCUFHE>(
@@ -171,15 +200,12 @@ void makeTFHEppRAMNetworkForCUFHEImpl(
         auto taskSEIAndKS = bc.emplaceTask<TaskCUFHERAMSEIAndKS>(
             NodeLabel{"SEI&KS", utility::fok("[", i, "]")});
 
-        auto taskGB = bc.emplaceTask<TaskCUFHERAMGateBootstrapping>(
-            NodeLabel{"GB", utility::fok("[", i, "]")}, taskRAMUX->get(i));
-
         // ... and connect them.
         connectTasks(taskMUXWoSE, taskCMUXs);
         for (auto&& cb : cbs)
             connectTasks(cb, taskCMUXs);
         bridge1.push_back(connectWithBridge(taskCMUXs, taskSEIAndKS));
-        connectTasks(taskSEIAndKS, taskGB);
+        connectTasks(taskSEIAndKS, sinks.at(i));
     }
 }
 
@@ -211,7 +237,7 @@ CUFHENetworkWithTFHEpp makeTFHEppRAMNetworkForCUFHE(
         bt.addOUTPUT<TaskTFHEppGateWIRE>("rdata", indexBit, true);
 
         makeTFHEppRAMNetworkForCUFHEImpl(bc, bt, bridge0, bridge1, addressWidth,
-                                         ramPortName, cbs, indexBit);
+                                         ramPortName, cbs, indexBit, dataWidth);
     }
 
     auto ret = CUFHENetworkWithTFHEpp{
@@ -416,19 +442,12 @@ private:
             using RAM_TYPE = blueprint::BuiltinRAM::TYPE;
             switch (bp.type) {
             case RAM_TYPE::CMUX_MEMORY: {
-                std::vector<TRLWELvl1>& dst = resPacket.ram[bp.name];
-                assert(dst.size() == 0);
-                const size_t dataWidth = bp.inWdataWidth;
-                for (int bit = 0; bit < dataWidth; bit++) {
-                    auto& ram =
-                        *get<TaskCUFHERAMUX>({bp.name, {"ram", "", bit}});
-                    if (dst.size() == 0)
-                        dst.resize(ram.size() * dataWidth);
-                    else
-                        assert(ram.size() == dst.size() / dataWidth);
-                    for (size_t addr = 0; addr < ram.size(); addr++)
-                        dst.at(addr * dataWidth + bit) =
-                            ram.get(addr)->trlwehost;
+                std::vector<TLWELvl0>& dst = resPacket.ramInTLWE[bp.name];
+                for (size_t i = 0; i < (1 << bp.inAddrWidth) * bp.outRdataWidth;
+                     i++) {
+                    const auto& ram = *get<TaskCUFHERAMGateBootstrappingSource>(
+                        {bp.name, {"ram", "", static_cast<int>(i)}});
+                    dst.push_back(ram.get());
                 }
                 break;
             }
@@ -455,18 +474,18 @@ private:
             using RAM_TYPE = blueprint::BuiltinRAM::TYPE;
             switch (bpram.type) {
             case RAM_TYPE::CMUX_MEMORY: {
-                auto it = reqPacket_.ram.find(bpram.name);
-                if (it != reqPacket_.ram.end()) {
+                auto it = reqPacket_.ramInTLWE.find(bpram.name);
+                if (it != reqPacket_.ramInTLWE.end()) {
                     const auto& init = it->second;
-                    const size_t dataWidth = bpram.inWdataWidth;
-                    for (int bit = 0; bit < dataWidth; bit++) {
-                        auto& ram = *get<TaskCUFHERAMUX>(
-                            {bpram.name, {"ram", "", bit}});
-                        if (ram.size() != init.size() / dataWidth)
-                            error::die(
-                                "Invalid request packet: wrong length of RAM");
-                        for (size_t addr = 0; addr < ram.size(); addr++)
-                            ram.set(addr, init.at(addr * dataWidth + bit));
+                    if (init.size() !=
+                        (1 << bpram.inAddrWidth) * bpram.outRdataWidth)
+                        error::die(
+                            "Invalid request packet: wrong length of RAM");
+
+                    for (size_t i = 0; i < init.size(); i++) {
+                        auto& ram = *get<TaskCUFHERAMGateBootstrappingSource>(
+                            {bpram.name, {"ram", "", static_cast<int>(i)}});
+                        ram.set(init.at(i));
                     }
                 }
                 break;

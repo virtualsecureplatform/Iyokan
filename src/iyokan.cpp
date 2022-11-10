@@ -20,6 +20,7 @@ std::unordered_map<int, int> doRankuSort(
         {"RAMUX", 10},       {"SEI&KS", 5},   {"cufhe2tfhepp", 0},
         {"tfhepp2cufhe", 0}, {"bridge", 0},   {"RAMWriter", 0},
         {"RAMReader", 0},    {"ROM", 0},      {"SDFF", 0},
+        {"GBSink", 0},       {"GBSrc", 10},
     };
 
     auto isPseudoInit = [&](int id) {

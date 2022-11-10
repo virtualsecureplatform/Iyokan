@@ -499,12 +499,14 @@ CEREAL_REGISTER_TYPE(TaskTFHEpp2CUFHETRLWELvl1);
 class TaskCUFHERAMUX
     : public TaskAsync<TRGSWLvl1FFTPair, TRLWELvl1, TFHEppWorkerInfo> {
 private:
+    const size_t addressWidth_;
     std::vector<std::shared_ptr<cufhe::cuFHETRLWElvl1>> data_;
     std::vector<TRLWELvl1> temp_;  // temporary workspace for RAMUX()
 
 private:
     void RAMUX()
     {
+        // We just ignore input(j) where j >= addrWidth.
         const size_t addrWidth = getAddressWidth();
         const uint32_t num_trlwe = 1 << addrWidth;
         temp_.resize(num_trlwe / 2);
@@ -540,14 +542,16 @@ private:
     }
 
 public:
-    TaskCUFHERAMUX()
+    TaskCUFHERAMUX() : addressWidth_(0), data_(), temp_()
     {
     }
 
     TaskCUFHERAMUX(size_t addressWidth)
         : TaskAsync<TRGSWLvl1FFTPair, TRLWELvl1, TFHEppWorkerInfo>(
-              addressWidth),
-          data_(1 << addressWidth)
+              addressWidth + (1 << addressWidth)),
+          addressWidth_(addressWidth),
+          data_(1 << addressWidth),
+          temp_()
     {
         for (auto&& p : data_)
             p = std::make_shared<cufhe::cuFHETRLWElvl1>();
@@ -555,7 +559,7 @@ public:
 
     size_t getAddressWidth() const
     {
-        return getInputSize();
+        return addressWidth_;
     }
 
     size_t size() const
@@ -658,6 +662,98 @@ public:
     }
 };
 CEREAL_REGISTER_TYPE(TaskCUFHERAMGateBootstrapping);
+
+class TaskCUFHERAMGateBootstrappingSink
+    : public Task<cufhe::Ctxt, uint8_t /* dummy */, CUFHEWorkerInfo> {
+private:
+    CUFHEWorkerInfo wi_;
+    std::shared_ptr<cufhe::Ctxt> sink_;
+
+private:
+    void startAsyncImpl(CUFHEWorkerInfo) override
+    {
+        copyCtxt(*sink_, input(0));
+    }
+
+public:
+    TaskCUFHERAMGateBootstrappingSink()
+    {
+    }
+
+    TaskCUFHERAMGateBootstrappingSink(std::shared_ptr<cufhe::Ctxt> sink)
+        : Task<cufhe::Ctxt, uint8_t, CUFHEWorkerInfo>(1), sink_(std::move(sink))
+    {
+    }
+
+    bool hasFinished() const override
+    {
+        return true;
+    }
+
+    template <class Archive>
+    void serialize(Archive& ar)
+    {
+        ar(cereal::base_class<Task<cufhe::Ctxt, uint8_t, CUFHEWorkerInfo>>(
+               this),
+           sink_);
+    }
+};
+CEREAL_REGISTER_TYPE(TaskCUFHERAMGateBootstrappingSink);
+
+class TaskCUFHERAMGateBootstrappingSource
+    : public Task<uint8_t /* no input */, TRGSWLvl1FFTPair /* dummy */,
+                  CUFHEWorkerInfo> {
+private:
+    CUFHEWorkerInfo wi_;
+    std::weak_ptr<cufhe::cuFHETRLWElvl1> mem_;
+    std::shared_ptr<cufhe::Ctxt> src_;
+
+private:
+    void startAsyncImpl(CUFHEWorkerInfo wi) override
+    {
+        wi_ = std::move(wi);
+        cufhe::GateBootstrappingTLWE2TRLWElvl01NTT(*mem_.lock(), *src_,
+                                                   *wi_.stream);
+    }
+
+public:
+    TaskCUFHERAMGateBootstrappingSource()
+    {
+    }
+
+    TaskCUFHERAMGateBootstrappingSource(
+        std::weak_ptr<cufhe::cuFHETRLWElvl1> mem,
+        std::shared_ptr<cufhe::Ctxt> src)
+        : Task<uint8_t, TRGSWLvl1FFTPair, CUFHEWorkerInfo>(0),
+          mem_(std::move(mem)),
+          src_(std::move(src))
+    {
+    }
+
+    void set(const TLWELvl0& t)
+    {
+        src_->tlwehost = t;
+    }
+
+    TLWELvl0 get() const
+    {
+        return src_->tlwehost;
+    }
+
+    bool hasFinished() const override
+    {
+        return cufhe::StreamQuery(*wi_.stream);
+    }
+
+    template <class Archive>
+    void serialize(Archive& ar)
+    {
+        ar(cereal::base_class<Task<uint8_t, TRGSWLvl1FFTPair, CUFHEWorkerInfo>>(
+               this),
+           mem_, src_);
+    }
+};
+CEREAL_REGISTER_TYPE(TaskCUFHERAMGateBootstrappingSource);
 
 using CUFHE2TFHEppBridge = BridgeDepNode<CUFHEWorkerInfo, TFHEppWorkerInfo>;
 using TFHEpp2CUFHEBridge = BridgeDepNode<TFHEppWorkerInfo, CUFHEWorkerInfo>;
