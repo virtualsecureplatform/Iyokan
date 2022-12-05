@@ -455,18 +455,18 @@ reg.add_in_out "cahp-ruby-14", "test/config-toml/cahp-ruby.toml",
                "test/in/test14.in", "test/out/test14.out", ncycles: 20, set_plain_ncycles: true, tfhe_tags: nil, cufhe_tags: nil
 reg.add_in_out "cahp-ruby-iyokanl1-09", "test/config-toml/cahp-ruby-iyokanl1.toml",
                "test/in/test09.in", "test/out/test09-ruby.out", ncycles: -1, tfhe_tags: nil, cufhe_tags: nil
-reg.add_in_out("register-init-4bit-18", "test/config-toml/register-init-4bit.toml",
-               "test/in/test18.in", "test/out/test18.out",
-               ncycles: 1, set_plain_ncycles: true,
-               plain_iyokan_args: ["--skip-reset"],
-               tfhe_iyokan_args: ["--skip-reset", "--secret-key", "_test_sk"],
-               cufhe_iyokan_args: ["--skip-reset", "--secret-key", "_test_sk"])
-reg.add_in_out("register-init-4bit-19", "test/config-toml/register-init-4bit.toml",
-               "test/in/test19.in", "test/out/test19.out",
-               ncycles: 2, set_plain_ncycles: true,
-               plain_iyokan_args: ["--skip-reset"],
-               tfhe_iyokan_args: ["--skip-reset", "--secret-key", "_test_sk"],
-               cufhe_iyokan_args: ["--skip-reset", "--secret-key", "_test_sk"])
+#reg.add_in_out("register-init-4bit-18", "test/config-toml/register-init-4bit.toml",
+#               "test/in/test18.in", "test/out/test18.out",
+#               ncycles: 1, set_plain_ncycles: true,
+#               plain_iyokan_args: ["--skip-reset"],
+#               tfhe_iyokan_args: ["--skip-reset", "--secret-key", "_test_sk"],
+#               cufhe_iyokan_args: ["--skip-reset", "--secret-key", "_test_sk"])
+#reg.add_in_out("register-init-4bit-19", "test/config-toml/register-init-4bit.toml",
+#               "test/in/test19.in", "test/out/test19.out",
+#               ncycles: 2, set_plain_ncycles: true,
+#               plain_iyokan_args: ["--skip-reset"],
+#               tfhe_iyokan_args: ["--skip-reset", "--secret-key", "_test_sk"],
+#               cufhe_iyokan_args: ["--skip-reset", "--secret-key", "_test_sk"])
 
 reg.add_in_out "big-mult-21", "test/config-toml/big-mult.toml",
                "test/in/test21.in", "test/out/test21.out", ncycles: 1, set_plain_ncycles: true, tfhe_tags: nil

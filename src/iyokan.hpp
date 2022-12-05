@@ -2277,15 +2277,23 @@ public:
                 bit = get("Q");
                 break;
             case CELL::SDFFPP0:
-                id = builder.SDFF(Bit(false));
-                cellvec.emplace_back(CELL::DFFP, id, get("D"));
-                bit = get("Q");
-                break;
+                error::die(
+                    "Currently $_SDFF_PP0_ and $_SDFF_PP1_ are not supported "
+                    "because Iyokan cannot handle their 'R' inputs correctly. "
+                    "A patch for this issue is welcome!");
+                // id = builder.SDFF(Bit(false));
+                // cellvec.emplace_back(CELL::DFFP, id, get("D"));
+                // bit = get("Q");
+                // break;
             case CELL::SDFFPP1:
-                id = builder.SDFF(Bit(true));
-                cellvec.emplace_back(CELL::DFFP, id, get("D"));
-                bit = get("Q");
-                break;
+                error::die(
+                    "Currently $_SDFF_PP0_ and $_SDFF_PP1_ are not supported "
+                    "because Iyokan cannot handle their 'R' inputs correctly. "
+                    "A patch for this issue is welcome!");
+                // id = builder.SDFF(Bit(true));
+                // cellvec.emplace_back(CELL::DFFP, id, get("D"));
+                // bit = get("Q");
+                // break;
             case CELL::NOT:
                 id = builder.NOT();
                 cellvec.emplace_back(CELL::NOT, id, get("A"));
