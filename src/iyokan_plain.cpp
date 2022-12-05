@@ -70,7 +70,7 @@ struct PlainRunParameter {
     {
     }
 
-    PlainRunParameter(const Options &opt)
+    PlainRunParameter(const Options& opt)
     {
         blueprint = opt.blueprint.value();
         numCPUWorkers =
@@ -81,7 +81,7 @@ struct PlainRunParameter {
         sched = opt.sched == SCHED::UND ? SCHED::RANKU : opt.sched;
     }
 
-    void overwrite(const Options &opt)
+    void overwrite(const Options& opt)
     {
 #define OVERWRITE(name) \
     if (opt.name)       \
@@ -106,7 +106,7 @@ struct PlainRunParameter {
     }
 
     template <class Archive>
-    void serialize(Archive &ar)
+    void serialize(Archive& ar)
     {
         ar(blueprint, numCPUWorkers, numCycles, inputFile, outputFile);
     }
@@ -120,11 +120,11 @@ private:
     int currentCycle_;
 
 private:
-    PlainFrontend(const PlainFrontend &);
-    PlainFrontend &operator=(const PlainFrontend &);
+    PlainFrontend(const PlainFrontend&);
+    PlainFrontend& operator=(const PlainFrontend&);
 
     template <class T = TaskPlainGate>
-    std::shared_ptr<T> get(const blueprint::Port &port)
+    std::shared_ptr<T> get(const blueprint::Port& port)
     {
         auto it = name2net_.find(port.nodeName);
         if (it == name2net_.end())
@@ -138,8 +138,8 @@ private:
     }
 
     template <class T = TaskPlainGateMem>
-    std::shared_ptr<T> get_at(const std::string &kind,
-                              const std::string &portName, int portBit = 0)
+    std::shared_ptr<T> get_at(const std::string& kind,
+                              const std::string& portName, int portBit = 0)
     {
         auto port = pr_.blueprint.at(portName, portBit);
         if (!port || port->portLabel.kind != kind)
@@ -153,7 +153,7 @@ private:
     }
 
     template <class T = TaskPlainGate>
-    std::shared_ptr<T> maybeGet(const blueprint::Port &port)
+    std::shared_ptr<T> maybeGet(const blueprint::Port& port)
     {
         auto it = name2net_.find(port.nodeName);
         if (it == name2net_.end())
@@ -162,8 +162,8 @@ private:
     }
 
     template <class T = TaskPlainGateMem>
-    std::shared_ptr<T> maybeGetAt(const std::string &kind,
-                                  const std::string &portName, int portBit = 0)
+    std::shared_ptr<T> maybeGetAt(const std::string& kind,
+                                  const std::string& portName, int portBit = 0)
     {
         auto port = pr_.blueprint.at(portName, portBit);
         if (!port || port->portLabel.kind != kind)
@@ -176,26 +176,26 @@ private:
         PlainPacket resPacket;
         resPacket.numCycles = numCycles;
         // Get values of output @port
-        for (auto &&[key, port] : pr_.blueprint.atPorts()) {
+        for (auto&& [key, port] : pr_.blueprint.atPorts()) {
             if (port.portLabel.kind != "output")
                 continue;
-            auto &[atPortName, atPortBit] = key;
-            auto &bits = resPacket.bits[atPortName];
+            auto& [atPortName, atPortBit] = key;
+            auto& bits = resPacket.bits[atPortName];
             if (bits.size() < atPortBit + 1)
                 bits.resize(atPortBit + 1);
             bits.at(atPortBit) = get<TaskPlainGateMem>(port)->get();
         }
         // Get values of RAM
         // FIXME: subset of RAMs?
-        for (auto &&bp : pr_.blueprint.builtinRAMs()) {
+        for (auto&& bp : pr_.blueprint.builtinRAMs()) {
             using RAM_TYPE = blueprint::BuiltinRAM::TYPE;
             switch (bp.type) {
             case RAM_TYPE::CMUX_MEMORY: {
-                std::vector<Bit> &dst = resPacket.ram[bp.name];
+                std::vector<Bit>& dst = resPacket.ram[bp.name];
                 assert(dst.size() == 0);
                 const size_t dataWidth = bp.inWdataWidth;
                 for (int bit = 0; bit < dataWidth; bit++) {
-                    auto &ram =
+                    auto& ram =
                         *get<TaskPlainRAMReader>({bp.name, {"ram", "", bit}});
                     if (dst.size() == 0)
                         dst.resize(ram.size() * dataWidth);
@@ -208,10 +208,10 @@ private:
             }
 
             case RAM_TYPE::MUX: {
-                std::vector<Bit> &dst = resPacket.ram[bp.name];
+                std::vector<Bit>& dst = resPacket.ram[bp.name];
                 for (size_t i = 0; i < (1 << bp.inAddrWidth) * bp.outRdataWidth;
                      i++) {
-                    const auto &ram = *get<TaskPlainGateMem>(
+                    const auto& ram = *get<TaskPlainGateMem>(
                         {bp.name, {"ram", "ramdata", static_cast<int>(i)}});
                     dst.push_back(ram.get());
                 }
@@ -225,16 +225,16 @@ private:
 
     void setInitialRAM()
     {
-        for (const auto &bpram : pr_.blueprint.builtinRAMs()) {
+        for (const auto& bpram : pr_.blueprint.builtinRAMs()) {
             using RAM_TYPE = blueprint::BuiltinRAM::TYPE;
             switch (bpram.type) {
             case RAM_TYPE::CMUX_MEMORY: {
                 auto it = reqPacket_.ram.find(bpram.name);
                 if (it != reqPacket_.ram.end()) {
-                    const auto &init = it->second;
+                    const auto& init = it->second;
                     const size_t dataWidth = bpram.inWdataWidth;
                     for (int bit = 0; bit < dataWidth; bit++) {
-                        auto &ram = *get<TaskPlainRAMReader>(
+                        auto& ram = *get<TaskPlainRAMReader>(
                             {bpram.name, {"ram", "", bit}});
                         if (ram.size() != init.size() / dataWidth)
                             error::die(
@@ -249,13 +249,13 @@ private:
             case RAM_TYPE::MUX: {
                 auto it = reqPacket_.ram.find(bpram.name);
                 if (it != reqPacket_.ram.end()) {
-                    const auto &init = it->second;
+                    const auto& init = it->second;
                     if (init.size() !=
                         (1 << bpram.inAddrWidth) * bpram.outRdataWidth)
                         error::die(
                             "Invalid request packet: wrong length of RAM");
                     for (size_t i = 0; i < init.size(); i++) {
-                        auto &ram = *get<TaskPlainGateMem>(
+                        auto& ram = *get<TaskPlainGateMem>(
                             {bpram.name,
                              {"ram", "ramdata", static_cast<int>(i)}});
                         ram.set(init.at(i));
@@ -270,16 +270,16 @@ private:
     void setCircularInputs(int currentCycle)
     {
         // Find input @port
-        for (auto &&[key, port] : pr_.blueprint.atPorts()) {
+        for (auto&& [key, port] : pr_.blueprint.atPorts()) {
             if (port.portLabel.kind != "input")
                 continue;
-            auto &[atPortName, atPortBit] = key;
+            auto& [atPortName, atPortBit] = key;
             auto it = reqPacket_.bits.find(atPortName);
             if (it == reqPacket_.bits.end())
                 continue;
             if (atPortName == "reset")
                 error::die("@reset cannot be set by user's input");
-            const auto &bits = it->second;  // Found input bit stream
+            const auto& bits = it->second;  // Found input bit stream
 
             // Calculate the index in the bit stream for the port.
             size_t index =
@@ -296,20 +296,20 @@ public:
     {
     }
 
-    PlainFrontend(const Options &opt) : pr_(opt), currentCycle_(0)
+    PlainFrontend(const Options& opt) : pr_(opt), currentCycle_(0)
     {
         reqPacket_ = readFromArchive<PlainPacket>(pr_.inputFile);
 
         // Create network according to blueprint and request packet
-        const NetworkBlueprint &bp = pr_.blueprint;
+        const NetworkBlueprint& bp = pr_.blueprint;
 
         // [[file]]
-        for (const auto &file : bp.files())
+        for (const auto& file : bp.files())
             name2net_.emplace(file.name,
                               readNetwork<PlainNetworkBuilder>(file));
 
         // [[builtin]] type = ram | type = mux-ram
-        for (const auto &ram : bp.builtinRAMs()) {
+        for (const auto& ram : bp.builtinRAMs()) {
             using RAM_TYPE = blueprint::BuiltinRAM::TYPE;
             switch (ram.type) {
             case RAM_TYPE::CMUX_MEMORY: {
@@ -333,7 +333,7 @@ public:
         }
 
         // [[builtin]] type = rom | type = mux-rom
-        for (const auto &bprom : bp.builtinROMs()) {
+        for (const auto& bprom : bp.builtinROMs()) {
             using ROM_TYPE = blueprint::BuiltinROM::TYPE;
             switch (bprom.type) {
             case ROM_TYPE::CMUX_MEMORY: {
@@ -346,14 +346,14 @@ public:
                     it != reqPacket_.rom.end()) {
                     const size_t inAddrSpaceSize = 1 << bprom.inAddrWidth;
 
-                    std::vector<Bit> &init = it->second;
+                    std::vector<Bit>& init = it->second;
                     if (init.size() != inAddrSpaceSize * bprom.outRdataWidth)
                         error::die(
                             "Invalid request packet: wrong length of ROM");
 
                     for (int addr = 0; addr < inAddrSpaceSize; addr++) {
                         for (int ibit = 0; ibit < bprom.outRdataWidth; ibit++) {
-                            auto &rom = *get<TaskPlainROMUX>(
+                            auto& rom = *get<TaskPlainROMUX>(
                                 {bprom.name, {"rom", "all", ibit}});
                             assert(rom.size() == inAddrSpaceSize);
                             rom.set(addr,
@@ -373,14 +373,14 @@ public:
                 // Set initial data
                 if (auto it = reqPacket_.rom.find(bprom.name);
                     it != reqPacket_.rom.end()) {
-                    std::vector<Bit> &init = it->second;
+                    std::vector<Bit>& init = it->second;
                     if (init.size() !=
                         (1 << bprom.inAddrWidth) * bprom.outRdataWidth)
                         error::die(
                             "Invalid request packet: wrong length of ROM");
 
                     for (size_t i = 0; i < init.size(); i++) {
-                        auto &rom = *romnet->get<TaskPlainGateMem>(
+                        auto& rom = *romnet->get<TaskPlainGateMem>(
                             {"rom", "romdata", static_cast<int>(i)});
                         rom.set(init.at(i));
                     }
@@ -392,7 +392,7 @@ public:
         }
 
         // Print gate counts
-        for (auto &&[name, net] : name2net_) {
+        for (auto&& [name, net] : name2net_) {
             GateCountVisitor vis;
             net->visit(vis);
 
@@ -400,7 +400,7 @@ public:
                 continue;
 
             spdlog::debug("{} :", name);
-            for (auto &&[kind, count] : vis.kind2count())
+            for (auto&& [kind, count] : vis.kind2count())
                 spdlog::debug("\t{}\t{}", count, kind);
             spdlog::debug("");
         }
@@ -409,11 +409,11 @@ public:
         // We need to treat "... = @..." and "@... = ..." differently from
         // "..." = ...".
         // First, check if ports that are connected to or from "@..." exist.
-        for (auto &&[key, port] : bp.atPorts()) {
+        for (auto&& [key, port] : bp.atPorts()) {
             get(port);  // Only checks if port exists
         }
         // Then, connect other ports. `get` checks if they also exist.
-        for (const auto &[src, dst] : bp.edges()) {
+        for (const auto& [src, dst] : bp.edges()) {
             assert(src.portLabel.kind == "output");
             assert(dst.portLabel.kind == "input");
             auto srcTask = get(src);
@@ -425,7 +425,7 @@ public:
         // Set priority to each DepNode
         {
             GraphVisitor grvis;
-            for (auto &&p : name2net_)
+            for (auto&& p : name2net_)
                 p.second->visit(grvis);
 
             std::optional<PrioritySetVisitor> privis;
@@ -440,17 +440,17 @@ public:
                 error::die("unreachable");
             }
 
-            for (auto &&p : name2net_)
+            for (auto&& p : name2net_)
                 p.second->visit(privis.value());
         }
     }
 
-    void overwriteParams(const Options &rhs)
+    void overwriteParams(const Options& rhs)
     {
         pr_.overwrite(rhs);
     }
 
-    void go(const Options &opt)
+    void go(const Options& opt)
     {
         pr_.print();
 
@@ -460,7 +460,7 @@ public:
                          ? std::make_shared<ProgressGraphMaker>()
                          : nullptr;
         PlainNetworkRunner runner{pr_.numCPUWorkers, graph};
-        for (auto &&p : name2net_)
+        for (auto&& p : name2net_)
             runner.addNetwork(p.second);
 
         // Reset
@@ -555,7 +555,7 @@ public:
     }
 
     template <class Archive>
-    void serialize(Archive &ar)
+    void serialize(Archive& ar)
     {
         ar(pr_, name2net_, reqPacket_, currentCycle_);
     }
@@ -563,7 +563,7 @@ public:
 
 }  // namespace
 
-void processAllGates(PlainNetwork &net, int numWorkers,
+void processAllGates(PlainNetwork& net, int numWorkers,
                      std::shared_ptr<ProgressGraphMaker> graph)
 {
     ReadyQueue<PlainWorkerInfo> readyQueue;
@@ -579,17 +579,17 @@ void processAllGates(PlainNetwork &net, int numWorkers,
     while (numFinishedTargets < net.numNodes()) {
         // Detect infinite loops.
         assert(std::any_of(workers.begin(), workers.end(),
-                           [](auto &&w) { return w.isWorking(); }) ||
+                           [](auto&& w) { return w.isWorking(); }) ||
                !readyQueue.empty());
 
-        for (auto &&w : workers)
+        for (auto&& w : workers)
             w.update();
     }
 
     assert(readyQueue.empty());
 }
 
-void doPlain(const Options &opt)
+void doPlain(const Options& opt)
 {
     std::optional<PlainFrontend> frontend;
     if (opt.resumeFile) {
@@ -605,7 +605,7 @@ void doPlain(const Options &opt)
         writeToArchive(*opt.snapshotFile, *frontend);
 }
 
-bool isSerializedPlainFrontend(const std::string &filepath)
+bool isSerializedPlainFrontend(const std::string& filepath)
 {
     return isCorrectArchive<PlainFrontend>(filepath);
 }

@@ -2,7 +2,7 @@
 
 namespace graph {
 std::unordered_map<int, int> doRankuSort(
-    const std::unordered_map<int, graph::NodePtr> &id2node)
+    const std::unordered_map<int, graph::NodePtr>& id2node)
 {
     // c.f. https://en.wikipedia.org/wiki/Heterogeneous_Earliest_Finish_Time
     // FIXME: Take communication costs into account
@@ -28,14 +28,14 @@ std::unordered_map<int, int> doRankuSort(
 
     // Make a map from id to the number of ready children of the node
     std::unordered_map<NodePtr, int> numReadyChildren;
-    for (auto &&[id, node] : id2node) {
+    for (auto&& [id, node] : id2node) {
         size_t n = std::count_if(node->children.begin(), node->children.end(),
                                  isPseudoInit);
         numReadyChildren.emplace(node, n);
     }
 
     std::queue<NodePtr> que;
-    for (auto &&[id, node] : id2node) {
+    for (auto&& [id, node] : id2node) {
         // Initial nodes should be "terminals", that is,
         // they have no children OR all of their children has no inputs to wait
         // for.
@@ -52,7 +52,7 @@ std::unordered_map<int, int> doRankuSort(
 
         // Calculate the priority for the node
         int pri = 0;
-        for (auto &&childId : node->children) {
+        for (auto&& childId : node->children) {
             NodePtr child = id2node.at(childId);
             if (!child->hasNoInputsToWaitFor)
                 pri = std::max(pri, node2pri.at(child));
@@ -79,7 +79,7 @@ std::unordered_map<int, int> doRankuSort(
     if (id2node.size() > node2pri.size()) {
         spdlog::debug("id2node {} != node2pri {}", id2node.size(),
                       node2pri.size());
-        for (auto &&[id, node] : id2node) {
+        for (auto&& [id, node] : id2node) {
             auto it = node2pri.find(node);
             if (it == node2pri.end()) {
                 spdlog::debug("\t{} {} {}", node->label.id, node->label.kind,
@@ -91,23 +91,23 @@ std::unordered_map<int, int> doRankuSort(
     assert(id2node.size() == node2pri.size());
 
     std::unordered_map<int, int> id2pri;
-    for (auto &&[node, pri] : node2pri)
+    for (auto&& [node, pri] : node2pri)
         id2pri[node->label.id] = pri;
 
     return id2pri;
 }
 
 std::unordered_map<int, int> doTopologicalSort(
-    const std::unordered_map<int, graph::NodePtr> &id2node)
+    const std::unordered_map<int, graph::NodePtr>& id2node)
 {
     // Make a map from id to the number of ready parents of the node
     std::unordered_map<NodePtr, int> numReadyParents;
-    for (auto &&[id, node] : id2node)
+    for (auto&& [id, node] : id2node)
         numReadyParents[node] = 0;
 
     // Make the initial queue for sorting
     std::queue<NodePtr> que;
-    for (auto &&[id, node] : id2node)
+    for (auto&& [id, node] : id2node)
         if (node->hasNoInputsToWaitFor)
             que.push(node);
 
@@ -120,14 +120,14 @@ std::unordered_map<int, int> doTopologicalSort(
         // Get the index for node
         int index = -1;
         if (!node->hasNoInputsToWaitFor) {
-            for (auto &&parentId : node->parents) {
+            for (auto&& parentId : node->parents) {
                 NodePtr parent = id2node.at(parentId);
                 index = std::max(index, node2index.at(parent));
             }
         }
         node2index[node] = index + 1;
 
-        for (auto &&childId : node->children) {
+        for (auto&& childId : node->children) {
             NodePtr child = id2node.at(childId);
             if (child->hasNoInputsToWaitFor)  // false parent-child
                                               // relationship
@@ -142,7 +142,7 @@ std::unordered_map<int, int> doTopologicalSort(
     if (id2node.size() > node2index.size()) {
         spdlog::debug("id2node {} != node2index {}", id2node.size(),
                       node2index.size());
-        for (auto &&[id, node] : id2node) {
+        for (auto&& [id, node] : id2node) {
             auto it = node2index.find(node);
             if (it == node2index.end()) {
                 spdlog::debug("\t{} {} {}", node->label.id, node->label.kind,
@@ -154,7 +154,7 @@ std::unordered_map<int, int> doTopologicalSort(
     assert(id2node.size() == node2index.size());
 
     std::unordered_map<int, int> id2index;
-    for (auto &&[node, index] : node2index)
+    for (auto&& [node, index] : node2index)
         id2index[node->label.id] = index;
 
     return id2index;

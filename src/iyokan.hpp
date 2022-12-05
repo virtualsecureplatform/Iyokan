@@ -104,14 +104,14 @@ struct NodeLabel {
         return utility::fok("#", id, " ", kind, " ", desc);
     }
 
-    std::ostream &operator<<(std::ostream &os)
+    std::ostream& operator<<(std::ostream& os)
     {
         os << str();
         return os;
     }
 
     template <class Archive>
-    void serialize(Archive &ar)
+    void serialize(Archive& ar)
     {
         ar(id, kind, desc);
     }
@@ -148,7 +148,7 @@ private:
     std::mutex mtxWrite_;
 
 private:
-    Node &node(const NodeLabel &label)
+    Node& node(const NodeLabel& label)
     {
         auto [it, emplaced] = nodes_.try_emplace(label.id, Node{label, -1});
         return it->second;
@@ -167,38 +167,38 @@ public:
         numNotifiedEdges_ = 0;
     }
 
-    void startNode(const NodeLabel &label)
+    void startNode(const NodeLabel& label)
     {
         std::lock_guard<std::mutex> lock(mtxWrite_);
 
-        auto &n = node(label);
+        auto& n = node(label);
         n.index = numStartedNodes_++;
         assert(!n.start && !n.end);
         n.start = std::chrono::high_resolution_clock::now();
     }
 
-    void finishNode(const NodeLabel &label)
+    void finishNode(const NodeLabel& label)
     {
         std::lock_guard<std::mutex> lock(mtxWrite_);
 
-        auto &n = node(label);
+        auto& n = node(label);
         assert(n.start && !n.end);
         n.end = std::chrono::high_resolution_clock::now();
     }
 
-    void notify(const NodeLabel &from, const NodeLabel &to)
+    void notify(const NodeLabel& from, const NodeLabel& to)
     {
         edges_.push_back(Edge{from.id, to.id, numNotifiedEdges_++});
     }
 
-    void dumpTime(std::ostream &os) const
+    void dumpTime(std::ostream& os) const
     {
         std::unordered_map<std::string, std::vector<Node>> kind2nodes;
-        for (auto &&[id, node] : nodes_)
+        for (auto&& [id, node] : nodes_)
             kind2nodes[node.label.kind].push_back(node);
-        for (auto &&[kind, nodes] : kind2nodes) {
+        for (auto&& [kind, nodes] : kind2nodes) {
             int64_t total = 0;
-            for (auto &&node : nodes) {
+            for (auto&& node : nodes) {
                 assert(node.start && node.end);
                 total += std::chrono::duration_cast<std::chrono::milliseconds>(
                              *node.end - *node.start)
@@ -208,11 +208,11 @@ public:
         }
     }
 
-    void dumpTimeCSV(std::ostream &os) const
+    void dumpTimeCSV(std::ostream& os) const
     {
         using namespace std::chrono;
 
-        for (auto &&[id, node] : nodes_) {
+        for (auto&& [id, node] : nodes_) {
             using namespace utility;
             os << "\"" << node.start.value() << "\"";
             os << ",\"" << node.end.value() << "\"";
@@ -224,10 +224,10 @@ public:
         }
     }
 
-    void dumpJSON(std::ostream &os) const
+    void dumpJSON(std::ostream& os) const
     {
         picojson::object nodes;
-        for (auto &&[id, node] : nodes_) {
+        for (auto&& [id, node] : nodes_) {
             picojson::object json;
             if (node.start)
                 json.emplace("start", utility::fok(*node.start));
@@ -242,7 +242,7 @@ public:
         }
 
         picojson::array edges;
-        for (auto &&edge : edges_) {
+        for (auto&& edge : edges_) {
             picojson::object json;
             json.emplace("index", static_cast<double>(edge.index));
             json.emplace("from", static_cast<double>(edge.from));
@@ -257,18 +257,18 @@ public:
         os << picojson::value(root);
     }
 
-    void dumpDOT(std::ostream &os) const
+    void dumpDOT(std::ostream& os) const
     {
         os << "digraph progress_graph_maker {" << std::endl;
         os << "node [ shape = record ];" << std::endl;
-        for (auto &&[id, node] : nodes_) {
+        for (auto&& [id, node] : nodes_) {
             os << "n" << id << " [label = \"{" << node.label.kind;
             if (!node.label.desc.empty())
                 os << "|" << node.label.desc;
             os << "}\"];" << std::endl;
         }
         os << std::endl;
-        for (auto &&edge : edges_) {
+        for (auto&& edge : edges_) {
             os << "n" << edge.from << " -> "
                << "n" << edge.to << " [label = \"" << edge.index << "\"];"
                << std::endl;
@@ -301,13 +301,13 @@ public:
         priority_ = newPri;
     }
 
-    const NodeLabel &label() const noexcept
+    const NodeLabel& label() const noexcept
     {
         return label_;
     }
 
     template <class Archive>
-    void serialize(Archive &ar)
+    void serialize(Archive& ar)
     {
         ar(priority_, label_);
     }
@@ -333,11 +333,11 @@ public:
     }
 
     virtual size_t getInputSize() const = 0;
-    virtual void checkValid(error::Stack &err) = 0;
+    virtual void checkValid(error::Stack& err) = 0;
     virtual void notifyOneInputReady() = 0;
     virtual bool areInputsReady() const = 0;
     virtual void startAsync(WorkerInfo,
-                            ProgressGraphMaker *graph = nullptr) = 0;
+                            ProgressGraphMaker* graph = nullptr) = 0;
     virtual bool hasFinished() const = 0;
     virtual void tick() = 0;  // Reset for next process.
 
@@ -346,7 +346,7 @@ public:
     }
 
     template <class Archive>
-    void serialize(Archive &ar)
+    void serialize(Archive& ar)
     {
         ar(depnode_);
     }
@@ -362,19 +362,19 @@ private:
     std::vector<std::weak_ptr<const InType>> inputs_;
 
 protected:
-    const InType &input(size_t index) const
+    const InType& input(size_t index) const
     {
         std::shared_ptr<const InType> in = inputs_.at(index).lock();
         assert(in);
         return *in;
     }
 
-    OutType &output()
+    OutType& output()
     {
         return *output_;
     }
 
-    const OutType &output() const
+    const OutType& output() const
     {
         return *output_;
     }
@@ -384,7 +384,7 @@ protected:
         assert(0 && "Unreachable");
     }
 
-    virtual void startAsyncImpl(WorkerInfo wi, ProgressGraphMaker *graph)
+    virtual void startAsyncImpl(WorkerInfo wi, ProgressGraphMaker* graph)
     {
         startAsyncImpl(std::move(wi));
         if (graph) {
@@ -418,10 +418,10 @@ public:
         inputs_.resize(inputs_.size() + 1);
     }
 
-    void addInputPtr(const std::shared_ptr<const InType> &input)
+    void addInputPtr(const std::shared_ptr<const InType>& input)
     {
         auto it = std::find_if(inputs_.begin(), inputs_.end(),
-                               [](auto &&in) { return in.use_count() == 0; });
+                               [](auto&& in) { return in.use_count() == 0; });
         assert(it != inputs_.end());
         *it = input;
     }
@@ -431,13 +431,13 @@ public:
         return output_;
     }
 
-    void checkValid(error::Stack &err) override
+    void checkValid(error::Stack& err) override
     {
         assert(this->depnode());
 
-        const NodeLabel &label = this->depnode()->label();
+        const NodeLabel& label = this->depnode()->label();
         if (!std::all_of(inputs_.begin(), inputs_.end(),
-                         [](auto &&in) { return in.use_count() != 0; }))
+                         [](auto&& in) { return in.use_count() != 0; }))
             err.add("Not enough inputs: ", label.str());
     }
 
@@ -457,13 +457,13 @@ public:
         return numReadyInputs_ == inputs_.size();
     }
 
-    void startAsync(WorkerInfo wi, ProgressGraphMaker *graph) override
+    void startAsync(WorkerInfo wi, ProgressGraphMaker* graph) override
     {
         startAsyncImpl(std::move(wi), graph);
     }
 
     template <class Archive>
-    void serialize(Archive &ar)
+    void serialize(Archive& ar)
     {
         ar(cereal::base_class<TaskBase<WorkerInfo>>(this), numReadyInputs_,
            output_, inputs_);
@@ -471,8 +471,8 @@ public:
 };
 
 template <class T0, class T1>
-void connectTasks(const std::shared_ptr<T0> &from,
-                  const std::shared_ptr<T1> &to)
+void connectTasks(const std::shared_ptr<T0>& from,
+                  const std::shared_ptr<T1>& to)
 {
     to->addInputPtr(from->getOutputPtr());
     from->depnode()->addDependent(to->depnode());
@@ -485,20 +485,20 @@ struct TaskLabel {
     std::string kind, portName;
     int portBit;
 
-    bool operator==(const TaskLabel &rhs) const
+    bool operator==(const TaskLabel& rhs) const
     {
         return kind == rhs.kind && portName == rhs.portName &&
                portBit == rhs.portBit;
     }
 
-    bool operator<(const TaskLabel &rhs) const
+    bool operator<(const TaskLabel& rhs) const
     {
         return std::make_tuple(kind, portName, portBit) <
                std::make_tuple(rhs.kind, rhs.portName, rhs.portBit);
     }
 
     template <class Archive>
-    void serialize(Archive &ar)
+    void serialize(Archive& ar)
     {
         ar(kind, portName, portBit);
     }
@@ -510,7 +510,7 @@ struct Node {
     std::set<int> parents, children;
     bool hasNoInputsToWaitFor;
 
-    Node(const NodeLabel &label, bool hasNoInputsToWaitFor)
+    Node(const NodeLabel& label, bool hasNoInputsToWaitFor)
         : label(label), hasNoInputsToWaitFor(hasNoInputsToWaitFor)
     {
     }
@@ -518,9 +518,9 @@ struct Node {
 using NodePtr = std::shared_ptr<graph::Node>;
 
 std::unordered_map<int, int> doRankuSort(
-    const std::unordered_map<int, graph::NodePtr> &id2node);
+    const std::unordered_map<int, graph::NodePtr>& id2node);
 std::unordered_map<int, int> doTopologicalSort(
-    const std::unordered_map<int, graph::NodePtr> &id2node);
+    const std::unordered_map<int, graph::NodePtr>& id2node);
 
 }  // namespace graph
 
@@ -538,7 +538,7 @@ private:
 private:
     template <class WorkerInfo>
     std::pair<graph::NodePtr, bool> depnode2node(
-        const DepNode<WorkerInfo> &depnode)
+        const DepNode<WorkerInfo>& depnode)
     {
         auto it = id2node_.find(depnode.label().id);
         if (it != id2node_.end())
@@ -553,7 +553,7 @@ private:
     }
 
 protected:
-    virtual void onStart(DepNodeBase &)
+    virtual void onStart(DepNodeBase&)
     {
     }
 
@@ -575,13 +575,13 @@ public:
         return STRATEGY::DFS;
     }
 
-    const std::unordered_map<int, graph::NodePtr> &getMap() const
+    const std::unordered_map<int, graph::NodePtr>& getMap() const
     {
         return id2node_;
     }
 
     template <class WorkerInfo>
-    bool start(DepNode<WorkerInfo> &curNode)
+    bool start(DepNode<WorkerInfo>& curNode)
     {
         auto [node, isNew] = depnode2node(curNode);
 
@@ -622,7 +622,7 @@ public:
     }
 
 private:
-    void onStart(DepNodeBase &depnode) override
+    void onStart(DepNodeBase& depnode) override
     {
         depnode.priority(id2index_.at(depnode.label().id));
     }
@@ -637,7 +637,7 @@ private:
     std::unordered_map<std::string, int> kind2count_;
 
 public:
-    const std::unordered_map<std::string, int> &kind2count() const
+    const std::unordered_map<std::string, int>& kind2count() const
     {
         return kind2count_;
     }
@@ -648,7 +648,7 @@ public:
     }
 
 private:
-    void onStart(DepNodeBase &depnode) override
+    void onStart(DepNodeBase& depnode) override
     {
         std::string kind = depnode.label().kind;
         auto [it, inserted] = kind2count_.emplace(kind, 0);
@@ -665,7 +665,7 @@ class DepNode : public DepNodeBase,
                 public std::enable_shared_from_this<DepNode<WorkerInfo>> {
     friend TaskNetwork<WorkerInfo>;
     friend void ReadyQueue<WorkerInfo>::push(
-        const std::shared_ptr<DepNode<WorkerInfo>> &);
+        const std::shared_ptr<DepNode<WorkerInfo>>&);
 
 private:
     bool hasQueued_;
@@ -712,7 +712,7 @@ public:
         return task_;
     }
 
-    void addDependent(const std::shared_ptr<DepNode> &dep)
+    void addDependent(const std::shared_ptr<DepNode>& dep)
     {
         dependents_.push_back(dep);
     }
@@ -722,7 +722,7 @@ public:
         task_->startAsync(std::move(wi));
     }
 
-    void start(WorkerInfo wi, ProgressGraphMaker &graph)
+    void start(WorkerInfo wi, ProgressGraphMaker& graph)
     {
         task_->startAsync(std::move(wi), &graph);
     }
@@ -732,9 +732,9 @@ public:
         return task_->hasFinished();
     }
 
-    virtual void propagate(ReadyQueue<WorkerInfo> &readyQueue);
-    virtual void propagate(ReadyQueue<WorkerInfo> &readyQueue,
-                           ProgressGraphMaker &graph);
+    virtual void propagate(ReadyQueue<WorkerInfo>& readyQueue);
+    virtual void propagate(ReadyQueue<WorkerInfo>& readyQueue,
+                           ProgressGraphMaker& graph);
 
     void tick()
     {
@@ -742,13 +742,13 @@ public:
         task_->tick();
     }
 
-    virtual void visit(GraphVisitor &visitor)
+    virtual void visit(GraphVisitor& visitor)
     {
         if (!visitor.start(*this))
             return;
 
         if (visitor.getStrategy() == GraphVisitor::STRATEGY::DFS) {
-            for (auto &&dep : dependents_) {
+            for (auto&& dep : dependents_) {
                 auto next = dep.lock();
                 assert(next);
                 next->visit(visitor);
@@ -764,7 +764,7 @@ public:
     }
 
     template <class Archive>
-    void serialize(Archive &ar)
+    void serialize(Archive& ar)
     {
         ar(cereal::base_class<DepNodeBase>(this), hasQueued_, task_,
            dependents_);
@@ -790,7 +790,7 @@ public:
         return depnode;
     }
 
-    void push(const std::shared_ptr<DepNode<WorkerInfo>> &depnode)
+    void push(const std::shared_ptr<DepNode<WorkerInfo>>& depnode)
     {
         queue_.emplace(depnode->priority(), depnode);
         depnode->hasQueued_ = true;
@@ -798,13 +798,13 @@ public:
 };
 
 template <class WorkerInfo>
-void DepNode<WorkerInfo>::propagate(ReadyQueue<WorkerInfo> &readyQueue)
+void DepNode<WorkerInfo>::propagate(ReadyQueue<WorkerInfo>& readyQueue)
 {
     assert(task_->hasFinished());
 
-    for (auto &&dep_weak : dependents_) {
+    for (auto&& dep_weak : dependents_) {
         auto dep = dep_weak.lock();
-        auto &&task = dep->task_;
+        auto&& task = dep->task_;
 
         task->notifyOneInputReady();
         if (!dep->hasQueued() && task->areInputsReady())
@@ -813,14 +813,14 @@ void DepNode<WorkerInfo>::propagate(ReadyQueue<WorkerInfo> &readyQueue)
 }
 
 template <class WorkerInfo>
-void DepNode<WorkerInfo>::propagate(ReadyQueue<WorkerInfo> &readyQueue,
-                                    ProgressGraphMaker &graph)
+void DepNode<WorkerInfo>::propagate(ReadyQueue<WorkerInfo>& readyQueue,
+                                    ProgressGraphMaker& graph)
 {
     graph.finishNode(label());
 
     propagate(readyQueue);
 
-    for (auto &&dep_weak : dependents_) {
+    for (auto&& dep_weak : dependents_) {
         auto dep = dep_weak.lock();
         graph.notify(label(), dep->label());
     }
@@ -829,13 +829,13 @@ void DepNode<WorkerInfo>::propagate(ReadyQueue<WorkerInfo> &readyQueue,
 template <class WorkerInfo>
 class Worker {
 private:
-    ReadyQueue<WorkerInfo> &readyQueue_;
-    size_t &numFinishedTargets_;
+    ReadyQueue<WorkerInfo>& readyQueue_;
+    size_t& numFinishedTargets_;
     std::shared_ptr<DepNode<WorkerInfo>> target_;
     std::shared_ptr<ProgressGraphMaker> graph_;
 
 public:
-    Worker(ReadyQueue<WorkerInfo> &readyQueue, size_t &numFinishedTargets,
+    Worker(ReadyQueue<WorkerInfo>& readyQueue, size_t& numFinishedTargets,
            std::shared_ptr<ProgressGraphMaker> graph)
         : readyQueue_(readyQueue),
           numFinishedTargets_(numFinishedTargets),
@@ -898,23 +898,23 @@ private:
         std::unordered_map<std::shared_ptr<DepNode<WorkerInfo>>,
                            std::set<std::shared_ptr<DepNode<WorkerInfo>>>>
             sources;
-        for (auto &&[id, depnode] : id2node_)
-            for (auto &&dependent : depnode->dependents_)
+        for (auto&& [id, depnode] : id2node_)
+            for (auto&& dependent : depnode->dependents_)
                 sources[dependent.lock()].insert(depnode);
 
-        for (auto &&[dst, srcs] : sources)
+        for (auto&& [dst, srcs] : sources)
             if (dst->task()->getInputSize() != srcs.size())
                 return false;
 
         return true;
     }
 
-    void checkInputSizeIsExpected(error::Stack &err)
+    void checkInputSizeIsExpected(error::Stack& err)
     {
         GraphVisitor visitor;
         visit(visitor);
-        const auto &id2node = visitor.getMap();
-        for (auto &&[id, node] : id2node)
+        const auto& id2node = visitor.getMap();
+        for (auto&& [id, node] : id2node)
             if (node->parents.size() != id2node_.at(id)->task()->getInputSize())
                 err.add("Incorrect connection: ", node->label.str());
     }
@@ -931,9 +931,9 @@ public:
     {
     }
 
-    TaskNetwork(NetworkBuilderBase<WorkerInfo> &&builder);
+    TaskNetwork(NetworkBuilderBase<WorkerInfo>&& builder);
 
-    const Label2TaskMap &getNamedMems() const
+    const Label2TaskMap& getNamedMems() const
     {
         return namedMems_;
     }
@@ -943,14 +943,14 @@ public:
         return id2node_.size();
     }
 
-    void pushReadyTasks(ReadyQueue<WorkerInfo> &queue) const
+    void pushReadyTasks(ReadyQueue<WorkerInfo>& queue) const
     {
-        for (auto &&[id, node] : id2node_)
+        for (auto&& [id, node] : id2node_)
             if (node->task()->areInputsReady())
                 queue.push(node);
     }
 
-    std::shared_ptr<DepNode<WorkerInfo>> &node(int id)
+    std::shared_ptr<DepNode<WorkerInfo>>& node(int id)
     {
         return id2node_.at(id);
     }
@@ -973,7 +973,7 @@ public:
     }
 
     template <class T>
-    std::shared_ptr<T> get(const std::string &kind, const std::string &portName,
+    std::shared_ptr<T> get(const std::string& kind, const std::string& portName,
                            int portBit)
     {
         return get<T>(TaskLabel{kind, portName, portBit});
@@ -981,14 +981,14 @@ public:
 
     void tick()
     {
-        for (auto &&[key, node] : id2node_)
+        for (auto&& [key, node] : id2node_)
             node->tick();
     }
 
     template <class T>
     void setSDFFInitialValue()
     {
-        for (auto &&[key, node] : id2node_) {
+        for (auto&& [key, node] : id2node_) {
             if (node->label().kind != "SDFF") {
                 continue;
             }
@@ -999,9 +999,9 @@ public:
         }
     }
 
-    void checkValid(error::Stack &err)
+    void checkValid(error::Stack& err)
     {
-        for (auto &&[key, node] : id2node_)
+        for (auto&& [key, node] : id2node_)
             node->task()->checkValid(err);
 
         checkInputSizeIsExpected(err);
@@ -1014,13 +1014,13 @@ public:
         }
     }
 
-    TaskNetwork<WorkerInfo> merge(const TaskNetwork<WorkerInfo> &rhs)
+    TaskNetwork<WorkerInfo> merge(const TaskNetwork<WorkerInfo>& rhs)
     {
         TaskNetwork<WorkerInfo> ret{*this};
 
-        for (auto &&item : rhs.id2node_)
+        for (auto&& item : rhs.id2node_)
             ret.id2node_.insert(item);
-        for (auto &&item : rhs.namedMems_)
+        for (auto&& item : rhs.namedMems_)
             ret.namedMems_.insert(item);
 
         return ret;
@@ -1028,15 +1028,15 @@ public:
 
     template <class T>
     TaskNetwork<WorkerInfo> merge(
-        const TaskNetwork<WorkerInfo> &rhs,
-        const std::vector<std::tuple<std::string, int, std::string, int>>
-            &lhs2rhs,
-        const std::vector<std::tuple<std::string, int, std::string, int>>
-            &rhs2lhs)
+        const TaskNetwork<WorkerInfo>& rhs,
+        const std::vector<std::tuple<std::string, int, std::string, int>>&
+            lhs2rhs,
+        const std::vector<std::tuple<std::string, int, std::string, int>>&
+            rhs2lhs)
     {
         TaskNetwork<WorkerInfo> ret = merge(rhs);
 
-        for (auto &&[lPortName, lPortBit, rPortName, rPortBit] : lhs2rhs) {
+        for (auto&& [lPortName, lPortBit, rPortName, rPortBit] : lhs2rhs) {
             /*
                ------------+  in           out  +-----------
                LHS OUTPUT  |--> connects to >---|  RHS INPUT
@@ -1057,7 +1057,7 @@ public:
             connectTasks(in, out);
         }
 
-        for (auto &&[rPortName, rPortBit, lPortName, lPortBit] : rhs2lhs) {
+        for (auto&& [rPortName, rPortBit, lPortName, lPortBit] : rhs2lhs) {
             /*
                ------------+  in           out  +-----------
                RHS OUTPUT  |--> connects to >---|  LHS INPUT
@@ -1079,11 +1079,11 @@ public:
         return ret;
     }
 
-    void visit(GraphVisitor &visitor)
+    void visit(GraphVisitor& visitor)
     {
         using ST = GraphVisitor::STRATEGY;
         ST st = visitor.getStrategy();
-        for (auto &&[id, node] : id2node_) {
+        for (auto&& [id, node] : id2node_) {
             if (st == ST::SINGLE ||
                 (st == ST::DFS && node->task()->areInputsReady()))
                 node->visit(visitor);
@@ -1091,7 +1091,7 @@ public:
     }
 
     template <class Archive>
-    void serialize(Archive &ar)
+    void serialize(Archive& ar)
     {
         ar(id2node_, namedMems_);
     }
@@ -1116,15 +1116,15 @@ protected:
 
 public:
     template <class T>
-    std::shared_ptr<T> getTask(const std::string &kind,
-                               const std::string &portName, int portBit)
+    std::shared_ptr<T> getTask(const std::string& kind,
+                               const std::string& portName, int portBit)
     {
         return std::dynamic_pointer_cast<T>(
             namedMems_.at(TaskLabel{kind, portName, portBit}));
     }
 
     std::shared_ptr<TaskBase<WorkerInfo>> addTask(
-        NodeLabel label, const std::shared_ptr<TaskBase<WorkerInfo>> &task)
+        NodeLabel label, const std::shared_ptr<TaskBase<WorkerInfo>>& task)
     {
         auto depnode = std::make_shared<DepNode<WorkerInfo>>(task, label);
         depnode->prepareTaskBase();
@@ -1134,16 +1134,16 @@ public:
     }
 
     template <class T, class... Args>
-    std::shared_ptr<T> emplaceTask(NodeLabel label, Args &&... args)
+    std::shared_ptr<T> emplaceTask(NodeLabel label, Args&&... args)
     {
         auto task = std::make_shared<T>(std::forward<Args>(args)...);
         addTask(label, task);
         return task;
     }
 
-    void registerTask(const std::string &kind, const std::string &portName,
+    void registerTask(const std::string& kind, const std::string& portName,
                       int portBit,
-                      const std::shared_ptr<TaskBase<WorkerInfo>> &task)
+                      const std::shared_ptr<TaskBase<WorkerInfo>>& task)
     {
         auto [item, inserted] =
             namedMems_.emplace(TaskLabel{kind, portName, portBit}, task);
@@ -1151,8 +1151,8 @@ public:
     }
 
     template <class T, class... Args>
-    std::shared_ptr<T> addINPUT(const std::string &portName, int portBit,
-                                Args &&... args)
+    std::shared_ptr<T> addINPUT(const std::string& portName, int portBit,
+                                Args&&... args)
     {
         NodeLabel label{"INPUT", utility::fok(portName, "[", portBit, "]")};
         auto task = std::make_shared<T>(std::forward<Args>(args)...);
@@ -1162,8 +1162,8 @@ public:
     }
 
     template <class T, class... Args>
-    std::shared_ptr<T> addOUTPUT(const std::string &portName, int portBit,
-                                 Args &&... args)
+    std::shared_ptr<T> addOUTPUT(const std::string& portName, int portBit,
+                                 Args&&... args)
     {
         NodeLabel label{"OUTPUT", utility::fok(portName, "[", portBit, "]")};
         auto task = std::make_shared<T>(std::forward<Args>(args)...);
@@ -1195,8 +1195,8 @@ protected:
         return task;
     }
 
-    std::shared_ptr<TaskTypeDFF> addNamedDFF(const std::string &kind,
-                                             const std::string &portName,
+    std::shared_ptr<TaskTypeDFF> addNamedDFF(const std::string& kind,
+                                             const std::string& portName,
                                              int portBit)
     {
         auto task = addDFF();
@@ -1205,8 +1205,8 @@ protected:
     }
 
     std::shared_ptr<TaskTypeWIRE> addNamedWIRE(bool inputNeeded,
-                                               const std::string &kind,
-                                               const std::string &portName,
+                                               const std::string& kind,
+                                               const std::string& portName,
                                                int portBit)
     {
         auto task = std::make_shared<TaskTypeWIRE>(inputNeeded);
@@ -1229,20 +1229,20 @@ public:
         return task->depnode()->label().id;
     }
 
-    int ROM(const std::string &portName, int portBit)
+    int ROM(const std::string& portName, int portBit)
     {
         auto task = addNamedWIRE(false, "rom", portName, portBit);
         return task->depnode()->label().id;
     }
 
-    int INPUT(const std::string &portName, int portBit)
+    int INPUT(const std::string& portName, int portBit)
     {
         auto task =
             this->template addINPUT<TaskTypeWIRE>(portName, portBit, false);
         return task->depnode()->label().id;
     }
 
-    int OUTPUT(const std::string &portName, int portBit)
+    int OUTPUT(const std::string& portName, int portBit)
     {
         auto task =
             this->template addOUTPUT<TaskTypeWIRE>(portName, portBit, true);
@@ -1300,7 +1300,7 @@ public:
 };
 
 template <class WorkerInfo>
-TaskNetwork<WorkerInfo>::TaskNetwork(NetworkBuilderBase<WorkerInfo> &&builder)
+TaskNetwork<WorkerInfo>::TaskNetwork(NetworkBuilderBase<WorkerInfo>&& builder)
     : id2node_(std::move(builder.id2node_)),
       namedMems_(std::move(builder.namedMems_))
 {
@@ -1324,7 +1324,7 @@ public:
     }
 
     template <class Func>
-    AsyncThread &operator=(Func func)
+    AsyncThread& operator=(Func func)
     {
         finished_ = false;
         pool_->enqueue([this, func]() {
@@ -1356,18 +1356,18 @@ public:
     {
     }
 
-    void set(const OutType &newval)
+    void set(const OutType& newval)
     {
         this->output() = newval;
     }
 
-    const OutType &get() const
+    const OutType& get() const
     {
         return this->output();
     }
 
     template <class Archive>
-    void serialize(Archive &ar)
+    void serialize(Archive& ar)
     {
         ar(cereal::base_class<Task<InType, OutType, WorkerInfo>>(this));
     }
@@ -1409,7 +1409,7 @@ public:
     }
 
     template <class Archive>
-    void serialize(Archive &ar)
+    void serialize(Archive& ar)
     {
         ar(cereal::base_class<TaskMem<InType, OutType, WorkerInfo>>(this));
     }
@@ -1423,7 +1423,7 @@ private:
 private:
     virtual void startSync(WorkerInfo wi) = 0;
 
-    void startAsyncImpl(WorkerInfo wi, ProgressGraphMaker *graph) override
+    void startAsyncImpl(WorkerInfo wi, ProgressGraphMaker* graph) override
     {
         thr_ = [this, wi, graph] {
             if (graph)
@@ -1448,7 +1448,7 @@ public:
     }
 
     template <class Archive>
-    void serialize(Archive &ar)
+    void serialize(Archive& ar)
     {
         ar(cereal::base_class<Task<InType, OutType, WorkerInfo>>(this));
     }
@@ -1473,7 +1473,7 @@ public:
         return numInputs_;
     }
 
-    void checkValid(error::Stack &) override
+    void checkValid(error::Stack&) override
     {
         assert(this->depnode());
     }
@@ -1489,7 +1489,7 @@ public:
         return numReadyInputs_ == numInputs_;
     }
 
-    void startAsync(WorkerInfo, ProgressGraphMaker *graph) override
+    void startAsync(WorkerInfo, ProgressGraphMaker* graph) override
     {
         if (graph)
             graph->startNode(this->depnode()->label());
@@ -1508,7 +1508,7 @@ public:
     }
 
     template <class Archive>
-    void serialize(Archive &ar)
+    void serialize(Archive& ar)
     {
         ar(cereal::base_class<TaskBase<WorkerInfo>>(this), numInputs_,
            numReadyInputs_);
@@ -1556,7 +1556,7 @@ public:
         outReadyQueue_ = readyQueue;
     }
 
-    void propagate(ReadyQueue<InWorkerInfo> &) override
+    void propagate(ReadyQueue<InWorkerInfo>&) override
     {
         assert(src_);
         assert(!outReadyQueue_.expired());
@@ -1569,8 +1569,8 @@ public:
         }
     }
 
-    void propagate(ReadyQueue<InWorkerInfo> &readyQueue,
-                   ProgressGraphMaker &graph) override
+    void propagate(ReadyQueue<InWorkerInfo>& readyQueue,
+                   ProgressGraphMaker& graph) override
     {
         graph.finishNode(this->label());
 
@@ -1579,7 +1579,7 @@ public:
         graph.notify(this->label(), src_->label());
     }
 
-    void visit(GraphVisitor &visitor) override
+    void visit(GraphVisitor& visitor) override
     {
         if (!visitor.start(*this))
             return;
@@ -1589,7 +1589,7 @@ public:
     }
 
     template <class Archive>
-    void serialize(Archive &ar)
+    void serialize(Archive& ar)
     {
         ar(cereal::base_class<DepNode<InWorkerInfo>>(this), src_);
     }
@@ -1618,7 +1618,7 @@ struct File {
     std::string path, name;
 
     template <class Archive>
-    void serialize(Archive &ar)
+    void serialize(Archive& ar)
     {
         ar(type, path, name);
     }
@@ -1632,7 +1632,7 @@ struct BuiltinROM {
     size_t inAddrWidth, outRdataWidth;
 
     template <class Archive>
-    void serialize(Archive &ar)
+    void serialize(Archive& ar)
     {
         ar(type, name, inAddrWidth, outRdataWidth);
     }
@@ -1646,7 +1646,7 @@ struct BuiltinRAM {
     size_t inAddrWidth, inWdataWidth, outRdataWidth;
 
     template <class Archive>
-    void serialize(Archive &ar)
+    void serialize(Archive& ar)
     {
         ar(type, name, inAddrWidth, inWdataWidth, outRdataWidth);
     }
@@ -1655,13 +1655,13 @@ struct Port {
     std::string nodeName;
     TaskLabel portLabel;
 
-    bool operator==(const Port &rhs) const
+    bool operator==(const Port& rhs) const
     {
         return nodeName == rhs.nodeName && portLabel == rhs.portLabel;
     }
 
     template <class Archive>
-    void serialize(Archive &ar)
+    void serialize(Archive& ar)
     {
         ar(nodeName, portLabel);
     }
@@ -1681,15 +1681,15 @@ private:
 
 public:
     template <class Archive>
-    void serialize(Archive &ar)
+    void serialize(Archive& ar)
     {
         ar(sourceFile_, files_, builtinROMs_, builtinRAMs_, edges_, atPorts_,
            atPortWidths_);
     }
 
 private:
-    std::vector<blueprint::Port> parsePortString(const std::string &src,
-                                                 const std::string &kind)
+    std::vector<blueprint::Port> parsePortString(const std::string& src,
+                                                 const std::string& kind)
     {
         std::string nodeName, portName;
         int portBitFrom, portBitTo;
@@ -1728,7 +1728,7 @@ public:
     {
     }
 
-    NetworkBlueprint(const std::string &fileName) : sourceFile_(fileName)
+    NetworkBlueprint(const std::string& fileName) : sourceFile_(fileName)
     {
         namespace fs = std::filesystem;
 
@@ -1743,7 +1743,7 @@ public:
         {
             const auto srcFiles =
                 toml::find_or<std::vector<toml::value>>(src, "file", {});
-            for (const auto &srcFile : srcFiles) {
+            for (const auto& srcFile : srcFiles) {
                 std::string typeStr = toml::find<std::string>(srcFile, "type");
                 fs::path path = toml::find<std::string>(srcFile, "path");
                 std::string name = toml::find<std::string>(srcFile, "name");
@@ -1767,7 +1767,7 @@ public:
         {
             const auto srcBuiltins =
                 toml::find_or<std::vector<toml::value>>(src, "builtin", {});
-            for (const auto &srcBuiltin : srcBuiltins) {
+            for (const auto& srcBuiltin : srcBuiltins) {
                 const auto type = toml::find<std::string>(srcBuiltin, "type");
                 const auto name = toml::find<std::string>(srcBuiltin, "name");
 
@@ -1805,16 +1805,16 @@ public:
         {
             const auto srcConnect =
                 toml::find_or<toml::table>(src, "connect", {});
-            for (const auto &[srcKey, srcValue] : srcConnect) {
+            for (const auto& [srcKey, srcValue] : srcConnect) {
                 if (srcKey == "TOGND") {  // TOGND = [@...[n:m], @...[n:m], ...]
                     auto ary = toml::get<std::vector<std::string>>(srcValue);
-                    for (const auto &portStr : ary) {  // @...[n:m]
+                    for (const auto& portStr : ary) {  // @...[n:m]
                         if (portStr.empty() || portStr.at(0) != '@')
                             error::die("Invalid port name for TOGND: ",
                                        portStr);
                         auto ports = parsePortString(portStr, "output");
-                        for (auto &&port : ports) {  // @...[n]
-                            const std::string &name = port.portLabel.portName;
+                        for (auto&& port : ports) {  // @...[n]
+                            const std::string& name = port.portLabel.portName;
                             int bit = port.portLabel.portBit;
                             auto [it, inserted] =
                                 atPortWidths_.emplace(name, 0);
@@ -1843,14 +1843,14 @@ public:
                     error::die(errMsg);
 
                 for (size_t i = 0; i < portsTo.size(); i++) {
-                    const blueprint::Port &to = portsTo[i];
-                    const blueprint::Port &from = portsFrom[i];
+                    const blueprint::Port& to = portsTo[i];
+                    const blueprint::Port& from = portsFrom[i];
 
                     if (srcTo[0] == '@') {  // @... = ...
                         if (!to.nodeName.empty() || from.nodeName.empty())
                             error::die(errMsg);
 
-                        const std::string &name = to.portLabel.portName;
+                        const std::string& name = to.portLabel.portName;
                         int bit = to.portLabel.portBit;
 
                         {
@@ -1870,7 +1870,7 @@ public:
                         if (!from.nodeName.empty() || to.nodeName.empty())
                             error::die(errMsg);
 
-                        const std::string &name = from.portLabel.portName;
+                        const std::string& name = from.portLabel.portName;
                         int bit = from.portLabel.portBit;
 
                         {
@@ -1896,48 +1896,48 @@ public:
 
     bool needsCircuitKey() const
     {
-        for (const auto &bprom : builtinROMs_)
+        for (const auto& bprom : builtinROMs_)
             if (bprom.type == blueprint::BuiltinROM::TYPE::CMUX_MEMORY)
                 return true;
-        for (const auto &bpram : builtinRAMs_)
+        for (const auto& bpram : builtinRAMs_)
             if (bpram.type == blueprint::BuiltinRAM::TYPE::CMUX_MEMORY)
                 return true;
         return false;
     }
 
-    const std::string &sourceFile() const
+    const std::string& sourceFile() const
     {
         return sourceFile_;
     }
 
-    const std::vector<blueprint::File> &files() const
+    const std::vector<blueprint::File>& files() const
     {
         return files_;
     }
 
-    const std::vector<blueprint::BuiltinROM> &builtinROMs() const
+    const std::vector<blueprint::BuiltinROM>& builtinROMs() const
     {
         return builtinROMs_;
     }
 
-    const std::vector<blueprint::BuiltinRAM> &builtinRAMs() const
+    const std::vector<blueprint::BuiltinRAM>& builtinRAMs() const
     {
         return builtinRAMs_;
     }
 
-    const std::vector<std::pair<blueprint::Port, blueprint::Port>> &edges()
+    const std::vector<std::pair<blueprint::Port, blueprint::Port>>& edges()
         const
     {
         return edges_;
     }
 
-    const std::map<std::tuple<std::string, int>, blueprint::Port> &atPorts()
+    const std::map<std::tuple<std::string, int>, blueprint::Port>& atPorts()
         const
     {
         return atPorts_;
     }
 
-    std::optional<blueprint::Port> at(const std::string &portName,
+    std::optional<blueprint::Port> at(const std::string& portName,
                                       int portBit = 0) const
     {
         auto it = atPorts_.find(std::make_tuple(portName, portBit));
@@ -1946,7 +1946,7 @@ public:
         return it->second;
     }
 
-    const std::unordered_map<std::string, int> &atPortWidths() const
+    const std::unordered_map<std::string, int>& atPortWidths() const
     {
         return atPortWidths_;
     }
@@ -1994,13 +1994,13 @@ public:
     {
     }
 
-    void addNetwork(const std::shared_ptr<TaskNetwork<WorkerInfo>> &net)
+    void addNetwork(const std::shared_ptr<TaskNetwork<WorkerInfo>>& net)
     {
         nets_.push_back(net);
     }
 
     template <class... Args>
-    void addWorker(Args &&... args)
+    void addWorker(Args&&... args)
     {
         workers_.emplace_back(*readyQueue_, numFinishedTargets_,
                               std::forward<Args>(args)...);
@@ -2012,14 +2012,14 @@ public:
         assert(nets_.empty() || workers_.size() > 0);
 
         numFinishedTargets_ = 0;
-        for (auto &&net : nets_)
+        for (auto&& net : nets_)
             net->pushReadyTasks(*readyQueue_);
     }
 
     size_t numNodes() const
     {
         size_t ret = 0;
-        for (auto &&net : nets_)
+        for (auto&& net : nets_)
             ret += net->numNodes();
         return ret;
     }
@@ -2037,26 +2037,26 @@ public:
     bool isRunning() const
     {
         return std::any_of(workers_.begin(), workers_.end(),
-                           [](auto &&w) { return w.isWorking(); }) ||
+                           [](auto&& w) { return w.isWorking(); }) ||
                !readyQueue_->empty();
     }
 
     void update()
     {
-        for (auto &&w : workers_)
+        for (auto&& w : workers_)
             w.update();
     }
 
     void tick()
     {
-        for (auto &&net : nets_)
+        for (auto&& net : nets_)
             net->tick();
     }
 
     template <class T>
     void setSDFFInitialValue()
     {
-        for (auto &&net : nets_)
+        for (auto&& net : nets_)
             net->template setSDFFInitialValue<T>();
     }
 };
@@ -2112,10 +2112,10 @@ private:
     };
 
 private:
-    static int getConnBit(const picojson::object &conn, const std::string &key)
+    static int getConnBit(const picojson::object& conn, const std::string& key)
     {
         using namespace picojson;
-        const auto &bits = conn.at(key).get<array>();
+        const auto& bits = conn.at(key).get<array>();
         if (bits.size() != 1)
             error::die("Invalid JSON: wrong conn size: expected 1, got ",
                        bits.size());
@@ -2127,7 +2127,7 @@ private:
 
 public:
     template <class NetworkBuilder>
-    static void read(NetworkBuilder &builder, std::istream &is)
+    static void read(NetworkBuilder& builder, std::istream& is)
     {
         // Convert Yosys JSON to gates. Thanks to:
         // https://github.com/virtualsecureplatform/Iyokan-L1/blob/ef7c9a993ddbfd54ef58e66b116b681e59d90a3c/Converter/YosysConverter.cs
@@ -2138,22 +2138,22 @@ public:
         if (!err.empty())
             error::die("Invalid JSON of network: ", err);
 
-        object &root = v.get<object>();
-        object &modules = root.at("modules").get<object>();
+        object& root = v.get<object>();
+        object& modules = root.at("modules").get<object>();
         if (modules.size() != 1)
             error::die(".modules should be an object of size 1");
-        object &modul = modules.begin()->second.get<object>();
-        object &ports = modul.at("ports").get<object>();
-        object &cells = modul.at("cells").get<object>();
+        object& modul = modules.begin()->second.get<object>();
+        object& ports = modul.at("ports").get<object>();
+        object& cells = modul.at("cells").get<object>();
 
         std::unordered_map<int, int> bit2id;
 
         // Create INPUT/OUTPUT and extract port connection info
         std::vector<Port> portvec;
-        for (auto &&[key, valAny] : ports) {
-            object &val = valAny.template get<object>();
-            std::string &direction = val["direction"].get<std::string>();
-            array &bits = val["bits"].get<array>();
+        for (auto&& [key, valAny] : ports) {
+            object& val = valAny.template get<object>();
+            std::string& direction = val["direction"].get<std::string>();
+            array& bits = val["bits"].get<array>();
 
             if (key == "clock")
                 continue;
@@ -2163,7 +2163,7 @@ public:
                 error::die("Invalid direction token: ", direction);
 
             const bool isDirInput = direction == "input";
-            const std::string &portName = key;
+            const std::string& portName = key;
             for (size_t i = 0; i < bits.size(); i++) {
                 const int portBit = i;
 
@@ -2221,11 +2221,11 @@ public:
             {"$_MUX_", CELL::MUX},
         };
         std::vector<Cell> cellvec;
-        for (auto &&[_key, valAny] : cells) {
-            object &val = valAny.template get<object>();
-            const std::string &type = val.at("type").get<std::string>();
-            object &conn = val.at("connections").get<object>();
-            auto get = [&](const char *key) -> int {
+        for (auto&& [_key, valAny] : cells) {
+            object& val = valAny.template get<object>();
+            const std::string& type = val.at("type").get<std::string>();
+            object& conn = val.at("connections").get<object>();
+            auto get = [&](const char* key) -> int {
                 return getConnBit(conn, key);
             };
 
@@ -2309,14 +2309,14 @@ public:
             bit2id.emplace(bit, id);
         }
 
-        for (auto &&port : portvec) {
+        for (auto&& port : portvec) {
             if (port.type == PORT::IN)
                 // Actually nothing to do!
                 continue;
             builder.connect(bit2id.at(port.bit), port.id);
         }
 
-        for (auto &&cell : cellvec) {
+        for (auto&& cell : cellvec) {
             switch (cell.type) {
             case CELL::AND:
             case CELL::NAND:
@@ -2348,7 +2348,7 @@ public:
 class IyokanL1JSONReader {
 public:
     template <class NetworkBuilder>
-    static void read(NetworkBuilder &builder, std::istream &is)
+    static void read(NetworkBuilder& builder, std::istream& is)
     {
         std::unordered_map<int, int> id2taskId;
         auto addId = [&](int id, int taskId) { id2taskId.emplace(id, taskId); };
@@ -2367,10 +2367,10 @@ public:
         if (!err.empty())
             error::die("Invalid JSON of network: ", err);
 
-        picojson::object &obj = v.get<picojson::object>();
-        picojson::array &cells = obj["cells"].get<picojson::array>();
-        picojson::array &ports = obj["ports"].get<picojson::array>();
-        for (const auto &e : ports) {
+        picojson::object& obj = v.get<picojson::object>();
+        picojson::array& cells = obj["cells"].get<picojson::array>();
+        picojson::array& ports = obj["ports"].get<picojson::array>();
+        for (const auto& e : ports) {
             picojson::object port = e.get<picojson::object>();
             std::string type = port.at("type").get<std::string>();
             int id = static_cast<int>(port.at("id").get<double>());
@@ -2381,7 +2381,7 @@ public:
             else if (type == "output")
                 addId(id, builder.OUTPUT(portName, portBit));
         }
-        for (const auto &e : cells) {
+        for (const auto& e : cells) {
             picojson::object cell = e.get<picojson::object>();
             std::string type = cell.at("type").get<std::string>();
             int id = static_cast<int>(cell.at("id").get<double>());
@@ -2424,22 +2424,22 @@ public:
                 }
             }
         }
-        for (const auto &e : ports) {
+        for (const auto& e : ports) {
             picojson::object port = e.get<picojson::object>();
             std::string type = port.at("type").get<std::string>();
             int id = static_cast<int>(port.at("id").get<double>());
-            picojson::array &bits = port.at("bits").get<picojson::array>();
+            picojson::array& bits = port.at("bits").get<picojson::array>();
             if (type == "input") {
                 // nothing to do!
             }
             else if (type == "output") {
-                for (const auto &b : bits) {
+                for (const auto& b : bits) {
                     int logic = static_cast<int>(b.get<double>());
                     connectIds(logic, id);
                 }
             }
         }
-        for (const auto &e : cells) {
+        for (const auto& e : cells) {
             picojson::object cell = e.get<picojson::object>();
             std::string type = cell.at("type").get<std::string>();
             int id = static_cast<int>(cell.at("id").get<double>());
@@ -2477,7 +2477,7 @@ public:
 
 template <class NetworkBuilder>
 std::shared_ptr<typename NetworkBuilder::NetworkType> readNetwork(
-    const blueprint::File &file)
+    const blueprint::File& file)
 {
     using NT = typename NetworkBuilder::NetworkType;
 
@@ -2530,7 +2530,7 @@ std::shared_ptr<typename NetworkBuilder::NetworkType> makeROMWithMUX(
 }
 
 template <class NetworkBuilder>
-void make1bitROMWithMUX(NetworkBuilder &b, const std::vector<int> &addrInputs,
+void make1bitROMWithMUX(NetworkBuilder& b, const std::vector<int>& addrInputs,
                         int outRdataWidth, int indexOutRdata)
 {
     /*
@@ -2638,7 +2638,7 @@ std::shared_ptr<typename NetworkBuilder::NetworkType> makeRAMWithMUX(
 }
 
 template <class NetworkBuilder>
-void make1bitRAMWithMUX(NetworkBuilder &b, const std::vector<int> &addrInputs,
+void make1bitRAMWithMUX(NetworkBuilder& b, const std::vector<int>& addrInputs,
                         int wrenInput, int indexWRdata)
 {
     /*

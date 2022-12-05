@@ -67,7 +67,7 @@ struct TFHEppRunParameter {
     {
     }
 
-    TFHEppRunParameter(const Options &opt)
+    TFHEppRunParameter(const Options& opt)
     {
         blueprint = opt.blueprint.value();
         numCPUWorkers =
@@ -79,7 +79,7 @@ struct TFHEppRunParameter {
         sched = opt.sched == SCHED::UND ? SCHED::RANKU : opt.sched;
     }
 
-    void overwrite(const Options &opt)
+    void overwrite(const Options& opt)
     {
 #define OVERWRITE(name) \
     if (opt.name)       \
@@ -106,7 +106,7 @@ struct TFHEppRunParameter {
     }
 
     template <class Archive>
-    void serialize(Archive &ar)
+    void serialize(Archive& ar)
     {
         ar(blueprint, numCPUWorkers, numCycles, bkeyFile, inputFile,
            outputFile);
@@ -122,11 +122,11 @@ private:
 
 private:
     // Don't allow to copy this object.
-    TFHEppFrontend(const TFHEppFrontend &);
-    TFHEppFrontend &operator=(const TFHEppFrontend &);
+    TFHEppFrontend(const TFHEppFrontend&);
+    TFHEppFrontend& operator=(const TFHEppFrontend&);
 
     template <class T = TaskTFHEppGate>
-    std::shared_ptr<T> get(const blueprint::Port &port)
+    std::shared_ptr<T> get(const blueprint::Port& port)
     {
         auto it = name2net_.find(port.nodeName);
         if (it == name2net_.end())
@@ -140,8 +140,8 @@ private:
     }
 
     template <class T = TaskTFHEppGateMem>
-    std::shared_ptr<T> get_at(const std::string &kind,
-                              const std::string &portName, int portBit = 0)
+    std::shared_ptr<T> get_at(const std::string& kind,
+                              const std::string& portName, int portBit = 0)
     {
         auto port = pr_.blueprint.at(portName, portBit);
         if (!port || port->portLabel.kind != kind)
@@ -155,7 +155,7 @@ private:
     }
 
     template <class T = TaskTFHEppGate>
-    std::shared_ptr<T> maybeGet(const blueprint::Port &port)
+    std::shared_ptr<T> maybeGet(const blueprint::Port& port)
     {
         auto it = name2net_.find(port.nodeName);
         if (it == name2net_.end())
@@ -164,8 +164,8 @@ private:
     }
 
     template <class T = TaskTFHEppGateMem>
-    std::shared_ptr<T> maybeGetAt(const std::string &kind,
-                                  const std::string &portName, int portBit = 0)
+    std::shared_ptr<T> maybeGetAt(const std::string& kind,
+                                  const std::string& portName, int portBit = 0)
     {
         auto port = pr_.blueprint.at(portName, portBit);
         if (!port || port->portLabel.kind != kind)
@@ -179,26 +179,26 @@ private:
         resPacket.numCycles = numCycles;
 
         // Get values of output @port
-        for (auto &&[key, port] : pr_.blueprint.atPorts()) {
+        for (auto&& [key, port] : pr_.blueprint.atPorts()) {
             if (port.portLabel.kind != "output")
                 continue;
-            auto &[atPortName, atPortBit] = key;
-            auto &bits = resPacket.bits[atPortName];
+            auto& [atPortName, atPortBit] = key;
+            auto& bits = resPacket.bits[atPortName];
             if (bits.size() < atPortBit + 1)
                 bits.resize(atPortBit + 1);
             bits.at(atPortBit) = get<TaskTFHEppGateMem>(port)->get();
         }
         // Get values of RAM
         // FIXME: subset of RAMs?
-        for (auto &&bp : pr_.blueprint.builtinRAMs()) {
+        for (auto&& bp : pr_.blueprint.builtinRAMs()) {
             using RAM_TYPE = blueprint::BuiltinRAM::TYPE;
             switch (bp.type) {
             case RAM_TYPE::CMUX_MEMORY: {
-                std::vector<TRLWELvl1> &dst = resPacket.ram[bp.name];
+                std::vector<TRLWELvl1>& dst = resPacket.ram[bp.name];
                 assert(dst.size() == 0);
                 const size_t dataWidth = bp.inWdataWidth;
                 for (int bit = 0; bit < dataWidth; bit++) {
-                    auto &ram =
+                    auto& ram =
                         *get<TaskTFHEppRAMUX>({bp.name, {"ram", "", bit}});
                     if (dst.size() == 0)
                         dst.resize(ram.size() * dataWidth);
@@ -211,10 +211,10 @@ private:
             }
 
             case RAM_TYPE::MUX: {
-                std::vector<TLWELvl0> &dst = resPacket.ramInTLWE[bp.name];
+                std::vector<TLWELvl0>& dst = resPacket.ramInTLWE[bp.name];
                 for (size_t i = 0; i < (1 << bp.inAddrWidth) * bp.outRdataWidth;
                      i++) {
-                    const auto &ram = *get<TaskTFHEppGateMem>(
+                    const auto& ram = *get<TaskTFHEppGateMem>(
                         {bp.name, {"ram", "ramdata", static_cast<int>(i)}});
                     dst.push_back(ram.get());
                 }
@@ -228,16 +228,16 @@ private:
 
     void setInitialRAM()
     {
-        for (const auto &bpram : pr_.blueprint.builtinRAMs()) {
+        for (const auto& bpram : pr_.blueprint.builtinRAMs()) {
             using RAM_TYPE = blueprint::BuiltinRAM::TYPE;
             switch (bpram.type) {
             case RAM_TYPE::CMUX_MEMORY: {
                 auto it = reqPacket_.ram.find(bpram.name);
                 if (it != reqPacket_.ram.end()) {
-                    const auto &init = it->second;
+                    const auto& init = it->second;
                     const size_t dataWidth = bpram.inWdataWidth;
                     for (int bit = 0; bit < dataWidth; bit++) {
-                        auto &ram = *get<TaskTFHEppRAMUX>(
+                        auto& ram = *get<TaskTFHEppRAMUX>(
                             {bpram.name, {"ram", "", bit}});
                         if (ram.size() != init.size() / dataWidth)
                             error::die(
@@ -252,14 +252,14 @@ private:
             case RAM_TYPE::MUX: {
                 auto it = reqPacket_.ramInTLWE.find(bpram.name);
                 if (it != reqPacket_.ramInTLWE.end()) {
-                    const auto &init = it->second;
+                    const auto& init = it->second;
                     if (init.size() !=
                         (1 << bpram.inAddrWidth) * bpram.outRdataWidth)
                         error::die(
                             "Invalid request packet: wrong length of RAM");
 
                     for (size_t i = 0; i < init.size(); i++) {
-                        auto &ram = *get<TaskTFHEppGateMem>(
+                        auto& ram = *get<TaskTFHEppGateMem>(
                             {bpram.name,
                              {"ram", "ramdata", static_cast<int>(i)}});
                         ram.set(init.at(i));
@@ -274,16 +274,16 @@ private:
     void setCircularInputs(int currentCycle)
     {
         // Find input @port
-        for (auto &&[key, port] : pr_.blueprint.atPorts()) {
+        for (auto&& [key, port] : pr_.blueprint.atPorts()) {
             if (port.portLabel.kind != "input")
                 continue;
-            auto &[atPortName, atPortBit] = key;
+            auto& [atPortName, atPortBit] = key;
             auto it = reqPacket_.bits.find(atPortName);
             if (it == reqPacket_.bits.end())
                 continue;
             if (atPortName == "reset")
                 error::die("@reset cannot be set by user's input");
-            const auto &bits = it->second;  // Found input bit stream
+            const auto& bits = it->second;  // Found input bit stream
 
             // Calculate the index in the bit stream for the port.
             size_t index =
@@ -295,8 +295,8 @@ private:
         }
     }
 
-    void dumpDecryptedPacket(const std::string &dumpPrefix,
-                             const std::string &secretKey, int currentCycle)
+    void dumpDecryptedPacket(const std::string& dumpPrefix,
+                             const std::string& secretKey, int currentCycle)
     {
         auto sk = std::make_shared<TFHEpp::SecretKey>();
         readFromArchive(*sk, secretKey);
@@ -309,20 +309,20 @@ public:
     {
     }
 
-    TFHEppFrontend(const Options &opt) : pr_(opt), currentCycle_(0)
+    TFHEppFrontend(const Options& opt) : pr_(opt), currentCycle_(0)
     {
         reqPacket_ = readFromArchive<TFHEPacket>(pr_.inputFile);
 
         // Create network according to blueprint
-        const NetworkBlueprint &bp = pr_.blueprint;
+        const NetworkBlueprint& bp = pr_.blueprint;
 
         // [[file]]
-        for (const auto &file : bp.files())
+        for (const auto& file : bp.files())
             name2net_.emplace(file.name,
                               readNetwork<TFHEppNetworkBuilder>(file));
 
         // [[builtin]] type = ram | type = mux-ram
-        for (const auto &ram : bp.builtinRAMs()) {
+        for (const auto& ram : bp.builtinRAMs()) {
             // FIXME: relax this constraint
             if (ram.inWdataWidth != ram.outRdataWidth)
                 error::die(
@@ -347,7 +347,7 @@ public:
         }
 
         // [[builtin]] type = rom | type = mux-rom
-        for (const auto &bprom : bp.builtinROMs()) {
+        for (const auto& bprom : bp.builtinROMs()) {
             using ROM_TYPE = blueprint::BuiltinROM::TYPE;
             switch (bprom.type) {
             case ROM_TYPE::CMUX_MEMORY: {
@@ -362,8 +362,8 @@ public:
                 // Set initial ROM data
                 if (auto it = reqPacket_.rom.find(bprom.name);
                     it != reqPacket_.rom.end()) {
-                    std::vector<TRLWELvl1> &init = it->second;
-                    auto &rom =
+                    std::vector<TRLWELvl1>& init = it->second;
+                    auto& rom =
                         *get<TaskTFHEppROMUX>({bprom.name, {"rom", "all", 0}});
 
                     if (rom.size() != init.size())
@@ -385,14 +385,14 @@ public:
                 // Set initial data
                 if (auto it = reqPacket_.romInTLWE.find(bprom.name);
                     it != reqPacket_.romInTLWE.end()) {
-                    std::vector<TLWELvl0> &init = it->second;
+                    std::vector<TLWELvl0>& init = it->second;
                     if (init.size() !=
                         (1 << bprom.inAddrWidth) * bprom.outRdataWidth)
                         error::die(
                             "Invalid request packet: wrong length of ROM");
 
                     for (size_t i = 0; i < init.size(); i++) {
-                        auto &rom = *romnet->get<TaskTFHEppGateMem>(
+                        auto& rom = *romnet->get<TaskTFHEppGateMem>(
                             {"rom", "romdata", static_cast<int>(i)});
                         rom.set(init.at(i));
                     }
@@ -404,7 +404,7 @@ public:
         }
 
         // Print gate counts
-        for (auto &&[name, net] : name2net_) {
+        for (auto&& [name, net] : name2net_) {
             GateCountVisitor vis;
             net->visit(vis);
 
@@ -412,7 +412,7 @@ public:
                 continue;
 
             spdlog::debug("{} :", name);
-            for (auto &&[kind, count] : vis.kind2count())
+            for (auto&& [kind, count] : vis.kind2count())
                 spdlog::debug("\t{}\t{}", count, kind);
             spdlog::debug("");
         }
@@ -421,11 +421,11 @@ public:
         // We need to treat "... = @..." and "@... = ..." differently from
         // "..." = ...".
         // First, check if ports that are connected to or from "@..." exist.
-        for (auto &&[key, port] : bp.atPorts()) {
+        for (auto&& [key, port] : bp.atPorts()) {
             get(port);  // Only checks if port exists
         }
         // Then, connect other ports. `get` checks if they also exist.
-        for (const auto &[src, dst] : bp.edges()) {
+        for (const auto& [src, dst] : bp.edges()) {
             assert(src.portLabel.kind == "output");
             assert(dst.portLabel.kind == "input");
             auto srcTask = get(src);
@@ -437,7 +437,7 @@ public:
         // Set priority to each DepNode
         {
             GraphVisitor grvis;
-            for (auto &&p : name2net_)
+            for (auto&& p : name2net_)
                 p.second->visit(grvis);
 
             std::optional<PrioritySetVisitor> privis;
@@ -452,17 +452,17 @@ public:
                 error::die("unreachable");
             }
 
-            for (auto &&p : name2net_)
+            for (auto&& p : name2net_)
                 p.second->visit(privis.value());
         }
     }
 
-    void overwriteParams(const Options &rhs)
+    void overwriteParams(const Options& rhs)
     {
         pr_.overwrite(rhs);
     }
 
-    void go(const Options &opt)
+    void go(const Options& opt)
     {
         pr_.print();
 
@@ -480,7 +480,7 @@ public:
                          : nullptr;
         TFHEppWorkerInfo wi{bkey.gk, bkey.ck};
         TFHEppNetworkRunner runner{pr_.numCPUWorkers, wi, graph};
-        for (auto &&p : name2net_)
+        for (auto&& p : name2net_)
             runner.addNetwork(p.second);
 
         // Reset
@@ -566,7 +566,7 @@ public:
     }
 
     template <class Archive>
-    void serialize(Archive &ar)
+    void serialize(Archive& ar)
     {
         ar(pr_, name2net_, reqPacket_, currentCycle_);
     }
@@ -574,7 +574,7 @@ public:
 
 }  // namespace
 
-void processAllGates(TFHEppNetwork &net, int numWorkers, TFHEppWorkerInfo wi,
+void processAllGates(TFHEppNetwork& net, int numWorkers, TFHEppWorkerInfo wi,
                      std::shared_ptr<ProgressGraphMaker> graph)
 {
     ReadyQueue<TFHEppWorkerInfo> readyQueue;
@@ -590,17 +590,17 @@ void processAllGates(TFHEppNetwork &net, int numWorkers, TFHEppWorkerInfo wi,
     while (numFinishedTargets < net.numNodes()) {
         // Detect infinite loops.
         assert(std::any_of(workers.begin(), workers.end(),
-                           [](auto &&w) { return w.isWorking(); }) ||
+                           [](auto&& w) { return w.isWorking(); }) ||
                !readyQueue.empty());
 
-        for (auto &&w : workers)
+        for (auto&& w : workers)
             w.update();
     }
 
     assert(readyQueue.empty());
 }
 
-void doTFHE(const Options &opt)
+void doTFHE(const Options& opt)
 {
     std::optional<TFHEppFrontend> frontend;
     if (opt.resumeFile) {
@@ -616,7 +616,7 @@ void doTFHE(const Options &opt)
         writeToArchive(*opt.snapshotFile, *frontend);
 }
 
-bool isSerializedTFHEppFrontend(const std::string &filepath)
+bool isSerializedTFHEppFrontend(const std::string& filepath)
 {
     return isCorrectArchive<TFHEppFrontend>(filepath);
 }

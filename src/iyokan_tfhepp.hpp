@@ -49,7 +49,7 @@ public:
     }
 
     template <class Archive>
-    void serialize(Archive &ar)
+    void serialize(Archive& ar)
     {
         ar(cereal::base_class<TaskDFF<TLWELvl0, TLWELvl0, TFHEppWorkerInfo>>(
             this));
@@ -63,7 +63,7 @@ private:
     AsyncThread thr_;
 
 private:
-    void startAsyncImpl(TFHEppWorkerInfo, ProgressGraphMaker *graph) override
+    void startAsyncImpl(TFHEppWorkerInfo, ProgressGraphMaker* graph) override
     {
         if (getInputSize() == 0) {
             if (graph)
@@ -99,7 +99,7 @@ public:
     }
 
     template <class Archive>
-    void serialize(Archive &ar)
+    void serialize(Archive& ar)
     {
         ar(cereal::base_class<TaskMem<TLWELvl0, TLWELvl0, TFHEppWorkerInfo>>(
             this));
@@ -122,7 +122,7 @@ CEREAL_REGISTER_TYPE(TaskTFHEppGateWIRE);
         }                                                   \
                                                             \
         template <class Archive>                            \
-        void serialize(Archive &ar)                         \
+        void serialize(Archive& ar)                         \
         {                                                   \
             ar(cereal::base_class<TaskAsyncTFHEpp>(this));  \
         }                                                   \
@@ -182,8 +182,8 @@ private:
     }
 
 public:
-    TFHEppWorker(ReadyQueue<TFHEppWorkerInfo> &readyQueue,
-                 size_t &numFinishedTargets, TFHEppWorkerInfo wi,
+    TFHEppWorker(ReadyQueue<TFHEppWorkerInfo>& readyQueue,
+                 size_t& numFinishedTargets, TFHEppWorkerInfo wi,
                  std::shared_ptr<ProgressGraphMaker> graph)
         : Worker(readyQueue, numFinishedTargets, graph), wi_(std::move(wi))
     {
@@ -195,7 +195,7 @@ private:
     AsyncThread thrs_[TFHEpp::lvl1param::l];
 
 private:
-    void startAsyncImpl(TFHEppWorkerInfo wi, ProgressGraphMaker *graph) override
+    void startAsyncImpl(TFHEppWorkerInfo wi, ProgressGraphMaker* graph) override
     {
         for (size_t i = 0; i < TFHEpp::lvl1param::l; i++)
             thrs_[i] = [i, wi, this, graph] {
@@ -230,7 +230,7 @@ public:
     }
 
     template <class Archive>
-    void serialize(Archive &ar)
+    void serialize(Archive& ar)
     {
         ar(cereal::base_class<Task<TLWELvl0, TRGSWLvl1FFT, TFHEppWorkerInfo>>(
             this));
@@ -244,7 +244,7 @@ private:
     TLWELvl0 invtlwe_;
 
 private:
-    void startAsyncImpl(TFHEppWorkerInfo wi, ProgressGraphMaker *graph) override
+    void startAsyncImpl(TFHEppWorkerInfo wi, ProgressGraphMaker* graph) override
     {
         for (size_t i = 0; i <= TFHEpp::lvl0param::n; i++)
             invtlwe_[i] = -input(0)[i];
@@ -283,7 +283,7 @@ public:
     }
 
     template <class Archive>
-    void serialize(Archive &ar)
+    void serialize(Archive& ar)
     {
         ar(cereal::base_class<Task<TLWELvl0, TRGSWLvl1FFT, TFHEppWorkerInfo>>(
             this));
@@ -301,7 +301,7 @@ private:
     std::vector<TRLWELvl1> UROMUX_temp;
 
 private:
-    void UROMUX(TRLWELvl1 &result)
+    void UROMUX(TRLWELvl1& result)
     {
         if (inAddrWidth_ <= log2NumWordsPerTRLWE_) {
             result = data_[0];
@@ -312,23 +312,23 @@ private:
         const size_t log2NumTRLWE = inAddrWidth_ - log2NumWordsPerTRLWE_;
         assert(numTRLWE == (1 << log2NumTRLWE));
 
-        std::vector<TRLWELvl1> &temp = UROMUX_temp;
+        std::vector<TRLWELvl1>& temp = UROMUX_temp;
         temp.resize(numTRLWE / 2);
 
         for (size_t bit = 0; bit < log2NumTRLWE; bit++) {
             size_t numCMUX = (numTRLWE >> (bit + 1));
             for (size_t i = 0; i < numCMUX; i++) {
-                auto &in = (bit == 0 ? data_ : temp);
-                auto &out = (bit == log2NumTRLWE - 1 ? result : temp[i]);
+                auto& in = (bit == 0 ? data_ : temp);
+                auto& out = (bit == log2NumTRLWE - 1 ? result : temp[i]);
                 TFHEpp::CMUXFFT<Lvl1>(out, input(log2NumWordsPerTRLWE_ + bit),
                                       in[2 * i], in[2 * i + 1]);
             }
         }
     }
 
-    void LROMUX(const uint32_t N, const TRLWELvl1 &data)
+    void LROMUX(const uint32_t N, const TRLWELvl1& data)
     {
-        TRLWELvl1 &acc = output();
+        TRLWELvl1& acc = output();
         acc = data;
 
         TRLWELvl1 temp;
@@ -384,7 +384,7 @@ public:
     }
 
     template <class Archive>
-    void serialize(Archive &ar)
+    void serialize(Archive& ar)
     {
         ar(cereal::base_class<
                TaskAsync<TRGSWLvl1FFT, TRLWELvl1, TFHEppWorkerInfo>>(this),
@@ -400,7 +400,7 @@ private:
 private:
     void startSync(TFHEppWorkerInfo wi) override
     {
-        const KeySwitchingKey &ksk = wi.gateKey->ksk;
+        const KeySwitchingKey& ksk = wi.gateKey->ksk;
 
         TLWELvl1 reslvl1;
         TFHEpp::SampleExtractIndex<Lvl1>(reslvl1, input(0), index_);
@@ -418,7 +418,7 @@ public:
     }
 
     template <class Archive>
-    void serialize(Archive &ar)
+    void serialize(Archive& ar)
     {
         ar(cereal::base_class<TaskAsync<TRLWELvl1, TLWELvl0, TFHEppWorkerInfo>>(
                this),
@@ -431,7 +431,7 @@ struct TRGSWLvl1FFTPair {
     TRGSWLvl1FFT normal, inverted;
 
     template <class Archive>
-    void serialize(Archive &ar)
+    void serialize(Archive& ar)
     {
         ar(normal, inverted);
     }
@@ -443,7 +443,7 @@ private:
     AsyncThread thrs_[TFHEpp::lvl1param::l];
 
 private:
-    void startAsyncImpl(TFHEppWorkerInfo wi, ProgressGraphMaker *graph) override
+    void startAsyncImpl(TFHEppWorkerInfo wi, ProgressGraphMaker* graph) override
     {
         for (size_t i = 0; i < TFHEpp::lvl1param::l; i++)
             thrs_[i] = [i, wi, this, graph] {
@@ -477,7 +477,7 @@ public:
     }
 
     template <class Archive>
-    void serialize(Archive &ar)
+    void serialize(Archive& ar)
     {
         ar(cereal::base_class<
             Task<TLWELvl0, TRGSWLvl1FFTPair, TFHEppWorkerInfo>>(this));
@@ -497,7 +497,7 @@ private:
         const size_t addrWidth = getAddressWidth();
         const uint32_t num_trlwe = 1 << addrWidth;
         temp_.resize(num_trlwe / 2);
-        auto addr = [this](size_t i) -> const TRGSWLvl1FFT & {
+        auto addr = [this](size_t i) -> const TRGSWLvl1FFT& {
             return input(i).inverted;
         };
 
@@ -537,7 +537,7 @@ public:
               addressWidth),
           data_(1 << addressWidth)
     {
-        for (auto &p : data_)
+        for (auto& p : data_)
             p = std::make_shared<TRLWELvl1>();
     }
 
@@ -556,7 +556,7 @@ public:
         return data_.at(addr);
     }
 
-    std::shared_ptr<TRLWELvl1> &get(size_t addr)
+    std::shared_ptr<TRLWELvl1>& get(size_t addr)
     {
         return data_.at(addr);
     }
@@ -567,7 +567,7 @@ public:
     }
 
     template <class Archive>
-    void serialize(Archive &ar)
+    void serialize(Archive& ar)
     {
         ar(cereal::base_class<
                TaskAsync<TRGSWLvl1FFTPair, TRLWELvl1, TFHEppWorkerInfo>>(this),
@@ -593,7 +593,7 @@ public:
     }
 
     template <class Archive>
-    void serialize(Archive &ar)
+    void serialize(Archive& ar)
     {
         ar(cereal::base_class<TaskAsync<TLWELvl0, TRLWELvl1, TFHEppWorkerInfo>>(
             this));
@@ -641,13 +641,13 @@ public:
         return getAddressWidth() + 1;
     }
 
-    void checkValid(error::Stack &err) override
+    void checkValid(error::Stack& err) override
     {
         assert(this->depnode());
 
-        const NodeLabel &label = this->depnode()->label();
+        const NodeLabel& label = this->depnode()->label();
         if (!std::all_of(inputAddrs_.begin(), inputAddrs_.end(),
-                         [](auto &&in) { return in.use_count() != 0; }) ||
+                         [](auto&& in) { return in.use_count() != 0; }) ||
             inputWritten_.use_count() == 0)
             err.add("Not enough inputs: ", label.str());
     }
@@ -673,15 +673,15 @@ public:
         return thr_.hasFinished();
     }
 
-    void addInputPtr(const std::shared_ptr<const TRGSWLvl1FFTPair> &input)
+    void addInputPtr(const std::shared_ptr<const TRGSWLvl1FFTPair>& input)
     {
         auto it = std::find_if(inputAddrs_.begin(), inputAddrs_.end(),
-                               [](auto &&in) { return in.use_count() == 0; });
+                               [](auto&& in) { return in.use_count() == 0; });
         assert(it != inputAddrs_.end());
         *it = input;
     }
 
-    void addInputPtr(const std::shared_ptr<const TRLWELvl1> &input)
+    void addInputPtr(const std::shared_ptr<const TRLWELvl1>& input)
     {
         assert(inputWritten_.use_count() == 0);
         inputWritten_ = input;
@@ -692,7 +692,7 @@ public:
         return output_;
     }
 
-    void startAsync(TFHEppWorkerInfo, ProgressGraphMaker *graph) override
+    void startAsync(TFHEppWorkerInfo, ProgressGraphMaker* graph) override
     {
         thr_ = [this, graph] {
             if (graph)
@@ -700,7 +700,7 @@ public:
 
             *output_ = *inputWritten_.lock();
             for (size_t j = 0; j < getAddressWidth(); j++) {
-                const TRGSWLvl1FFT &in = (memIndex_ >> j) & 1u
+                const TRGSWLvl1FFT& in = (memIndex_ >> j) & 1u
                                              ? inputAddrs_[j].lock()->normal
                                              : inputAddrs_[j].lock()->inverted;
                 TFHEpp::CMUXFFT<Lvl1>(*output_, in, *output_, *mem_.lock());
@@ -709,7 +709,7 @@ public:
     }
 
     template <class Archive>
-    void serialize(Archive &ar)
+    void serialize(Archive& ar)
     {
         ar(cereal::base_class<TaskBase<TFHEppWorkerInfo>>(this),
            numReadyInputs_, memIndex_, output_, inputAddrs_, inputWritten_,
@@ -726,7 +726,7 @@ private:
 private:
     void startSync(TFHEppWorkerInfo wi) override
     {
-        const GateKeyFFT &gk = *wi.gateKey;
+        const GateKeyFFT& gk = *wi.gateKey;
         TFHEpp::GateBootstrappingTLWE2TRLWEFFT<Lvl01>(*mem_.lock(), input(0),
                                                       gk.bkfftlvl01);
     }
@@ -743,7 +743,7 @@ public:
     }
 
     template <class Archive>
-    void serialize(Archive &ar)
+    void serialize(Archive& ar)
     {
         ar(cereal::base_class<TaskAsync<TLWELvl0, uint8_t, TFHEppWorkerInfo>>(
                this),
@@ -753,9 +753,9 @@ public:
 CEREAL_REGISTER_TYPE(TaskTFHEppRAMGateBootstrapping);
 
 inline void makeTFHEppRAMNetworkImpl(
-    NetworkBuilderBase<TFHEppWorkerInfo> &builder, size_t addressWidth,
-    const std::string &ramPortName,
-    const std::vector<std::shared_ptr<TaskTFHEppCBWithInv>> &cbs, int indexBit)
+    NetworkBuilderBase<TFHEppWorkerInfo>& builder, size_t addressWidth,
+    const std::string& ramPortName,
+    const std::vector<std::shared_ptr<TaskTFHEppCBWithInv>>& cbs, int indexBit)
 {
     /*
         // Address CB
@@ -816,7 +816,7 @@ inline void makeTFHEppRAMNetworkImpl(
     builder.registerTask("ram", ramPortName, indexBit, taskRAMUX);
 
     // Connect CBs and RAMUX.
-    for (auto &&cb : cbs)
+    for (auto&& cb : cbs)
         connectTasks(cb, taskRAMUX);
 
     // Create SEIs and connect with CBs.
@@ -859,7 +859,7 @@ inline void makeTFHEppRAMNetworkImpl(
 
         // ... and connect them.
         connectTasks(taskMUXWoSE, taskCMUXs);
-        for (auto &&cb : cbs)
+        for (auto&& cb : cbs)
             connectTasks(cb, taskCMUXs);
         connectTasks(taskCMUXs, taskSEI);
         connectTasks(taskSEI, taskGB);
@@ -867,7 +867,7 @@ inline void makeTFHEppRAMNetworkImpl(
 }
 
 inline TaskNetwork<TFHEppWorkerInfo> makeTFHEppRAMNetwork(
-    size_t addressWidth, size_t dataWidth, const std::string &ramPortName)
+    size_t addressWidth, size_t dataWidth, const std::string& ramPortName)
 {
     NetworkBuilderBase<TFHEppWorkerInfo> builder;
 
@@ -968,9 +968,9 @@ inline TaskNetwork<TFHEppWorkerInfo> makeTFHEppROMNetwork(
     return TaskNetwork<TFHEppWorkerInfo>(std::move(builder));
 }
 
-bool isSerializedTFHEppFrontend(const std::string &filepath);
-void doTFHE(const Options &opt);
-void processAllGates(TFHEppNetwork &net, int numWorkers, TFHEppWorkerInfo wi,
+bool isSerializedTFHEppFrontend(const std::string& filepath);
+void doTFHE(const Options& opt);
+void processAllGates(TFHEppNetwork& net, int numWorkers, TFHEppWorkerInfo wi,
                      std::shared_ptr<ProgressGraphMaker> graph = nullptr);
 
 #endif

@@ -4,8 +4,7 @@
 #include "iyokan.hpp"
 #include "packet.hpp"
 
-struct PlainWorkerInfo {
-};
+struct PlainWorkerInfo {};
 
 using TaskPlainGate = Task<Bit, Bit, PlainWorkerInfo>;
 using TaskPlainGateMem = TaskMem<Bit, Bit, PlainWorkerInfo>;
@@ -33,7 +32,7 @@ public:
     }
 
     template <class Archive>
-    void serialize(Archive &ar)
+    void serialize(Archive& ar)
     {
         ar(cereal::base_class<TaskDFF<Bit, Bit, PlainWorkerInfo>>(this));
     }
@@ -71,7 +70,7 @@ public:
     }
 
     template <class Archive>
-    void serialize(Archive &ar)
+    void serialize(Archive& ar)
     {
         ar(cereal::base_class<TaskMem<Bit, Bit, PlainWorkerInfo>>(this));
     }
@@ -97,7 +96,7 @@ CEREAL_REGISTER_TYPE(TaskPlainGateWIRE);
         }                                                \
                                                          \
         template <class Archive>                         \
-        void serialize(Archive &ar)                      \
+        void serialize(Archive& ar)                      \
         {                                                \
             ar(cereal::base_class<TaskPlainGate>(this)); \
         }                                                \
@@ -151,8 +150,8 @@ private:
     }
 
 public:
-    PlainWorker(ReadyQueue<PlainWorkerInfo> &readyQueue,
-                size_t &numFinishedTargets,
+    PlainWorker(ReadyQueue<PlainWorkerInfo>& readyQueue,
+                size_t& numFinishedTargets,
                 std::shared_ptr<ProgressGraphMaker> graph)
         : Worker(readyQueue, numFinishedTargets, graph)
     {
@@ -206,7 +205,7 @@ public:
     }
 
     template <class Archive>
-    void serialize(Archive &ar)
+    void serialize(Archive& ar)
     {
         ar(cereal::base_class<Task<Bit, Bit, PlainWorkerInfo>>(this),
            inAddrWidth_, data_);
@@ -220,7 +219,7 @@ private:
 
 public:
     template <class Archive>
-    void serialize(Archive &ar)
+    void serialize(Archive& ar)
     {
         ar(cereal::base_class<Task<Bit, Bit, PlainWorkerInfo>>(this), data_);
     }
@@ -266,7 +265,7 @@ public:
         return data_->at(addr);
     }
 
-    const std::shared_ptr<std::vector<Bit>> &data()
+    const std::shared_ptr<std::vector<Bit>>& data()
     {
         return data_;
     }
@@ -285,7 +284,7 @@ private:
 
 public:
     template <class Archive>
-    void serialize(Archive &ar)
+    void serialize(Archive& ar)
     {
         ar(cereal::base_class<Task<Bit, uint8_t, PlainWorkerInfo>>(this),
            data_);
@@ -319,7 +318,7 @@ public:
     }
 
     TaskPlainRAMWriter(size_t addressWidth,
-                       const std::shared_ptr<std::vector<Bit>> &data)
+                       const std::shared_ptr<std::vector<Bit>>& data)
         : Task<Bit, uint8_t, PlainWorkerInfo>(/* addr */ addressWidth +
                                               /* wren */ 1 +
                                               /* wdata */ 1 +
@@ -343,7 +342,7 @@ public:
 CEREAL_REGISTER_TYPE(TaskPlainRAMWriter);
 
 inline TaskNetwork<PlainWorkerInfo> makePlainRAMNetwork(
-    size_t addressWidth, size_t dataWidth, const std::string &ramPortName)
+    size_t addressWidth, size_t dataWidth, const std::string& ramPortName)
 {
     NetworkBuilderBase<PlainWorkerInfo> builder;
 
@@ -427,7 +426,7 @@ inline TaskNetwork<PlainWorkerInfo> makePlainROMNetwork(size_t inAddrWidth,
 
         auto output = builder.addOUTPUT<TaskPlainGateWIRE>("rdata", i, true);
 
-        for (auto &&in : inputs)
+        for (auto&& in : inputs)
             connectTasks(in, taskROMUX);
         connectTasks(taskROMUX, output);
     }
@@ -435,9 +434,9 @@ inline TaskNetwork<PlainWorkerInfo> makePlainROMNetwork(size_t inAddrWidth,
     return TaskNetwork<PlainWorkerInfo>(std::move(builder));
 }
 
-bool isSerializedPlainFrontend(const std::string &filepath);
-void doPlain(const Options &opt);
-void processAllGates(PlainNetwork &net, int numWorkers,
+bool isSerializedPlainFrontend(const std::string& filepath);
+void doPlain(const Options& opt);
+void processAllGates(PlainNetwork& net, int numWorkers,
                      std::shared_ptr<ProgressGraphMaker> graph = nullptr);
 
 #endif

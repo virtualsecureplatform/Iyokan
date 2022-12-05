@@ -1,12 +1,12 @@
 BasedOnStyle: google
-Standard: Cpp11
+Standard: c++17
 IndentWidth: 4
 BreakBeforeBraces: Stroustrup
 AllowShortCaseLabelsOnASingleLine: false
 IndentCaseLabels: false
 AccessModifierOffset: -4
-AllowShortCaseLabelsOnASingleLine: false
 AllowShortFunctionsOnASingleLine: None
-AllowShortIfStatementsOnASingleLine: false
+AllowShortIfStatementsOnASingleLine: Never
 AllowShortLoopsOnASingleLine: false
 IncludeBlocks: Preserve
+DerivePointerAlignment: false

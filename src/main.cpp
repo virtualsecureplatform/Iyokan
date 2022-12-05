@@ -9,7 +9,7 @@
 #include "iyokan_cufhe.hpp"
 #endif
 
-int main(int argc, char **argv)
+int main(int argc, char** argv)
 {
     error::initialize("iyokan");
 
@@ -53,7 +53,7 @@ int main(int argc, char **argv)
                                           {"ranku", SCHED::RANKU}};
 
     {
-        CLI::App *plain = app.add_subcommand("plain", "");
+        CLI::App* plain = app.add_subcommand("plain", "");
         plain->parse_complete_callback([&] { type = TYPE::PLAIN; });
         plain->add_option("-c", opt.numCycles, "");
         plain->add_option("--cpu", opt.numCPUWorkers, "")
@@ -86,7 +86,7 @@ int main(int argc, char **argv)
         newRun
             ->add_option_function<std::string>(
                 "--blueprint",
-                [&](auto &&filepath) {
+                [&](auto&& filepath) {
                     opt.blueprint = NetworkBlueprint{filepath};
                 })
             ->required()
@@ -102,7 +102,7 @@ int main(int argc, char **argv)
     }
 
     {
-        CLI::App *tfhe = app.add_subcommand("tfhe", "");
+        CLI::App* tfhe = app.add_subcommand("tfhe", "");
         tfhe->parse_complete_callback([&] { type = TYPE::TFHE; });
         tfhe->add_option("--bkey", opt.bkeyFile, "")->required();
         auto optC = tfhe->add_option("-c", opt.numCycles, "");
@@ -136,7 +136,7 @@ int main(int argc, char **argv)
             ->check(CLI::PositiveNumber);
         tfhe->add_option_function<int>(
                 "--gpu_num",
-                [&](const int &v) {
+                [&](const int& v) {
                     spdlog::warn(
                         "Option --gpu_num is deprecated. Use --num-gpu "
                         "instead.");
@@ -156,7 +156,7 @@ int main(int argc, char **argv)
         newRun
             ->add_option_function<std::string>(
                 "--blueprint",
-                [&](auto &&filepath) {
+                [&](auto&& filepath) {
                     opt.blueprint = NetworkBlueprint{filepath};
                 })
             ->required()
