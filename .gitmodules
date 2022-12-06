@@ -28,3 +28,6 @@
 [submodule "fmt"]
 	path = thirdparty/fmt
 	url = https://github.com/fmtlib/fmt.git
+[submodule "thirdparty/loguru"]
+	path = thirdparty/loguru
+	url = https://github.com/emilk/loguru.git
