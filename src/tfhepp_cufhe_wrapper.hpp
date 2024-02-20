@@ -17,25 +17,23 @@ using TRGSWLvl1 = TFHEpp::TRGSW<Lvl1>;
 using TRGSWLvl1FFT = TFHEpp::TRGSWFFT<Lvl1>;
 using TRLWELvl1 = TFHEpp::TRLWE<Lvl1>;
 
-using GateKey = TFHEpp::GateKeywoFFT;
-using GateKeyFFT = TFHEpp::GateKey;
+using EvalKey = TFHEpp::EvalKey;
 using SecretKey = TFHEpp::SecretKey;
-using CircuitKey = TFHEpp::CircuitKey<Lvl02, Lvl21>;
 using KeySwitchingKey = TFHEpp::KeySwitchingKey<Lvl10>;
 
 inline bool decryptTLWELvl0(const TLWELvl0& src, const SecretKey& sk)
 {
-    return TFHEpp::bootsSymDecrypt({src}, sk).at(0);
+    return TFHEpp::bootsSymDecrypt<Lvl0>({src}, sk).at(0);
 }
 
 inline void setTLWELvl0Trivial0(TLWELvl0& dst)
 {
-    TFHEpp::HomCONSTANTZERO(dst);
+    TFHEpp::HomCONSTANTZERO<Lvl0>(dst);
 }
 
 inline void setTLWELvl0Trivial1(TLWELvl0& dst)
 {
-    TFHEpp::HomCONSTANTONE(dst);
+    TFHEpp::HomCONSTANTONE<Lvl0>(dst);
 }
 
 #ifdef IYOKAN_CUDA_ENABLED
@@ -70,28 +68,28 @@ inline void tfhepp2cufheInPlace(cufhe::Ctxt& dst, const TLWELvl0& src)
 
 inline void setCtxtZero(cufhe::Ctxt& out)
 {
-    TFHEpp::HomCONSTANTZERO(out.tlwehost);
+    TFHEpp::HomCONSTANTZERO<Lvl0>(out.tlwehost);
 }
 
 inline void setCtxtOne(cufhe::Ctxt& out)
 {
-    TFHEpp::HomCONSTANTONE(out.tlwehost);
+    TFHEpp::HomCONSTANTONE<Lvl0>(out.tlwehost);
 }
 
-inline void ifftGateKey(GateKey& out, const GateKeyFFT& src)
-{
-    out.ksk = src.ksk;
+// inline void ifftGateKey(GateKey& out, const GateKeyFFT& src)
+// {
+//     out.ksk = src.ksk;
 
-    for (size_t p = 0; p < Lvl0::n; p++) {
-        const TRGSWLvl1FFT& trgswfft = src.bkfftlvl01.at(p);
-        TRGSWLvl1& trgsw = out.bklvl01.at(p);
-        for (size_t q = 0; q < 2 * Lvl1::l; q++) {
-            for (size_t r = 0; r < 2; r++) {
-                TFHEpp::TwistFFT<Lvl1>(trgsw.at(q).at(r), trgswfft.at(q).at(r));
-            }
-        }
-    }
-}
+//     for (size_t p = 0; p < Lvl0::n; p++) {
+//         const TRGSWLvl1FFT& trgswfft = src.bkfftlvl01.at(p);
+//         TRGSWLvl1& trgsw = out.bklvl01.at(p);
+//         for (size_t q = 0; q < 2 * Lvl1::l; q++) {
+//             for (size_t r = 0; r < 2; r++) {
+//                 TFHEpp::TwistFFT<Lvl1>(trgsw.at(q).at(r), trgswfft.at(q).at(r));
+//             }
+//         }
+//     }
+// }
 
 #endif
 #endif

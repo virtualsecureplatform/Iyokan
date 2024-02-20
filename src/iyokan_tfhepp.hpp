@@ -8,8 +8,7 @@
 #include "tfhepp_cufhe_wrapper.hpp"
 
 struct TFHEppWorkerInfo {
-    std::shared_ptr<const GateKeyFFT> gateKey;
-    std::shared_ptr<const CircuitKey> circuitKey;
+    std::shared_ptr<const EvalKey> ek;
 };
 
 using TaskAsyncTFHEpp = TaskAsync<TLWELvl0, TLWELvl0, TFHEppWorkerInfo>;
@@ -24,27 +23,27 @@ public:
     TaskTFHEppGateDFF()
     {
         initialValue_ = 0_b;
-        TFHEpp::HomCONSTANTZERO(output());
+        TFHEpp::HomCONSTANTZERO<Lvl0>(output());
     }
 
     TaskTFHEppGateDFF(Bit initValue)
     {
         initialValue_ = initValue;
         if (initialValue_ == 0_b) {
-            TFHEpp::HomCONSTANTZERO(output());
+            TFHEpp::HomCONSTANTZERO<Lvl0>(output());
         }
         else {
-            TFHEpp::HomCONSTANTONE(output());
+            TFHEpp::HomCONSTANTONE<Lvl0>(output());
         }
     }
 
     void setInitialValue()
     {
         if (initialValue_ == 0_b) {
-            TFHEpp::HomCONSTANTZERO(output());
+            TFHEpp::HomCONSTANTZERO<Lvl0>(output());
         }
         else {
-            TFHEpp::HomCONSTANTONE(output());
+            TFHEpp::HomCONSTANTONE<Lvl0>(output());
         }
     }
 
@@ -112,7 +111,7 @@ CEREAL_REGISTER_TYPE(TaskTFHEppGateWIRE);
     private:                                                \
         void startSync(TFHEppWorkerInfo wi) override        \
         {                                                   \
-            auto gk = wi.gateKey;                           \
+            auto ek = wi.ek;                           \
             (expr);                                         \
         }                                                   \
                                                             \
@@ -128,20 +127,22 @@ CEREAL_REGISTER_TYPE(TaskTFHEppGateWIRE);
         }                                                   \
     };                                                      \
     CEREAL_REGISTER_TYPE(TaskTFHEppGate##name);
-DEFINE_TASK_GATE(AND, 2, TFHEpp::HomAND(output(), input(0), input(1), *gk));
-DEFINE_TASK_GATE(NAND, 2, TFHEpp::HomNAND(output(), input(0), input(1), *gk));
+#define COMMA ,
+DEFINE_TASK_GATE(AND, 2, TFHEpp::HomAND<TFHEpp::lvl01param COMMA TFHEpp::lvl1param::μ COMMA TFHEpp::lvl10param>(output(), input(0), input(1), *ek));
+DEFINE_TASK_GATE(NAND, 2, TFHEpp::HomNAND<TFHEpp::lvl01param COMMA TFHEpp::lvl1param::μ COMMA TFHEpp::lvl10param>(output(), input(0), input(1), *ek));
 DEFINE_TASK_GATE(ANDNOT, 2,
-                 TFHEpp::HomANDYN(output(), input(0), input(1), *gk));
-DEFINE_TASK_GATE(OR, 2, TFHEpp::HomOR(output(), input(0), input(1), *gk));
-DEFINE_TASK_GATE(NOR, 2, TFHEpp::HomNOR(output(), input(0), input(1), *gk));
-DEFINE_TASK_GATE(ORNOT, 2, TFHEpp::HomORYN(output(), input(0), input(1), *gk));
-DEFINE_TASK_GATE(XOR, 2, TFHEpp::HomXOR(output(), input(0), input(1), *gk));
-DEFINE_TASK_GATE(XNOR, 2, TFHEpp::HomXNOR(output(), input(0), input(1), *gk));
+                 TFHEpp::HomANDYN<TFHEpp::lvl01param COMMA TFHEpp::lvl1param::μ COMMA TFHEpp::lvl10param>(output(), input(0), input(1), *ek));
+DEFINE_TASK_GATE(OR, 2, TFHEpp::HomOR<TFHEpp::lvl01param COMMA TFHEpp::lvl1param::μ COMMA TFHEpp::lvl10param>(output(), input(0), input(1), *ek));
+DEFINE_TASK_GATE(NOR, 2, TFHEpp::HomNOR<TFHEpp::lvl01param COMMA TFHEpp::lvl1param::μ COMMA TFHEpp::lvl10param>(output(), input(0), input(1), *ek));
+DEFINE_TASK_GATE(ORNOT, 2, TFHEpp::HomORYN<TFHEpp::lvl01param COMMA TFHEpp::lvl1param::μ COMMA TFHEpp::lvl10param>(output(), input(0), input(1), *ek));
+DEFINE_TASK_GATE(XOR, 2, TFHEpp::HomXOR<TFHEpp::lvl01param COMMA TFHEpp::lvl1param::μ COMMA TFHEpp::lvl10param>(output(), input(0), input(1), *ek));
+DEFINE_TASK_GATE(XNOR, 2, TFHEpp::HomXNOR<TFHEpp::lvl01param COMMA TFHEpp::lvl1param::μ COMMA TFHEpp::lvl10param>(output(), input(0), input(1), *ek));
 DEFINE_TASK_GATE(MUX, 3,
-                 TFHEpp::HomMUX(output(), input(2), input(1), input(0), *gk));
-DEFINE_TASK_GATE(NOT, 1, TFHEpp::HomNOT(output(), input(0)));
-DEFINE_TASK_GATE(CONSTONE, 0, TFHEpp::HomCONSTANTONE(output()));
-DEFINE_TASK_GATE(CONSTZERO, 0, TFHEpp::HomCONSTANTZERO(output()));
+                 TFHEpp::HomMUX<Lvl0>(output(), input(2), input(1), input(0), *ek));
+DEFINE_TASK_GATE(NOT, 1, TFHEpp::HomNOT<Lvl0>(output(), input(0)));
+DEFINE_TASK_GATE(CONSTONE, 0, TFHEpp::HomCONSTANTONE<Lvl0>(output()));
+DEFINE_TASK_GATE(CONSTZERO, 0, TFHEpp::HomCONSTANTZERO<Lvl0>(output()));
+#undef COMMA
 #undef DEFINE_TASK_GATE
 
 class TFHEppNetworkBuilder
@@ -190,43 +191,17 @@ public:
     }
 };
 
-class TaskTFHEppCB : public Task<TLWELvl0, TRGSWLvl1FFT, TFHEppWorkerInfo> {
+class TaskTFHEppCB : public TaskAsync<TLWELvl0, TRGSWLvl1FFT, TFHEppWorkerInfo> {
 private:
-    AsyncThread thrs_[TFHEpp::lvl1param::l];
-
-private:
-    void startAsyncImpl(TFHEppWorkerInfo wi, ProgressGraphMaker* graph) override
+    void startSync(TFHEppWorkerInfo wi) override
     {
-        for (size_t i = 0; i < TFHEpp::lvl1param::l; i++)
-            thrs_[i] = [i, wi, this, graph] {
-                if (i == 0 && graph)
-                    graph->startNode(this->depnode()->label());
-
-                auto ck = wi.circuitKey;
-                assert(ck);
-
-                TRLWELvl1 trgswupper, trgswlower;
-                TFHEpp::CircuitBootstrappingPartial(trgswupper, trgswlower,
-                                                    input(0), *ck, i);
-                for (size_t j = 0; j < 2; j++) {
-                    TFHEpp::TwistIFFT<Lvl1>(output()[i][j], trgswupper[j]);
-                    TFHEpp::TwistIFFT<Lvl1>(
-                        output()[i + TFHEpp::lvl1param::l][j], trgswlower[j]);
-                }
-            };
+        auto ek = wi.ek;
+        TFHEpp::CircuitBootstrappingFFT<TFHEpp::lvl02param,TFHEpp::lvl21param>(output(), input(0), *ek);
     }
 
 public:
-    TaskTFHEppCB() : Task<TLWELvl0, TRGSWLvl1FFT, TFHEppWorkerInfo>(1)
+    TaskTFHEppCB() : TaskAsync<TLWELvl0, TRGSWLvl1FFT, TFHEppWorkerInfo>(1)
     {
-    }
-
-    bool hasFinished() const override
-    {
-        for (size_t i = 0; i < TFHEpp::lvl1param::l; i++)
-            if (!thrs_[i].hasFinished())
-                return false;
-        return true;
     }
 
     template <class Archive>
@@ -238,48 +213,17 @@ public:
 };
 CEREAL_REGISTER_TYPE(TaskTFHEppCB);
 
-class TaskTFHEppCBInv : public Task<TLWELvl0, TRGSWLvl1FFT, TFHEppWorkerInfo> {
+class TaskTFHEppCBInv : public TaskAsync<TLWELvl0, TRGSWLvl1FFT, TFHEppWorkerInfo> {
 private:
-    AsyncThread thrs_[TFHEpp::lvl1param::l];
-    TLWELvl0 invtlwe_;
-
-private:
-    void startAsyncImpl(TFHEppWorkerInfo wi, ProgressGraphMaker* graph) override
+    void startSync(TFHEppWorkerInfo wi) override
     {
-        for (size_t i = 0; i <= TFHEpp::lvl0param::n; i++)
-            invtlwe_[i] = -input(0)[i];
-
-        for (size_t i = 0; i < TFHEpp::lvl1param::l; i++)
-            thrs_[i] = [i, wi, this, graph] {
-                if (i == 0 && graph) {
-                    graph->startNode(this->depnode()->label());
-                }
-
-                auto ck = wi.circuitKey;
-                assert(ck);
-
-                TRLWELvl1 trgswupper, trgswlower;
-                TFHEpp::CircuitBootstrappingPartial(trgswupper, trgswlower,
-                                                    invtlwe_, *ck, i);
-                for (size_t j = 0; j < 2; j++) {
-                    TFHEpp::TwistIFFT<Lvl1>(output()[i][j], trgswupper[j]);
-                    TFHEpp::TwistIFFT<Lvl1>(
-                        output()[i + TFHEpp::lvl1param::l][j], trgswlower[j]);
-                }
-            };
+        auto ek = wi.ek;
+        TFHEpp::CircuitBootstrappingFFTInv<TFHEpp::lvl02param,TFHEpp::lvl21param>(output(), input(0), *ek);
     }
 
 public:
-    TaskTFHEppCBInv() : Task<TLWELvl0, TRGSWLvl1FFT, TFHEppWorkerInfo>(1)
+    TaskTFHEppCBInv() : TaskAsync<TLWELvl0, TRGSWLvl1FFT, TFHEppWorkerInfo>(1)
     {
-    }
-
-    bool hasFinished() const override
-    {
-        for (size_t i = 0; i < TFHEpp::lvl1param::l; i++)
-            if (!thrs_[i].hasFinished())
-                return false;
-        return true;
     }
 
     template <class Archive>
@@ -400,7 +344,7 @@ private:
 private:
     void startSync(TFHEppWorkerInfo wi) override
     {
-        const KeySwitchingKey& ksk = wi.gateKey->ksk;
+        const KeySwitchingKey& ksk = wi.ek->getiksk<TFHEpp::lvl10param>();
 
         TLWELvl1 reslvl1;
         TFHEpp::SampleExtractIndex<Lvl1>(reslvl1, input(0), index_);
@@ -438,42 +382,19 @@ struct TRGSWLvl1FFTPair {
 };
 
 class TaskTFHEppCBWithInv
-    : public Task<TLWELvl0, TRGSWLvl1FFTPair, TFHEppWorkerInfo> {
-private:
-    AsyncThread thrs_[TFHEpp::lvl1param::l];
+    : public TaskAsync<TLWELvl0, TRGSWLvl1FFTPair, TFHEppWorkerInfo> {
 
 private:
-    void startAsyncImpl(TFHEppWorkerInfo wi, ProgressGraphMaker* graph) override
+    void startSync(TFHEppWorkerInfo wi) override
     {
-        for (size_t i = 0; i < TFHEpp::lvl1param::l; i++)
-            thrs_[i] = [i, wi, this, graph] {
-                if (i == 0 && graph)
-                    graph->startNode(this->depnode()->label());
-
-                auto ck = wi.circuitKey;
-                assert(ck);
-
-                TFHEpp::CircuitBootstrappingFFTwithInvPartial(
-                    output().normal[i],
-                    output().normal[i + TFHEpp::lvl1param::l],
-                    output().inverted[i],
-                    output().inverted[i + TFHEpp::lvl1param::l], input(0), *ck,
-                    i);
-            };
+        auto ek = wi.ek;
+        TFHEpp::CircuitBootstrappingFFTwithInv<TFHEpp::lvl02param,TFHEpp::lvl21param>(output().normal,output().inverted, input(0), *ek);
     }
 
 public:
     TaskTFHEppCBWithInv()
-        : Task<TLWELvl0, TRGSWLvl1FFTPair, TFHEppWorkerInfo>(1)
+        : TaskAsync<TLWELvl0, TRGSWLvl1FFTPair, TFHEppWorkerInfo>(1)
     {
-    }
-
-    bool hasFinished() const override
-    {
-        for (size_t i = 0; i < TFHEpp::lvl1param::l; i++)
-            if (!thrs_[i].hasFinished())
-                return false;
-        return true;
     }
 
     template <class Archive>
@@ -581,9 +502,9 @@ class TaskTFHEppGateMUXWoSE
 private:
     void startSync(TFHEppWorkerInfo wi) override
     {
-        auto gk = wi.gateKey;
+        auto ek = wi.ek;
         TFHEpp::HomMUXwoSE<Lvl01>(output(), input(2), input(1), input(0),
-                                  gk->bkfftlvl01);
+                                  *ek);
     }
 
 public:
@@ -726,9 +647,8 @@ private:
 private:
     void startSync(TFHEppWorkerInfo wi) override
     {
-        const GateKeyFFT& gk = *wi.gateKey;
-        TFHEpp::GateBootstrappingTLWE2TRLWEFFT<Lvl01>(*mem_.lock(), input(0),
-                                                      gk.bkfftlvl01);
+        TFHEpp::BlindRotate<Lvl01>(*mem_.lock(), input(0),
+                                                      (*wi.ek).getbkfft<TFHEpp::lvl01param>(),TFHEpp::μpolygen<Lvl1, Lvl1::μ>());
     }
 
 public:

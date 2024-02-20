@@ -112,10 +112,10 @@ end
 
 ##### prepare #####
 
-$logger.info "Preparing skey and bkey..."
+$logger.info "Preparing skey and evalkey..."
 run_iyokan_packet ["genkey", "--type", "tfhepp", "--out", $skey] unless File.exist? $skey
-run_iyokan_packet ["genbkey", "--in", $skey, "--out", $bkey] unless File.exist? $bkey
-$logger.info "Preparing skey and bkey done."
+run_iyokan_packet ["genevalkey", "--in", $skey, "--out", $bkey] unless File.exist? $bkey
+$logger.info "Preparing skey and evalkey done."
 
 ##### method toml2packet #####
 
@@ -296,7 +296,7 @@ class TestRegisterer
                          "--out", $req_file]
       run_iyokan (["tfhe",
                    "--blueprint", blueprint,
-                   "--bkey", $bkey,
+                   "--evalkey", $bkey,
                    "-i", $req_file,
                    "-o", $res_file,
                    "-c", ncycles] + iyokan_args)

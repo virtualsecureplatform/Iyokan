@@ -1961,7 +1961,7 @@ enum class SCHED {
 struct Options {
     std::optional<NetworkBlueprint> blueprint;
     std::optional<int> numCPUWorkers, numGPUWorkers, numGPU, numCycles;
-    std::optional<std::string> bkeyFile, inputFile, outputFile, secretKey,
+    std::optional<std::string> ekFile, inputFile, outputFile, secretKey,
         dumpPrefix, snapshotFile, resumeFile;
     std::optional<std::string> dumpTimeCSVPrefix, dumpGraphJSONPrefix,
         dumpGraphDOTPrefix;

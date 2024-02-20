@@ -528,17 +528,20 @@ void testProgressGraphMaker()
 class TFHEppTestHelper {
 private:
     std::shared_ptr<SecretKey> sk_;
-    std::shared_ptr<GateKeyFFT> gk_;
-    std::shared_ptr<CircuitKey> ck_;
+    std::shared_ptr<EvalKey> ek_;
     TLWELvl0 zero_, one_;
 
 private:
     TFHEppTestHelper()
     {
         sk_ = std::make_shared<SecretKey>();
-        gk_ = std::make_shared<GateKeyFFT>(*sk_);
-        zero_ = TFHEpp::bootsSymEncrypt({0}, *sk_).at(0);
-        one_ = TFHEpp::bootsSymEncrypt({1}, *sk_).at(0);
+        ek_ = std::make_shared<EvalKey>();
+        (*ek_).emplaceiksk<Lvl10>(*sk_);
+        (*ek_).emplacebkfft<Lvl01>(*sk_);
+        (*ek_).emplacebkfft<Lvl02>(*sk_);
+        (*ek_).emplaceprivksk4cb<Lvl21>(*sk_);
+        zero_ = TFHEpp::bootsSymEncrypt<Lvl0>({0}, *sk_).at(0);
+        one_ = TFHEpp::bootsSymEncrypt<Lvl0>({1}, *sk_).at(0);
     }
 
 public:
@@ -548,14 +551,9 @@ public:
         return inst;
     }
 
-    void prepareCircuitKey()
-    {
-        ck_ = std::make_shared<CircuitKey>(*sk_);
-    }
-
     TFHEppWorkerInfo wi() const
     {
-        return TFHEppWorkerInfo{gk_, ck_};
+        return TFHEppWorkerInfo{ek_};
     }
 
     const std::shared_ptr<SecretKey>& sk() const
@@ -563,9 +561,9 @@ public:
         return sk_;
     }
 
-    const std::shared_ptr<GateKeyFFT>& gk() const
+    const std::shared_ptr<EvalKey>& ek() const
     {
-        return gk_;
+        return ek_;
     }
 
     const TLWELvl0& zero() const
@@ -594,7 +592,7 @@ void setInput(std::shared_ptr<TaskTFHEppGateMem> task, int val)
 
 int getOutput(std::shared_ptr<TaskTFHEppGateMem> task)
 {
-    return TFHEpp::bootsSymDecrypt({task->get()},
+    return TFHEpp::bootsSymDecrypt<Lvl0>({task->get()},
                                    *TFHEppTestHelper::instance().sk())[0];
 }
 
@@ -602,7 +600,7 @@ void testTFHEppSerialization()
 {
     auto& h = TFHEppTestHelper::instance();
     const std::shared_ptr<const SecretKey>& sk = h.sk();
-    const std::shared_ptr<const GateKeyFFT>& gk = h.wi().gateKey;
+    const std::shared_ptr<const EvalKey>& ek = h.wi().ek;
 
     // Test for secret key
     {
@@ -612,11 +610,11 @@ void testTFHEppSerialization()
         auto sk2 = std::make_shared<SecretKey>();
         readFromArchive<SecretKey>(*sk2, "_test_sk");
 
-        auto zero = TFHEpp::bootsSymEncrypt({0}, *sk2).at(0);
-        auto one = TFHEpp::bootsSymEncrypt({1}, *sk2).at(0);
+        auto zero = TFHEpp::bootsSymEncrypt<Lvl0>({0}, *sk2).at(0);
+        auto one = TFHEpp::bootsSymEncrypt<Lvl0>({1}, *sk2).at(0);
         TLWELvl0 res;
-        TFHEpp::HomANDNY(res, zero, one, *gk);
-        assert(TFHEpp::bootsSymDecrypt({res}, *sk2).at(0) == 1);
+        TFHEpp::HomANDNY<TFHEpp::lvl01param,TFHEpp::lvl1param::μ,TFHEpp::lvl10param>(res, zero, one, *ek);
+        assert(TFHEpp::bootsSymDecrypt<Lvl0>({res}, *sk2).at(0) == 1);
     }
 
     // Test for gate key
@@ -624,16 +622,16 @@ void testTFHEppSerialization()
         std::stringstream ss{std::ios::binary | std::ios::out | std::ios::in};
 
         // Dump
-        writeToArchive(ss, *gk);
+        writeToArchive(ss, *ek);
         // Load
-        auto gk2 = std::make_shared<GateKeyFFT>();
-        readFromArchive<GateKeyFFT>(*gk2, ss);
+        auto ek2 = std::make_shared<EvalKey>();
+        readFromArchive<TFHEpp::EvalKey>(*ek2, ss);
 
-        auto zero = TFHEpp::bootsSymEncrypt({0}, *sk).at(0);
-        auto one = TFHEpp::bootsSymEncrypt({1}, *sk).at(0);
+        auto zero = TFHEpp::bootsSymEncrypt<Lvl0>({0}, *sk).at(0);
+        auto one = TFHEpp::bootsSymEncrypt<Lvl0>({1}, *sk).at(0);
         TLWELvl0 res;
-        TFHEpp::HomANDNY(res, zero, one, *gk2);
-        assert(TFHEpp::bootsSymDecrypt({res}, *sk).at(0) == 1);
+        TFHEpp::HomANDNY<TFHEpp::lvl01param,TFHEpp::lvl1param::μ,TFHEpp::lvl10param>(res, zero, one, *ek2);
+        assert(TFHEpp::bootsSymDecrypt<Lvl0>({res}, *sk).at(0) == 1);
     }
 
     // Test for TLWE level 0
@@ -641,8 +639,8 @@ void testTFHEppSerialization()
         std::stringstream ss{std::ios::binary | std::ios::out | std::ios::in};
 
         {
-            auto zero = TFHEpp::bootsSymEncrypt({0}, *sk).at(0);
-            auto one = TFHEpp::bootsSymEncrypt({1}, *sk).at(0);
+            auto zero = TFHEpp::bootsSymEncrypt<Lvl0>({0}, *sk).at(0);
+            auto one = TFHEpp::bootsSymEncrypt<Lvl0>({1}, *sk).at(0);
             writeToArchive(ss, zero);
             writeToArchive(ss, one);
             ss.seekg(0);
@@ -652,8 +650,8 @@ void testTFHEppSerialization()
             TLWELvl0 res, zero, one;
             readFromArchive(zero, ss);
             readFromArchive(one, ss);
-            TFHEpp::HomANDNY(res, zero, one, *gk);
-            assert(TFHEpp::bootsSymDecrypt({res}, *sk).at(0) == 1);
+            TFHEpp::HomANDNY<TFHEpp::lvl01param,TFHEpp::lvl1param::μ,TFHEpp::lvl10param>(res, zero, one, *ek);
+            assert(TFHEpp::bootsSymDecrypt<Lvl0>({res}, *sk).at(0) == 1);
         }
     }
 }
