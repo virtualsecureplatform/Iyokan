@@ -79,17 +79,19 @@ inline std::vector<TRLWELvl1> encryptROM(const TFHEpp::SecretKey& key,
                                          const std::vector<Bit>& src)
 {
     using P = TFHEpp::lvl1param;
-    std::vector<TRLWELvl1> ret;
+    std::vector<TRLWELvl1> ret(src.size() / P::n + ((src.size()%P::n)?1:0));
 
-    PolyLvl1 pmu = {};
-    for (size_t i = 0; i < src.size(); i++) {
-        pmu[i % P::n] = src[i] == 1_b ? P::μ : -P::μ;
-        if (i % P::n == P::n - 1)
-            ret.push_back(
-                TFHEpp::trlweSymEncrypt<Lvl1>(pmu, P::α, key.key.lvl1));
+    #pragma omp parallel for
+    for(size_t thread = 0; thread < src.size(); thread += P::n) {
+        PolyLvl1 pmu;
+        for (size_t i = 0; i < P::n; i++){
+            if (thread + i < src.size())
+                pmu[i] = (src[thread + i] == 1_b) ? P::μ : -P::μ;
+            else
+                pmu[i] = 0;
+        }
+        ret[thread / P::n] = TFHEpp::trlweSymEncrypt<Lvl1>(pmu, P::α, key.key.lvl1);
     }
-    if (src.size() % P::n != 0)
-        ret.push_back(TFHEpp::trlweSymEncrypt<Lvl1>(pmu, P::α, key.key.lvl1));
 
     return ret;
 }
@@ -104,12 +106,13 @@ inline std::vector<TRLWELvl1> encryptRAM(const TFHEpp::SecretKey& key,
                                          const std::vector<Bit>& src)
 {
     using P = TFHEpp::lvl1param;
-    std::vector<TRLWELvl1> ret;
+    std::vector<TRLWELvl1> ret(src.size());
 
-    for (auto&& bit : src) {
+    #pragma omp parallel for
+    for (size_t bit = 0; bit < src.size(); bit++){
         PolyLvl1 pmu = {};
-        pmu[0] = bit == 1_b ? P::μ : -P::μ;
-        ret.push_back(TFHEpp::trlweSymEncrypt<Lvl1>(pmu, P::α, key.key.lvl1));
+        pmu[0] = (src[bit] == 1_b) ? P::μ : -P::μ;
+        ret[bit] = TFHEpp::trlweSymEncrypt<Lvl1>(pmu, P::α, key.key.lvl1);
     }
 
     return ret;

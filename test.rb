@@ -327,7 +327,7 @@ class TestRegisterer
       run_iyokan (["tfhe",
                    "--enable-gpu",
                    "--blueprint", blueprint,
-                   "--bkey", $bkey,
+                   "--evalkey", $bkey,
                    "-i", $req_file,
                    "-o", $res_file,
                    "-c", ncycles] + iyokan_args)
@@ -520,7 +520,7 @@ reg.add("tfhe-addr-addr-4bit-20", [:tfhe]) do
   run_iyokan_packet ["enc", "--key", $skey, "--in", $req_file, "--out", $req_file]
   run_iyokan ["tfhe",
               "--blueprint", "test/config-toml/addr-4bit.toml",
-              "--bkey", $bkey,
+              "--evalkey", $bkey,
               "-i", $req_file,
               "-o", $res_file,
               "-c", 1]
@@ -532,7 +532,7 @@ reg.add("tfhe-addr-addr-4bit-20", [:tfhe]) do
                      "bits.B = a.out"]
   run_iyokan ["tfhe",
               "--blueprint", "test/config-toml/addr-4bit.toml",
-              "--bkey", $bkey,
+              "--evalkey", $bkey,
               "-i", $req_file,
               "-o", $res_file,
               "-c", 1]

@@ -207,7 +207,7 @@ public:
     template <class Archive>
     void serialize(Archive& ar)
     {
-        ar(cereal::base_class<Task<TLWELvl0, TRGSWLvl1FFT, TFHEppWorkerInfo>>(
+        ar(cereal::base_class<TaskAsync<TLWELvl0, TRGSWLvl1FFT, TFHEppWorkerInfo>>(
             this));
     }
 };
@@ -229,7 +229,7 @@ public:
     template <class Archive>
     void serialize(Archive& ar)
     {
-        ar(cereal::base_class<Task<TLWELvl0, TRGSWLvl1FFT, TFHEppWorkerInfo>>(
+        ar(cereal::base_class<TaskAsync<TLWELvl0, TRGSWLvl1FFT, TFHEppWorkerInfo>>(
             this));
     }
 };
@@ -401,7 +401,7 @@ public:
     void serialize(Archive& ar)
     {
         ar(cereal::base_class<
-            Task<TLWELvl0, TRGSWLvl1FFTPair, TFHEppWorkerInfo>>(this));
+            TaskAsync<TLWELvl0, TRGSWLvl1FFTPair, TFHEppWorkerInfo>>(this));
     }
 };
 CEREAL_REGISTER_TYPE(TaskTFHEppCBWithInv);
