@@ -661,14 +661,13 @@ void testTFHEppSerialization()
 
 class CUFHETestHelper {
 private:
-    std::shared_ptr<GateKey> gk_;
-    cufhe::Ctxt zero_, one_;
+    std::shared_ptr<EvalKey> ek_;
+    cufhe::Ctxt<TFHEpp::lvl0param> zero_, one_;
 
 private:
     CUFHETestHelper()
     {
-        gk_ = std::make_shared<GateKey>();
-        ifftGateKey(*gk_, *TFHEppTestHelper::instance().gk());
+        ek_ = std::make_shared<TFHEpp::EvalKey>();
         setCtxtZero(zero_);
         setCtxtOne(one_);
     }
@@ -678,7 +677,7 @@ public:
     public:
         CUFHEManager()
         {
-            cufhe::Initialize(*CUFHETestHelper::instance().gk_);
+            cufhe::Initialize(*CUFHETestHelper::instance().ek_);
         }
 
         ~CUFHEManager()

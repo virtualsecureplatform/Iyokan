@@ -38,58 +38,42 @@ inline void setTLWELvl0Trivial1(TLWELvl0& dst)
 
 #ifdef IYOKAN_CUDA_ENABLED
 
-#include <cufhe.h>
 #include <cufhe_gpu.cuh>
 
-inline TLWELvl0 cufhe2tfhepp(const cufhe::Ctxt& src)
+inline TLWELvl0 cufhe2tfhepp(const cufhe::Ctxt<TFHEpp::lvl0param>& src)
 {
     // Assume src.tlwehost has valid data
     return src.tlwehost;
 }
 
-inline void cufhe2tfheppInPlace(TLWELvl0& dst, const cufhe::Ctxt& src)
+inline void cufhe2tfheppInPlace(TLWELvl0& dst, const cufhe::Ctxt<TFHEpp::lvl0param>& src)
 {
     // Assume src.tlwehost has valid data
     // FIXME: Optimization using in-place property?
     dst = src.tlwehost;
 }
 
-inline std::shared_ptr<cufhe::Ctxt> tfhepp2cufhe(const TLWELvl0& src)
+inline std::shared_ptr<cufhe::Ctxt<TFHEpp::lvl0param>> tfhepp2cufhe(const TLWELvl0& src)
 {
-    auto c = std::make_shared<cufhe::Ctxt>();
+    auto c = std::make_shared<cufhe::Ctxt<TFHEpp::lvl0param>>();
     c->tlwehost = src;
     return c;
 }
 
-inline void tfhepp2cufheInPlace(cufhe::Ctxt& dst, const TLWELvl0& src)
+inline void tfhepp2cufheInPlace(cufhe::Ctxt<TFHEpp::lvl0param>& dst, const TLWELvl0& src)
 {
     dst.tlwehost = src;
 }
 
-inline void setCtxtZero(cufhe::Ctxt& out)
+inline void setCtxtZero(cufhe::Ctxt<TFHEpp::lvl0param>& out)
 {
     TFHEpp::HomCONSTANTZERO<Lvl0>(out.tlwehost);
 }
 
-inline void setCtxtOne(cufhe::Ctxt& out)
+inline void setCtxtOne(cufhe::Ctxt<TFHEpp::lvl0param>& out)
 {
     TFHEpp::HomCONSTANTONE<Lvl0>(out.tlwehost);
 }
-
-// inline void ifftGateKey(GateKey& out, const GateKeyFFT& src)
-// {
-//     out.ksk = src.ksk;
-
-//     for (size_t p = 0; p < Lvl0::n; p++) {
-//         const TRGSWLvl1FFT& trgswfft = src.bkfftlvl01.at(p);
-//         TRGSWLvl1& trgsw = out.bklvl01.at(p);
-//         for (size_t q = 0; q < 2 * Lvl1::l; q++) {
-//             for (size_t r = 0; r < 2; r++) {
-//                 TFHEpp::TwistFFT<Lvl1>(trgsw.at(q).at(r), trgswfft.at(q).at(r));
-//             }
-//         }
-//     }
-// }
 
 #endif
 #endif
