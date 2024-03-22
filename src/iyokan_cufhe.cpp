@@ -731,7 +731,7 @@ public:
         pr_.print();
 
         // Check bkey is correct.
-        if (!(&ek.getbkfft<Lvl01>())|| (pr_.blueprint.needsCircuitKey() && !(&ek.getbkfft<TFHEpp::lvl02param>())))
+        if (!(&ek.getbk<Lvl01>()) &&  !(&ek.getbkfft<Lvl01>()) &&  (pr_.blueprint.needsCircuitKey() || !(&ek.getbkfft<TFHEpp::lvl02param>())))
             error::die("Invalid bootstrapping key");
 
         // Make runner

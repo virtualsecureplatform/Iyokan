@@ -537,7 +537,8 @@ private:
         sk_ = std::make_shared<SecretKey>();
         ek_ = std::make_shared<EvalKey>();
         (*ek_).emplaceiksk<Lvl10>(*sk_);
-        (*ek_).emplacebkfft<Lvl01>(*sk_);
+        (*ek_).emplacebk<Lvl01>(*sk_);
+        (*ek_).emplacebk2bkfft<Lvl01>();
         (*ek_).emplacebkfft<Lvl02>(*sk_);
         (*ek_).emplaceprivksk4cb<Lvl21>(*sk_);
         zero_ = TFHEpp::bootsSymEncrypt<Lvl0>({0}, *sk_).at(0);
@@ -661,13 +662,11 @@ void testTFHEppSerialization()
 
 class CUFHETestHelper {
 private:
-    std::shared_ptr<EvalKey> ek_;
     cufhe::Ctxt<TFHEpp::lvl0param> zero_, one_;
 
 private:
     CUFHETestHelper()
     {
-        ek_ = std::make_shared<TFHEpp::EvalKey>();
         setCtxtZero(zero_);
         setCtxtOne(one_);
     }
@@ -677,7 +676,7 @@ public:
     public:
         CUFHEManager()
         {
-            cufhe::Initialize(*CUFHETestHelper::instance().ek_);
+            cufhe::Initialize(*TFHEppTestHelper::instance().ek());
         }
 
         ~CUFHEManager()

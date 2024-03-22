@@ -152,7 +152,8 @@ void doGenEvalKeyTFHEpp(const std::string& in, const std::string& out)
     auto sk = readFromArchive<TFHEpp::SecretKey>(in);
     TFHEpp::EvalKey ek;
     ek.emplaceiksk<TFHEpp::lvl10param>(sk);
-    ek.emplacebkfft<TFHEpp::lvl01param>(sk);
+    ek.emplacebk<TFHEpp::lvl01param>(sk);
+    ek.emplacebk2bkfft<TFHEpp::lvl01param>();
     ek.emplacebkfft<TFHEpp::lvl02param>(sk);
     ek.emplaceprivksk4cb<TFHEpp::lvl21param>(sk);
     writeToArchive(out, ek);
