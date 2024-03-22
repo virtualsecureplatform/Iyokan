@@ -7,7 +7,7 @@ namespace {
 
 enum class TYPE {
     GENKEY,
-    GENBKEY,
+    GENEVALKEY,
     ENC,
     DEC,
     PACK,
@@ -147,11 +147,16 @@ void doGenKeyTFHEpp(const std::string& out)
     writeToArchive(out, sk);
 }
 
-void doGenBKeyTFHEpp(const std::string& in, const std::string& out)
+void doGenEvalKeyTFHEpp(const std::string& in, const std::string& out)
 {
     auto sk = readFromArchive<TFHEpp::SecretKey>(in);
-    TFHEppBKey bk{sk};
-    writeToArchive(out, bk);
+    TFHEpp::EvalKey ek;
+    ek.emplaceiksk<TFHEpp::lvl10param>(sk);
+    ek.emplacebk<TFHEpp::lvl01param>(sk);
+    ek.emplacebk2bkfft<TFHEpp::lvl01param>();
+    ek.emplacebkfft<TFHEpp::lvl02param>(sk);
+    ek.emplaceprivksk4cb<TFHEpp::lvl21param>(sk);
+    writeToArchive(out, ek);
 }
 
 void doEnc(const std::string& key, const std::string& in,
@@ -297,8 +302,8 @@ std::string type2str(TYPE t)
     switch (t) {
     case TYPE::GENKEY:
         return "genkey";
-    case TYPE::GENBKEY:
-        return "genbkey";
+    case TYPE::GENEVALKEY:
+        return "genevalkey";
     case TYPE::ENC:
         return "enc";
     case TYPE::DEC:
@@ -323,15 +328,15 @@ std::string type2str(TYPE t)
 int main(int argc, char** argv)
 {
     /*
-       genkey  --type tfhepp --out secret.key
-       genbkey --in secret.key --out bootstrapping.key
-       enc     --key secret.key --bkey bootstrapping.key \
-               --in packet.plain --out packet.enc
-       dec     --key secret.key --in packet.enc --out packet.plain
-       pack    --out packet.plain            \
-               --rom A:a.bin --rom C:c.bin \
-               --ram D:d.bin --ram E:e.bin \
-               --bits F:f.bin
+       genkey     --type tfhepp --out secret.key
+       genevalkey --in secret.key --out bootstrapping.key
+       enc        --key secret.key --bkey bootstrapping.key \
+                  --in packet.plain --out packet.enc
+       dec        --key secret.key --in packet.enc --out packet.plain
+       pack       --out packet.plain            \
+                  --rom A:a.bin --rom C:c.bin \
+                  --ram D:d.bin --ram E:e.bin \
+                  --bits F:f.bin
        packet2toml --in packet.plain
        toml2packet --in packet.toml --out packet.plain
     */
@@ -364,8 +369,8 @@ int main(int argc, char** argv)
     }
 
     {
-        CLI::App* sub = app.add_subcommand("genbkey", "");
-        sub->parse_complete_callback([&] { type = TYPE::GENBKEY; });
+        CLI::App* sub = app.add_subcommand("genevalkey", "");
+        sub->parse_complete_callback([&] { type = TYPE::GENEVALKEY; });
         sub->add_option("-i,--in", in)->required();
         sub->add_option("-o,--out", out)->required();
     }
@@ -439,8 +444,8 @@ int main(int argc, char** argv)
         doGenKeyTFHEpp(out);
         break;
 
-    case TYPE::GENBKEY:
-        doGenBKeyTFHEpp(in, out);
+    case TYPE::GENEVALKEY:
+        doGenEvalKeyTFHEpp(in, out);
         break;
 
     case TYPE::ENC:

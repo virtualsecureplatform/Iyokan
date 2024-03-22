@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.16)
+cmake_minimum_required(VERSION 3.18)
 
 option(IYOKAN_80BIT_SECURITY "Use 80-bit security parameter for TFHE and cuFHE" OFF)
 
@@ -14,7 +14,7 @@ if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
   set(CMAKE_BUILD_TYPE Debug CACHE STRING "Choose the type of build." FORCE)
 endif()
 
-set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
@@ -30,6 +30,12 @@ if (IYOKAN_80BIT_SECURITY)
 endif()
 if (IYOKAN_ENABLE_CUDA)
     enable_language(CUDA)
+    set(CMAKE_CUDA_STANDARD 20)
+    # https://gitlab.kitware.com/cmake/cmake/-/issues/23079
+    if(NOT DEFINED CMAKE_CUDA20_STANDARD_COMPILE_OPTION)
+        set(CMAKE_CUDA20_STANDARD_COMPILE_OPTION "")
+        set(CMAKE_CUDA20_EXTENSION_COMPILE_OPTION "")
+    endif()
     add_subdirectory(thirdparty/cuFHE)
 else()
     add_subdirectory(thirdparty/cuFHE/thirdparties/TFHEpp)

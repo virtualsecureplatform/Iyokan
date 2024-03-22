@@ -28,7 +28,7 @@ public:
 
 struct CUFHEWorkerInfo {
     std::shared_ptr<CUFHEStream> stream;
-    std::vector<std::shared_ptr<cufhe::Ctxt>> ctxts;
+    std::vector<std::shared_ptr<cufhe::Ctxt<TFHEpp::lvl0param>>> ctxts;
 };
 
 CEREAL_REGISTER_TYPE(BridgeDepNode<TFHEppWorkerInfo, CUFHEWorkerInfo>);
@@ -38,24 +38,25 @@ CEREAL_REGISTER_TYPE(TaskBlackHole<CUFHEWorkerInfo>);
 
 using TaskCUFHEGate = Task<TLWELvl0, TLWELvl0, CUFHEWorkerInfo>;
 
-inline void copyCtxt(cufhe::Ctxt& dst, const cufhe::Ctxt& src)
-{
-    cufhe::CopyOnHost(dst, const_cast<cufhe::Ctxt&>(src));
-}
+// inline void copyCtxt(cufhe::Ctxt& dst, const cufhe::Ctxt& src)
+// {
+//     cufhe::CopyOnHost(dst, const_cast<cufhe::Ctxt&>(src));
+// }
 
 namespace cufhe {
 template <class Archive>
-void save(Archive& ar, const Ctxt& ctxt)
+void save(Archive& ar, const Ctxt<TFHEpp::lvl0param>& ctxt)
 {
     ar(cufhe2tfhepp(ctxt));
 }
 
 template <class Archive>
-void load(Archive& ar, Ctxt& ctxt)
+void load(Archive& ar, cufhe::Ctxt<TFHEpp::lvl0param>& ctxt)
 {
     TLWELvl0 tlwe;
     ar(tlwe);
-    copyCtxt(ctxt, *tfhepp2cufhe(tlwe));
+    // copyCtxt(ctxt, *tfhepp2cufhe(tlwe));
+    cufhe::CopyOnHost<TFHEpp::lvl0param>(ctxt, const_cast<cufhe::Ctxt<TFHEpp::lvl0param>&>(*tfhepp2cufhe(tlwe)));
 }
 
 template <class Archive>
@@ -209,13 +210,13 @@ CEREAL_REGISTER_TYPE(TaskCUFHEGateWIRE);
         CUFHEWorkerInfo wi_;                                     \
                                                                  \
     private:                                                     \
-        cufhe::Ctxt& output()                                    \
+        cufhe::Ctxt<TFHEpp::lvl0param>& output()                                    \
         {                                                        \
             return *wi_.ctxts.at(0);                             \
         }                                                        \
-        cufhe::Ctxt& input(size_t index)                         \
+        cufhe::Ctxt<TFHEpp::lvl0param>& input(size_t index)                         \
         {                                                        \
-            cufhe::Ctxt& in = *wi_.ctxts.at(index + 1);          \
+            cufhe::Ctxt<TFHEpp::lvl0param>& in = *wi_.ctxts.at(index + 1);          \
             in.tlwehost = TaskCUFHEGate::input(index);           \
             return in;                                           \
         }                                                        \
@@ -245,19 +246,19 @@ CEREAL_REGISTER_TYPE(TaskCUFHEGateWIRE);
         }                                                        \
     };                                                           \
     CEREAL_REGISTER_TYPE(TaskCUFHEGate##name);
-DEFINE_TASK_GATE(AND, 2, cufhe::And(output(), input(0), input(1), *st));
-DEFINE_TASK_GATE(NAND, 2, cufhe::Nand(output(), input(0), input(1), *st));
-DEFINE_TASK_GATE(ANDNOT, 2, cufhe::AndYN(output(), input(0), input(1), *st));
-DEFINE_TASK_GATE(OR, 2, cufhe::Or(output(), input(0), input(1), *st));
-DEFINE_TASK_GATE(NOR, 2, cufhe::Nor(output(), input(0), input(1), *st));
-DEFINE_TASK_GATE(ORNOT, 2, cufhe::OrYN(output(), input(0), input(1), *st));
-DEFINE_TASK_GATE(XOR, 2, cufhe::Xor(output(), input(0), input(1), *st));
-DEFINE_TASK_GATE(XNOR, 2, cufhe::Xnor(output(), input(0), input(1), *st));
+DEFINE_TASK_GATE(AND, 2, cufhe::And<TFHEpp::lvl0param>(output(), input(0), input(1), *st));
+DEFINE_TASK_GATE(NAND, 2, cufhe::Nand<TFHEpp::lvl0param>(output(), input(0), input(1), *st));
+DEFINE_TASK_GATE(ANDNOT, 2, cufhe::AndYN<TFHEpp::lvl0param>(output(), input(0), input(1), *st));
+DEFINE_TASK_GATE(OR, 2, cufhe::Or<TFHEpp::lvl0param>(output(), input(0), input(1), *st));
+DEFINE_TASK_GATE(NOR, 2, cufhe::Nor<TFHEpp::lvl0param>(output(), input(0), input(1), *st));
+DEFINE_TASK_GATE(ORNOT, 2, cufhe::OrYN<TFHEpp::lvl0param>(output(), input(0), input(1), *st));
+DEFINE_TASK_GATE(XOR, 2, cufhe::Xor<TFHEpp::lvl0param>(output(), input(0), input(1), *st));
+DEFINE_TASK_GATE(XNOR, 2, cufhe::Xnor<TFHEpp::lvl0param>(output(), input(0), input(1), *st));
 DEFINE_TASK_GATE(MUX, 3,
-                 cufhe::Mux(output(), input(2), input(1), input(0), *st));
-DEFINE_TASK_GATE(NOT, 1, cufhe::Not(output(), input(0), *st));
-DEFINE_TASK_GATE(CONSTONE, 0, TFHEpp::HomCONSTANTONE(output().tlwehost));
-DEFINE_TASK_GATE(CONSTZERO, 0, TFHEpp::HomCONSTANTZERO(output().tlwehost));
+                 cufhe::Mux<TFHEpp::lvl0param>(output(), input(2), input(1), input(0), *st));
+DEFINE_TASK_GATE(NOT, 1, cufhe::Not<TFHEpp::lvl0param>(output(), input(0), *st));
+DEFINE_TASK_GATE(CONSTONE, 0, TFHEpp::HomCONSTANTONE<TFHEpp::lvl0param>(output().tlwehost));
+DEFINE_TASK_GATE(CONSTZERO, 0, TFHEpp::HomCONSTANTZERO<TFHEpp::lvl0param>(output().tlwehost));
 #undef DEFINE_TASK_GATE
 
 class CUFHENetworkBuilder
@@ -306,12 +307,12 @@ public:
     {
         wi_.stream = std::make_shared<CUFHEStream>();
         for (size_t i = 0; i < WORKER_INFO_CTXTS_SIZE; i++)
-            wi_.ctxts.push_back(std::make_shared<cufhe::Ctxt>());
+            wi_.ctxts.push_back(std::make_shared<cufhe::Ctxt<TFHEpp::lvl0param>>());
     }
 };
 
 class TaskCUFHE2TFHEpp
-    : public TaskAsync<cufhe::Ctxt, TLWELvl0, TFHEppWorkerInfo> {
+    : public TaskAsync<cufhe::Ctxt<TFHEpp::lvl0param>, TLWELvl0, TFHEppWorkerInfo> {
 private:
     void startSync(TFHEppWorkerInfo) override
     {
@@ -319,7 +320,7 @@ private:
     }
 
 public:
-    TaskCUFHE2TFHEpp() : TaskAsync<cufhe::Ctxt, TLWELvl0, TFHEppWorkerInfo>(1)
+    TaskCUFHE2TFHEpp() : TaskAsync<cufhe::Ctxt<TFHEpp::lvl0param>, TLWELvl0, TFHEppWorkerInfo>(1)
     {
     }
 
@@ -327,13 +328,13 @@ public:
     void serialize(Archive& ar)
     {
         ar(cereal::base_class<
-            TaskAsync<cufhe::Ctxt, TLWELvl0, TFHEppWorkerInfo>>(this));
+            TaskAsync<cufhe::Ctxt<TFHEpp::lvl0param>, TLWELvl0, TFHEppWorkerInfo>>(this));
     }
 };
 CEREAL_REGISTER_TYPE(TaskCUFHE2TFHEpp);
 
 class TaskTFHEpp2CUFHE
-    : public TaskAsync<TLWELvl0, cufhe::Ctxt, TFHEppWorkerInfo> {
+    : public TaskAsync<TLWELvl0, cufhe::Ctxt<TFHEpp::lvl0param>, TFHEppWorkerInfo> {
 private:
     void startSync(TFHEppWorkerInfo) override
     {
@@ -341,7 +342,7 @@ private:
     }
 
 public:
-    TaskTFHEpp2CUFHE() : TaskAsync<TLWELvl0, cufhe::Ctxt, TFHEppWorkerInfo>(1)
+    TaskTFHEpp2CUFHE() : TaskAsync<TLWELvl0, cufhe::Ctxt<TFHEpp::lvl0param>, TFHEppWorkerInfo>(1)
     {
     }
 
@@ -349,7 +350,7 @@ public:
     void serialize(Archive& ar)
     {
         ar(cereal::base_class<
-            TaskAsync<TLWELvl0, cufhe::Ctxt, TFHEppWorkerInfo>>(this));
+            TaskAsync<TLWELvl0, cufhe::Ctxt<TFHEpp::lvl0param>, TFHEppWorkerInfo>>(this));
     }
 };
 CEREAL_REGISTER_TYPE(TaskTFHEpp2CUFHE);
@@ -589,7 +590,7 @@ public:
 CEREAL_REGISTER_TYPE(TaskCUFHERAMUX);
 
 class TaskCUFHERAMSEIAndKS
-    : public Task<cufhe::cuFHETRLWElvl1, cufhe::Ctxt, CUFHEWorkerInfo> {
+    : public Task<cufhe::cuFHETRLWElvl1, cufhe::Ctxt<TFHEpp::lvl0param>, CUFHEWorkerInfo> {
 private:
     CUFHEWorkerInfo wi_;
 
@@ -602,7 +603,7 @@ private:
 
 public:
     TaskCUFHERAMSEIAndKS()
-        : Task<cufhe::cuFHETRLWElvl1, cufhe::Ctxt, CUFHEWorkerInfo>(1)
+        : Task<cufhe::cuFHETRLWElvl1, cufhe::Ctxt<TFHEpp::lvl0param>, CUFHEWorkerInfo>(1)
     {
     }
 
@@ -615,13 +616,13 @@ public:
     void serialize(Archive& ar)
     {
         ar(cereal::base_class<
-            Task<cufhe::cuFHETRLWElvl1, cufhe::Ctxt, CUFHEWorkerInfo>>(this));
+            Task<cufhe::cuFHETRLWElvl1, cufhe::Ctxt<TFHEpp::lvl0param>, CUFHEWorkerInfo>>(this));
     }
 };
 CEREAL_REGISTER_TYPE(TaskCUFHERAMSEIAndKS);
 
 class TaskCUFHERAMGateBootstrapping
-    : public Task<cufhe::Ctxt, uint8_t /* dummy */, CUFHEWorkerInfo> {
+    : public Task<cufhe::Ctxt<TFHEpp::lvl0param>, uint8_t /* dummy */, CUFHEWorkerInfo> {
 private:
     CUFHEWorkerInfo wi_;
     std::weak_ptr<cufhe::cuFHETRLWElvl1> mem_;
@@ -631,7 +632,7 @@ private:
     {
         wi_ = std::move(wi);
         cufhe::GateBootstrappingTLWE2TRLWElvl01NTT(
-            *mem_.lock(), const_cast<cufhe::Ctxt&>(input(0)), *wi_.stream);
+            *mem_.lock(), const_cast<cufhe::Ctxt<TFHEpp::lvl0param>&>(input(0)), *wi_.stream);
     }
 
 public:
@@ -640,7 +641,7 @@ public:
     }
 
     TaskCUFHERAMGateBootstrapping(std::weak_ptr<cufhe::cuFHETRLWElvl1> mem)
-        : Task<cufhe::Ctxt, uint8_t, CUFHEWorkerInfo>(1), mem_(std::move(mem))
+        : Task<cufhe::Ctxt<TFHEpp::lvl0param>, uint8_t, CUFHEWorkerInfo>(1), mem_(std::move(mem))
     {
     }
 
@@ -652,7 +653,7 @@ public:
     template <class Archive>
     void serialize(Archive& ar)
     {
-        ar(cereal::base_class<Task<cufhe::Ctxt, uint8_t, CUFHEWorkerInfo>>(
+        ar(cereal::base_class<Task<cufhe::Ctxt<TFHEpp::lvl0param>, uint8_t, CUFHEWorkerInfo>>(
                this),
            mem_);
     }

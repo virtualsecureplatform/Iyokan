@@ -244,7 +244,7 @@ public:
 struct CUFHERunParameter {
     NetworkBlueprint blueprint;
     int numCPUWorkers, numGPUWorkers, numGPU, numCycles;
-    std::string bkeyFile, inputFile, outputFile;
+    std::string ekFile, inputFile, outputFile;
     SCHED sched;
 
     CUFHERunParameter()
@@ -259,7 +259,7 @@ struct CUFHERunParameter {
         numGPUWorkers = opt.numGPUWorkers.value_or(80 * 10);
         numGPU = opt.numGPU.value_or(1);
         numCycles = opt.numCycles.value_or(-1);
-        bkeyFile = opt.bkeyFile.value();
+        ekFile = opt.ekFile.value();
         inputFile = opt.inputFile.value();
         outputFile = opt.outputFile.value();
         sched = opt.sched == SCHED::UND ? SCHED::RANKU : opt.sched;
@@ -275,7 +275,7 @@ struct CUFHERunParameter {
         OVERWRITE(numGPUWorkers);
         OVERWRITE(numGPU);
         OVERWRITE(numCycles);
-        OVERWRITE(bkeyFile);
+        OVERWRITE(ekFile);
         OVERWRITE(inputFile);
         OVERWRITE(outputFile);
 #undef OVERWRITE
@@ -290,7 +290,7 @@ struct CUFHERunParameter {
         spdlog::info("\t# of GPU workers: {}", numGPUWorkers);
         spdlog::info("\t# of GPUs: {}", numGPU);
         spdlog::info("\t# of cycles: {}", numCycles);
-        spdlog::info("\tBKey file: {}", bkeyFile);
+        spdlog::info("\tEvalKey file: {}", ekFile);
         spdlog::info("\tInput file (request packet): {}", inputFile);
         spdlog::info("\tOutput file (result packet): {}", outputFile);
     }
@@ -298,7 +298,7 @@ struct CUFHERunParameter {
     template <class Archive>
     void serialize(Archive& ar)
     {
-        ar(blueprint, numCPUWorkers, numGPUWorkers, numGPU, numCycles, bkeyFile,
+        ar(blueprint, numCPUWorkers, numGPUWorkers, numGPU, numCycles, ekFile,
            inputFile, outputFile);
     }
 };
@@ -311,7 +311,7 @@ private:
     std::vector<std::shared_ptr<CUFHE2TFHEppBridge>> bridges0_;
     std::vector<std::shared_ptr<TFHEpp2CUFHEBridge>> bridges1_;
     TFHEPacket reqPacket_;
-    TFHEppBKey bkey_;
+    TFHEpp::EvalKey ek;
     int currentCycle_;
     bool cufheInitialized_;
 
@@ -531,9 +531,7 @@ private:
     {
         assert(!cufheInitialized_);
         cufhe::SetGPUNum(pr_.numGPU);
-        auto gk = std::make_shared<GateKey>();
-        ifftGateKey(*gk, *bkey_.gk);
-        cufhe::Initialize(*gk);
+        cufhe::Initialize(ek);
         cufheInitialized_ = true;
     }
 
@@ -546,7 +544,8 @@ public:
         : pr_(opt), currentCycle_(0), cufheInitialized_(false)
     {
         reqPacket_ = readFromArchive<TFHEPacket>(pr_.inputFile);
-        bkey_ = readFromArchive<TFHEppBKey>(pr_.bkeyFile);
+        // Read ek
+        ek = readFromArchive<TFHEpp::EvalKey>(pr_.ekFile);
 
         // Prepare cuFHE
         initializeCUFHE();
@@ -732,7 +731,7 @@ public:
         pr_.print();
 
         // Check bkey is correct.
-        if (!bkey_.gk || (pr_.blueprint.needsCircuitKey() && !bkey_.ck))
+        if (!(&ek.getbk<Lvl01>()) &&  !(&ek.getbkfft<Lvl01>()) &&  (pr_.blueprint.needsCircuitKey() || !(&ek.getbkfft<TFHEpp::lvl02param>())))
             error::die("Invalid bootstrapping key");
 
         // Make runner
@@ -741,7 +740,7 @@ public:
                          ? std::make_shared<ProgressGraphMaker>()
                          : nullptr;
         CUFHENetworkRunner runner{pr_.numGPUWorkers, pr_.numCPUWorkers,
-                                  TFHEppWorkerInfo{bkey_.gk, bkey_.ck}, graph};
+                                  TFHEppWorkerInfo{std::make_shared<TFHEpp::EvalKey>(ek)}, graph};
         for (auto&& p : name2cnet_)
             runner.addNetwork(p.second);
         for (auto&& p : name2tnet_)
@@ -836,7 +835,8 @@ public:
     void load(Archive& ar)
     {
         ar(pr_, reqPacket_);
-        bkey_ = readFromArchive<TFHEppBKey>(pr_.bkeyFile);
+        // Read ek
+        auto ek = readFromArchive<TFHEpp::EvalKey>(pr_.ekFile);
         initializeCUFHE();
         ar(name2tnet_, name2cnet_, bridges0_, bridges1_, currentCycle_);
     }

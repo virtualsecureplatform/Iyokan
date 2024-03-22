@@ -104,7 +104,7 @@ int main(int argc, char** argv)
     {
         CLI::App* tfhe = app.add_subcommand("tfhe", "");
         tfhe->parse_complete_callback([&] { type = TYPE::TFHE; });
-        tfhe->add_option("--bkey", opt.bkeyFile, "")->required();
+        tfhe->add_option("--evalkey", opt.ekFile, "")->required();
         auto optC = tfhe->add_option("-c", opt.numCycles, "");
         tfhe->add_option("--cpu", opt.numCPUWorkers, "")
             ->check(CLI::PositiveNumber);
@@ -188,8 +188,8 @@ int main(int argc, char** argv)
         spdlog::info("\t# of GPUs: {}", *opt.numGPU);
     if (opt.numCycles)
         spdlog::info("\t# of cycles: {}", *opt.numCycles);
-    if (opt.bkeyFile)
-        spdlog::info("\tBKey file: {}", *opt.bkeyFile);
+    if (opt.ekFile)
+        spdlog::info("\tEvalKey file: {}", *opt.ekFile);
     if (opt.inputFile)
         spdlog::info("\tInput file (request packet): {}", *opt.inputFile);
     if (opt.outputFile)

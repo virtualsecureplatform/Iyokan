@@ -60,7 +60,7 @@ public:
 struct TFHEppRunParameter {
     NetworkBlueprint blueprint;
     int numCPUWorkers, numCycles;
-    std::string bkeyFile, inputFile, outputFile;
+    std::string ekFile, inputFile, outputFile;
     SCHED sched;
 
     TFHEppRunParameter()
@@ -73,7 +73,7 @@ struct TFHEppRunParameter {
         numCPUWorkers =
             opt.numCPUWorkers.value_or(std::thread::hardware_concurrency());
         numCycles = opt.numCycles.value_or(-1);
-        bkeyFile = opt.bkeyFile.value();
+        ekFile = opt.ekFile.value();
         inputFile = opt.inputFile.value();
         outputFile = opt.outputFile.value();
         sched = opt.sched == SCHED::UND ? SCHED::RANKU : opt.sched;
@@ -87,7 +87,7 @@ struct TFHEppRunParameter {
         OVERWRITE(blueprint);
         OVERWRITE(numCPUWorkers);
         OVERWRITE(numCycles);
-        OVERWRITE(bkeyFile);
+        OVERWRITE(ekFile);
         OVERWRITE(inputFile);
         OVERWRITE(outputFile);
 #undef OVERWRITE
@@ -100,7 +100,7 @@ struct TFHEppRunParameter {
         spdlog::info("\tBlueprint: {}", blueprint.sourceFile());
         spdlog::info("\t# of CPU workers: {}", numCPUWorkers);
         spdlog::info("\t# of cycles: {}", numCycles);
-        spdlog::info("\tBKey file: {}", bkeyFile);
+        spdlog::info("\tEvalKey file: {}", ekFile);
         spdlog::info("\tInput file (request packet): {}", inputFile);
         spdlog::info("\tOutput file (result packet): {}", outputFile);
     }
@@ -108,7 +108,7 @@ struct TFHEppRunParameter {
     template <class Archive>
     void serialize(Archive& ar)
     {
-        ar(blueprint, numCPUWorkers, numCycles, bkeyFile, inputFile,
+        ar(blueprint, numCPUWorkers, numCycles, ekFile, inputFile,
            outputFile);
     }
 };
@@ -466,11 +466,11 @@ public:
     {
         pr_.print();
 
-        // Read bkey
-        auto bkey = readFromArchive<TFHEppBKey>(pr_.bkeyFile);
+        // Read ek
+        auto ek = readFromArchive<TFHEpp::EvalKey>(pr_.ekFile);
 
         // Check bkey is correct.
-        if (!bkey.gk || (pr_.blueprint.needsCircuitKey() && !bkey.ck))
+        if (!(&ek.getbkfft<Lvl01>())|| (pr_.blueprint.needsCircuitKey() && !(&ek.getbkfft<TFHEpp::lvl02param>())))
             error::die("Invalid bootstrapping key");
 
         // Make runner
@@ -478,7 +478,7 @@ public:
                              opt.dumpGraphDOTPrefix
                          ? std::make_shared<ProgressGraphMaker>()
                          : nullptr;
-        TFHEppWorkerInfo wi{bkey.gk, bkey.ck};
+        TFHEppWorkerInfo wi{std::make_shared<TFHEpp::EvalKey>(ek)};
         TFHEppNetworkRunner runner{pr_.numCPUWorkers, wi, graph};
         for (auto&& p : name2net_)
             runner.addNetwork(p.second);
@@ -489,7 +489,7 @@ public:
         if (currentCycle_ == 0 && !opt.skipReset) {
             if (auto reset = maybeGetAt("input", "reset"); reset) {
                 TLWELvl0 one;
-                TFHEpp::HomCONSTANTONE(one);
+                TFHEpp::HomCONSTANTONE<Lvl0>(one);
 
                 reset->set(one);
                 runner.run(opt.showCombinationalProgress);
@@ -517,7 +517,7 @@ public:
 
                 if (i == 0 && shouldNegateReset) {
                     TLWELvl0 zero;
-                    TFHEpp::HomCONSTANTZERO(zero);
+                    TFHEpp::HomCONSTANTZERO<Lvl0>(zero);
                     reset->set(zero);
                 }
 
