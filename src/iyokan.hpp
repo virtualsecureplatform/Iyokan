@@ -2280,7 +2280,10 @@ public:
                 error::die(
                     "Currently $_SDFF_PP0_ and $_SDFF_PP1_ are not supported "
                     "because Iyokan cannot handle their 'R' inputs correctly. "
-                    "A patch for this issue is welcome!");
+                    "A patch for this issue is welcome!"
+                    "Please use $_DFF_P_ instead."
+                    "dfflegalize -cell $_DFF_P_ 01" 
+                    "ensure that in Yosys.");
                 // id = builder.SDFF(Bit(false));
                 // cellvec.emplace_back(CELL::DFFP, id, get("D"));
                 // bit = get("Q");
@@ -2289,7 +2292,10 @@ public:
                 error::die(
                     "Currently $_SDFF_PP0_ and $_SDFF_PP1_ are not supported "
                     "because Iyokan cannot handle their 'R' inputs correctly. "
-                    "A patch for this issue is welcome!");
+                    "A patch for this issue is welcome! "
+                    "Please use $_DFF_P_ instead. "
+                    "dfflegalize -cell $_DFF_P_ 01 " 
+                    "ensure that in Yosys.");
                 // id = builder.SDFF(Bit(true));
                 // cellvec.emplace_back(CELL::DFFP, id, get("D"));
                 // bit = get("Q");
