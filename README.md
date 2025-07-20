@@ -51,6 +51,15 @@ If you want to run slow but detailed tests including ones for CUDA support:
 $ ruby test.rb build/bin slow cuda
 ```
 
+## Verilog and Yosys script Requirements
+
+Here, we explicitly specify two requirements to correctly synthesize the Verilog file to supported JSON format. 
+
+1. The name of reset must be `reset` not `rst` or any other name. 
+- We treat ``reset'' as a special name. Currently, we remove all `reset'` related logic and the DFF initalization at the beggining. If you use other name, you will see a strange initizalization behavior. 
+2. Use only $_DFF_P_ as a flipflop. Make it sure by running `dfflegalize -cell $_DFF_P_ 01`
+- At least for Yosys 0.55 (we forgot exact version for this change), the flipflop will be synthesized as $_SDFF_PP0_ or $_SDFF_PP1_ in the default setting. However, we decided to stick supporting only $_DFF_P_ because we treat the `reset` in a special manner. This might be merely interface issue, so if you really neeed $_SDFF_PP0_ and $_SDFF_PP1_, please make PR or issue.
+
 ## See Also
 
 See our [wiki](https://github.com/virtualsecureplatform/Iyokan/wiki) for tutorials and more!
