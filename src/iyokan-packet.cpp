@@ -98,12 +98,13 @@ PlainPacket makePlainPacketFromCmdOptions(
 
 void printPlainPacket(std::ostream& os, const PlainPacket& pkt)
 {
-    toml::value root = {
-        {"cycles", pkt.numCycles ? *pkt.numCycles : -1},
-        {"ram", std::vector<toml::table>{}},
-        {"rom", std::vector<toml::table>{}},
-        {"bits", std::vector<toml::table>{}},
-    };
+    toml::table root_table;
+    root_table["cycles"] = pkt.numCycles ? *pkt.numCycles : -1;
+    root_table["ram"] = std::vector<toml::table>{};
+    root_table["rom"] = std::vector<toml::table>{};
+    root_table["bits"] = std::vector<toml::table>{};
+    
+    toml::value root(std::move(root_table));
 
     auto bits2bytes = [](const std::vector<Bit>& bits) -> toml::array {
         toml::array ret;
@@ -126,12 +127,13 @@ void printPlainPacket(std::ostream& os, const PlainPacket& pkt)
                 name2bitvec,
             const std::string& entryName) {
             auto& v = toml::find<toml::array>(root, entryName);
-            for (auto&& [name, bits] : name2bitvec)
-                v.push_back(toml::table{
-                    {"name", name},
-                    {"size", bits.size()},
-                    {"bytes", bits2bytes(bits)},
-                });
+            for (auto&& [name, bits] : name2bitvec) {
+                toml::table entry;
+                entry["name"] = name;
+                entry["size"] = bits.size();
+                entry["bytes"] = bits2bytes(bits);
+                v.push_back(std::move(entry));
+            }
         };
 
     printEntry(pkt.ram, "ram");
