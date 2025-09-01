@@ -7,7 +7,6 @@ set(CMAKE_MODULE_PATH
     "${CMAKE_SOURCE_DIR}/thirdparty/sanitizers-cmake/cmake"
     ${CMAKE_MODULE_PATH}
 )
-set(Backward_DIR "${CMAKE_SOURCE_DIR}/thirdparty/backward-cpp")
 
 # Defaults to CMAKE_BUILD_TYPE=Debug
 if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
@@ -20,10 +19,11 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 project(iyokan LANGUAGES CXX)
 
+add_subdirectory(thirdparty/backward-cpp)
+
 find_package(Threads REQUIRED)
 find_package(OpenMP REQUIRED)
 find_package(Sanitizers)
-find_package(Backward)
 
 if (IYOKAN_80BIT_SECURITY)
     set(USE_80BIT_SECURITY ON CACHE BOOL "")
