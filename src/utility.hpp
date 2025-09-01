@@ -31,9 +31,9 @@ inline std::ostream& fokImpl(std::ostream& os,
                     duration_cast<milliseconds>(
                         duration_cast<seconds>(tp.time_since_epoch()));
 
-    fmt::fprintf(os, "%04d-%02d-%02d %02d:%02d:%02d.%03ld", t->tm_year + 1900,
-                 t->tm_mon + 1, t->tm_mday, t->tm_hour, t->tm_min, t->tm_sec,
-                 fraction.count());
+    os << fmt::sprintf("%04d-%02d-%02d %02d:%02d:%02d.%03ld", t->tm_year + 1900,
+                       t->tm_mon + 1, t->tm_mday, t->tm_hour, t->tm_min, t->tm_sec,
+                       fraction.count());
 
     return os;
 }
