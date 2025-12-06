@@ -836,7 +836,7 @@ public:
     {
         ar(pr_, reqPacket_);
         // Read ek
-        auto ek = readFromArchive<TFHEpp::EvalKey>(pr_.ekFile);
+        ek = readFromArchive<TFHEpp::EvalKey>(pr_.ekFile);
         initializeCUFHE();
         ar(name2tnet_, name2cnet_, bridges0_, bridges1_, currentCycle_);
     }
