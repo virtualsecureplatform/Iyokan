@@ -1,6 +1,7 @@
 #ifndef VIRTUALSECUREPLATFORM_IYOKAN_TFHEPP_CUFHE_WRAPPER_HPP
 #define VIRTUALSECUREPLATFORM_IYOKAN_TFHEPP_CUFHE_WRAPPER_HPP
 
+#include "int128_make_signed_fix.hpp"
 #include <tfhe++.hpp>
 
 using Lvl0 = TFHEpp::lvl0param;

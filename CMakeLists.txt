@@ -36,10 +36,16 @@ if (IYOKAN_ENABLE_CUDA)
         set(CMAKE_CUDA20_STANDARD_COMPILE_OPTION "")
         set(CMAKE_CUDA20_EXTENSION_COMPILE_OPTION "")
     endif()
-    add_subdirectory(thirdparty/cuFHE)
+    add_subdirectory(thirdparty/cuFHEpp)
 else()
-    add_subdirectory(thirdparty/cuFHE/thirdparties/TFHEpp)
+    add_subdirectory(thirdparty/cuFHEpp/thirdparties/TFHEpp)
 endif(IYOKAN_ENABLE_CUDA)
+
+# Workaround: GCC < 14 does not support std::make_signed<__int128>.
+# TFHEpp's lvl3param uses __uint128_t, causing compilation failure.
+target_compile_options(tfhe++ PRIVATE
+    -include ${CMAKE_CURRENT_SOURCE_DIR}/src/int128_make_signed_fix.hpp)
+
 add_subdirectory(thirdparty/spdlog)
 
 set(IYOKAN_CXXFLAGS -Wall -Wextra -Wno-sign-compare)
@@ -49,20 +55,28 @@ set(IYOKAN_INCLUDE_DIRS
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/picojson>
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/ThreadPool>
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/CLI11/include>
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/cuFHE/thirdparties/TFHEpp/thirdparties/cereal/include>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/cuFHEpp/thirdparties/TFHEpp/thirdparties/cereal/include>
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/ELFIO>
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/toml11/include>
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/spdlog/include>
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/fmt/include>
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/cuFHE/include>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/cuFHEpp/include>
 )
 if (IYOKAN_ENABLE_CUDA)
     list(APPEND IYOKAN_INCLUDE_DIRS ${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES})
+    # Match cuFHEpp's compile definitions so TFHEpp headers see the same types.
+    list(APPEND IYOKAN_COMPILE_DEFINITIONS USE_KEY_BUNDLE)
 endif(IYOKAN_ENABLE_CUDA)
 set(IYOKAN_LIBS tfhe++ Threads::Threads OpenMP::OpenMP_CXX Backward::Backward stdc++fs)
 if (IYOKAN_80BIT_SECURITY)
     # For TFHEpp headers
     list(APPEND IYOKAN_COMPILE_DEFINITIONS USE_80BIT_SECURITY)
+endif()
+# Propagate TFHEpp compile definitions to Iyokan targets so that header-only
+# template functions (CircuitBootstrapping, ExternalProduct, etc.) see the same
+# preprocessor state as the tfhe++ library, avoiding ODR violations.
+if(USE_BLAKE3)
+    list(APPEND IYOKAN_COMPILE_DEFINITIONS USE_BLAKE3)
 endif()
 
 set(CMAKE_C_FLAGS "")

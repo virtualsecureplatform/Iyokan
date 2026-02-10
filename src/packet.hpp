@@ -14,6 +14,7 @@
 #include <cereal/types/unordered_map.hpp>
 #include <cereal/types/vector.hpp>
 
+#include "int128_cereal.hpp"
 #include "tfhepp_cufhe_wrapper.hpp"
 
 #include "error.hpp"
@@ -72,7 +73,9 @@ inline std::vector<TLWELvl0> encryptBits(const TFHEpp::SecretKey& key,
     in.reserve(src.size());
     for (auto&& bit : src)
         in.push_back(bit == 1_b ? 1 : 0);
-    return TFHEpp::bootsSymEncrypt<Lvl0>(in, key);
+    std::vector<TLWELvl0> ret;
+    TFHEpp::bootsSymEncrypt<Lvl0>(ret, in, key);
+    return ret;
 }
 
 inline std::vector<TRLWELvl1> encryptROM(const TFHEpp::SecretKey& key,
@@ -90,7 +93,7 @@ inline std::vector<TRLWELvl1> encryptROM(const TFHEpp::SecretKey& key,
             else
                 pmu[i] = 0;
         }
-        ret[thread / P::n] = TFHEpp::trlweSymEncrypt<Lvl1>(pmu, P::α, key.key.lvl1);
+        TFHEpp::trlweSymEncrypt<Lvl1>(ret[thread / P::n], pmu, key.key.get<Lvl1>());
     }
 
     return ret;
@@ -112,7 +115,7 @@ inline std::vector<TRLWELvl1> encryptRAM(const TFHEpp::SecretKey& key,
     for (size_t bit = 0; bit < src.size(); bit++){
         PolyLvl1 pmu = {};
         pmu[0] = (src[bit] == 1_b) ? P::μ : -P::μ;
-        ret[bit] = TFHEpp::trlweSymEncrypt<Lvl1>(pmu, P::α, key.key.lvl1);
+        TFHEpp::trlweSymEncrypt<Lvl1>(ret[bit], pmu, key.key.get<Lvl1>());
     }
 
     return ret;
@@ -156,7 +159,7 @@ inline std::vector<Bit> decryptRAM(const TFHEpp::SecretKey& key,
     std::vector<Bit> ret;
     for (auto&& encbit : src) {
         uint8_t bitval =
-            TFHEpp::trlweSymDecrypt<Lvl1>(encbit, key.key.lvl1).at(0);
+            TFHEpp::trlweSymDecrypt<Lvl1>(encbit, key.key.get<Lvl1>())[0] ? 1 : 0;
         ret.push_back(bitval != 0 ? 1_b : 0_b);
     }
 
@@ -174,7 +177,7 @@ inline std::vector<Bit> decryptROM(const TFHEpp::SecretKey& key,
 {
     std::vector<Bit> ret;
     for (auto&& encblk : src) {
-        auto blk = TFHEpp::trlweSymDecrypt<Lvl1>(encblk, key.key.lvl1);
+        auto blk = TFHEpp::trlweSymDecrypt<Lvl1>(encblk, key.key.get<Lvl1>());
         for (uint8_t bitval : blk)
             ret.push_back(bitval != 0 ? 1_b : 0_b);
     }

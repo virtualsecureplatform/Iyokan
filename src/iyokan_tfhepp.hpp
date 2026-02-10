@@ -196,7 +196,7 @@ private:
     void startSync(TFHEppWorkerInfo wi) override
     {
         auto ek = wi.ek;
-        TFHEpp::CircuitBootstrappingFFT<TFHEpp::lvl02param,TFHEpp::lvl21param>(output(), input(0), *ek);
+        TFHEpp::CircuitBootstrapping<TFHEpp::lvl02param,TFHEpp::lvl21param>(output(), input(0), *ek);
     }
 
 public:
@@ -218,7 +218,7 @@ private:
     void startSync(TFHEppWorkerInfo wi) override
     {
         auto ek = wi.ek;
-        TFHEpp::CircuitBootstrappingFFTInv<TFHEpp::lvl02param,TFHEpp::lvl21param>(output(), input(0), *ek);
+        TFHEpp::CircuitBootstrappingInv<TFHEpp::lvl02param,TFHEpp::lvl21param>(output(), input(0), *ek);
     }
 
 public:
@@ -283,7 +283,7 @@ private:
                                                      2 * N - (N >> bit));
             TFHEpp::PolynomialMulByXaiMinusOne<Lvl1>(temp[1], acc[1],
                                                      2 * N - (N >> bit));
-            TFHEpp::trgswfftExternalProduct<Lvl1>(
+            TFHEpp::ExternalProduct<Lvl1>(
                 temp, temp, input(log2NumWordsPerTRLWE_ - bit));
             for (uint32_t i = 0; i < N; i++) {
                 acc[0][i] += temp[0][i];
@@ -388,7 +388,7 @@ private:
     void startSync(TFHEppWorkerInfo wi) override
     {
         auto ek = wi.ek;
-        TFHEpp::CircuitBootstrappingFFTwithInv<TFHEpp::lvl02param,TFHEpp::lvl21param>(output().normal,output().inverted, input(0), *ek);
+        TFHEpp::CircuitBootstrappingWithInv<TFHEpp::lvl02param,TFHEpp::lvl21param>(output().normal,output().inverted, input(0), *ek);
     }
 
 public:

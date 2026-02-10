@@ -538,11 +538,16 @@ private:
         ek_ = std::make_shared<EvalKey>();
         (*ek_).emplaceiksk<Lvl10>(*sk_);
         (*ek_).emplacebk<Lvl01>(*sk_);
-        (*ek_).emplacebk2bkfft<Lvl01>();
+        (*ek_).emplacebkfft<Lvl01>(*sk_);
         (*ek_).emplacebkfft<Lvl02>(*sk_);
         (*ek_).emplaceprivksk4cb<Lvl21>(*sk_);
-        zero_ = TFHEpp::bootsSymEncrypt<Lvl0>({0}, *sk_).at(0);
-        one_ = TFHEpp::bootsSymEncrypt<Lvl0>({1}, *sk_).at(0);
+        {
+            std::vector<TLWELvl0> tmp;
+            TFHEpp::bootsSymEncrypt<Lvl0>(tmp, {0}, *sk_);
+            zero_ = tmp.at(0);
+            TFHEpp::bootsSymEncrypt<Lvl0>(tmp, {1}, *sk_);
+            one_ = tmp.at(0);
+        }
     }
 
 public:
@@ -611,8 +616,11 @@ void testTFHEppSerialization()
         auto sk2 = std::make_shared<SecretKey>();
         readFromArchive<SecretKey>(*sk2, "_test_sk");
 
-        auto zero = TFHEpp::bootsSymEncrypt<Lvl0>({0}, *sk2).at(0);
-        auto one = TFHEpp::bootsSymEncrypt<Lvl0>({1}, *sk2).at(0);
+        std::vector<TLWELvl0> tmp0, tmp1;
+        TFHEpp::bootsSymEncrypt<Lvl0>(tmp0, {0}, *sk2);
+        TFHEpp::bootsSymEncrypt<Lvl0>(tmp1, {1}, *sk2);
+        auto zero = tmp0.at(0);
+        auto one = tmp1.at(0);
         TLWELvl0 res;
         TFHEpp::HomANDNY<TFHEpp::lvl01param,TFHEpp::lvl1param::μ,TFHEpp::lvl10param>(res, zero, one, *ek);
         assert(TFHEpp::bootsSymDecrypt<Lvl0>({res}, *sk2).at(0) == 1);
@@ -628,11 +636,69 @@ void testTFHEppSerialization()
         auto ek2 = std::make_shared<EvalKey>();
         readFromArchive<TFHEpp::EvalKey>(*ek2, ss);
 
-        auto zero = TFHEpp::bootsSymEncrypt<Lvl0>({0}, *sk).at(0);
-        auto one = TFHEpp::bootsSymEncrypt<Lvl0>({1}, *sk).at(0);
+        std::vector<TLWELvl0> tmp0, tmp1;
+        TFHEpp::bootsSymEncrypt<Lvl0>(tmp0, {0}, *sk);
+        TFHEpp::bootsSymEncrypt<Lvl0>(tmp1, {1}, *sk);
+        auto zero = tmp0.at(0);
+        auto one = tmp1.at(0);
         TLWELvl0 res;
         TFHEpp::HomANDNY<TFHEpp::lvl01param,TFHEpp::lvl1param::μ,TFHEpp::lvl10param>(res, zero, one, *ek2);
         assert(TFHEpp::bootsSymDecrypt<Lvl0>({res}, *sk).at(0) == 1);
+
+        // Verify BK survives serialization
+        {
+            const auto& bk_orig = ek->getbk<Lvl01>();
+            const auto& bk_deser = ek2->getbk<Lvl01>();
+            bool bk_match = (std::memcmp(&bk_orig, &bk_deser, sizeof(bk_orig)) == 0);
+            if (!bk_match) {
+                std::cerr << "BK MISMATCH after serialization!" << std::endl;
+                // Find first differing byte
+                const auto* p1 = reinterpret_cast<const uint8_t*>(&bk_orig);
+                const auto* p2 = reinterpret_cast<const uint8_t*>(&bk_deser);
+                for (size_t i = 0; i < sizeof(bk_orig); i++) {
+                    if (p1[i] != p2[i]) {
+                        std::cerr << "  First diff at byte " << i << " of " << sizeof(bk_orig)
+                                  << ": orig=" << (int)p1[i] << " deser=" << (int)p2[i] << std::endl;
+                        break;
+                    }
+                }
+            }
+            assert(bk_match && "BK must survive serialization round-trip");
+        }
+
+        // Verify BKFFT survives serialization
+        {
+            const auto& bkfft_orig = ek->getbkfft<Lvl01>();
+            const auto& bkfft_deser = ek2->getbkfft<Lvl01>();
+            bool bkfft_match = (std::memcmp(&bkfft_orig, &bkfft_deser, sizeof(bkfft_orig)) == 0);
+            if (!bkfft_match) {
+                std::cerr << "BKFFT MISMATCH after serialization!" << std::endl;
+                const auto* p1 = reinterpret_cast<const uint8_t*>(&bkfft_orig);
+                const auto* p2 = reinterpret_cast<const uint8_t*>(&bkfft_deser);
+                size_t diff_count = 0;
+                size_t first_diff = 0;
+                for (size_t i = 0; i < sizeof(bkfft_orig); i++) {
+                    if (p1[i] != p2[i]) {
+                        if (diff_count == 0) first_diff = i;
+                        diff_count++;
+                    }
+                }
+                std::cerr << "  Total differing bytes: " << diff_count << " of " << sizeof(bkfft_orig) << std::endl;
+                std::cerr << "  First diff at byte " << first_diff << std::endl;
+            }
+            assert(bkfft_match && "BKFFT must survive serialization round-trip");
+        }
+
+        // Verify IKSK survives serialization
+        {
+            const auto& iksk_orig = ek->getiksk<Lvl10>();
+            const auto& iksk_deser = ek2->getiksk<Lvl10>();
+            bool iksk_match = (std::memcmp(&iksk_orig, &iksk_deser, sizeof(iksk_orig)) == 0);
+            if (!iksk_match) {
+                std::cerr << "IKSK MISMATCH after serialization!" << std::endl;
+            }
+            assert(iksk_match && "IKSK must survive serialization round-trip");
+        }
     }
 
     // Test for TLWE level 0
@@ -640,8 +706,11 @@ void testTFHEppSerialization()
         std::stringstream ss{std::ios::binary | std::ios::out | std::ios::in};
 
         {
-            auto zero = TFHEpp::bootsSymEncrypt<Lvl0>({0}, *sk).at(0);
-            auto one = TFHEpp::bootsSymEncrypt<Lvl0>({1}, *sk).at(0);
+            std::vector<TLWELvl0> tmp0, tmp1;
+            TFHEpp::bootsSymEncrypt<Lvl0>(tmp0, {0}, *sk);
+            TFHEpp::bootsSymEncrypt<Lvl0>(tmp1, {1}, *sk);
+            auto zero = tmp0.at(0);
+            auto one = tmp1.at(0);
             writeToArchive(ss, zero);
             writeToArchive(ss, one);
             ss.seekg(0);
@@ -655,6 +724,70 @@ void testTFHEppSerialization()
             assert(TFHEpp::bootsSymDecrypt<Lvl0>({res}, *sk).at(0) == 1);
         }
     }
+}
+
+void testTFHEppFileSerializedAdder()
+{
+    auto& h = TFHEppTestHelper::instance();
+    const std::shared_ptr<const SecretKey>& sk = h.sk();
+    const std::shared_ptr<const EvalKey>& ek = h.ek();
+
+    // Write EK to file
+    writeToArchive("_test_ek_file", *ek);
+
+    // Read EK back from file
+    auto ek2 = std::make_shared<EvalKey>();
+    readFromArchive<TFHEpp::EvalKey>(*ek2, "_test_ek_file");
+
+    // Verify BKFFT matches
+    {
+        const auto& bkfft_orig = ek->getbkfft<Lvl01>();
+        const auto& bkfft_deser = ek2->getbkfft<Lvl01>();
+        assert(std::memcmp(&bkfft_orig, &bkfft_deser, sizeof(bkfft_orig)) == 0
+               && "File BKFFT must match");
+    }
+
+    // Run addr_4bit with file-deserialized EK
+    TFHEppWorkerInfo wi2{ek2};
+
+    const std::string fileName = "test/iyokanl1-json/addr-4bit-iyokanl1.json";
+    std::ifstream ifs{fileName};
+    assert(ifs);
+
+    auto net = readNetworkFromJSON<TFHEppNetworkBuilder>(ifs);
+    assertNetValid(net);
+
+    // A=12=0b1100, B=10=0b1010
+    auto setInputWith = [&](const std::string& portName, int bit, int val) {
+        auto task = get<TFHEppNetworkBuilder>(net, "input", portName, bit);
+        task->set(val ? h.one() : h.zero());
+    };
+    setInputWith("io_inA", 0, 0);
+    setInputWith("io_inA", 1, 0);
+    setInputWith("io_inA", 2, 1);
+    setInputWith("io_inA", 3, 1);
+    setInputWith("io_inB", 0, 0);
+    setInputWith("io_inB", 1, 1);
+    setInputWith("io_inB", 2, 0);
+    setInputWith("io_inB", 3, 1);
+
+    // Process with file-deserialized EK
+    processAllGates(net, std::thread::hardware_concurrency(), wi2);
+
+    // Check output: 12+10=22 mod 16 = 6 = 0b0110
+    auto getOutputWith = [&](const std::string& portName, int bit) -> int {
+        auto task = get<TFHEppNetworkBuilder>(net, "output", portName, bit);
+        return TFHEpp::bootsSymDecrypt<Lvl0>({task->get()}, *sk)[0];
+    };
+    int out0 = getOutputWith("io_out", 0);
+    int out1 = getOutputWith("io_out", 1);
+    int out2 = getOutputWith("io_out", 2);
+    int out3 = getOutputWith("io_out", 3);
+    int result = out0 | (out1 << 1) | (out2 << 2) | (out3 << 3);
+
+    std::cerr << "File-serialized adder test: A=12, B=10, out="
+              << result << " (expected 6)" << std::endl;
+    assert(result == 6 && "File-serialized addr_4bit must produce correct result");
 }
 
 #ifdef IYOKAN_CUDA_ENABLED
@@ -878,6 +1011,7 @@ int main()
     testFromJSONtest_counter_4bit<TFHEppNetworkBuilder>();
     testPrioritySetVisitor<TFHEppNetworkBuilder>();
     testTFHEppSerialization();
+    testTFHEppFileSerializedAdder();
 
 #ifdef IYOKAN_CUDA_ENABLED
     {
@@ -896,6 +1030,52 @@ int main()
         testFromJSONtest_counter_4bit<CUFHENetworkBuilder>();
         testPrioritySetVisitor<CUFHENetworkBuilder>();
         testBridgeBetweenCUFHEAndTFHEpp();
+    }
+
+    // Test CUFHE with file-serialized key
+    {
+        auto ek_orig = TFHEppTestHelper::instance().ek();
+        auto sk = TFHEppTestHelper::instance().sk();
+
+        // Serialize to file
+        const std::string ek_file = "_test0_ek_roundtrip.bin";
+        writeToArchive(ek_file, *ek_orig);
+
+        // Deserialize from file
+        auto ek_deser = std::make_shared<TFHEpp::EvalKey>();
+        readFromArchive<TFHEpp::EvalKey>(*ek_deser, ek_file);
+
+        // Verify BK matches
+        {
+            const auto& bk_orig = ek_orig->getbk<Lvl01>();
+            const auto& bk_deser = ek_deser->getbk<Lvl01>();
+            assert(std::memcmp(&bk_orig, &bk_deser, sizeof(bk_orig)) == 0 &&
+                   "BK must match after file round-trip");
+        }
+
+        // Initialize CUFHE with deserialized key
+        {
+            cufhe::Initialize(*ek_deser);
+
+            // Run a simple gate test (AND of 1 and 1 = 1)
+            cufhe::Stream st;
+            cufhe::Ctxt<TFHEpp::lvl0param> c0, c1, cres;
+            setCtxtOne(c0);
+            setCtxtOne(c1);
+            cufhe::And<TFHEpp::lvl0param>(cres, c0, c1, st);
+            cufhe::Synchronize();
+            int result = decryptTLWELvl0(cres.tlwehost, *sk);
+            if (result != 1) {
+                std::cerr << "CUFHE with file-deserialized key: AND(1,1) = "
+                          << result << " (expected 1)" << std::endl;
+            }
+            assert(result == 1 && "CUFHE must work with file-deserialized key");
+
+            cufhe::CleanUp();
+        }
+
+        // Clean up temp file
+        std::remove(ek_file.c_str());
     }
 #endif
 

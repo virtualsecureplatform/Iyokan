@@ -10,9 +10,6 @@
 [submodule "sanitizers-cmake"]
 	path = thirdparty/sanitizers-cmake
 	url = https://github.com/arsenm/sanitizers-cmake.git
-[submodule "cuFHE"]
-	path = thirdparty/cuFHE
-	url = https://github.com/virtualsecureplatform/cuFHE.git
 [submodule "backward-cpp"]
 	path = thirdparty/backward-cpp
 	url = https://github.com/bombela/backward-cpp.git
@@ -25,3 +22,6 @@
 [submodule "fmt"]
 	path = thirdparty/fmt
 	url = https://github.com/fmtlib/fmt.git
+[submodule "thirdparty/cuFHEpp"]
+	path = thirdparty/cuFHEpp
+	url = https://github.com/virtualsecureplatform/cuFHEpp.git
