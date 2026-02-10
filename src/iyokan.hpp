@@ -2112,17 +2112,28 @@ private:
     };
 
 private:
-    static int getConnBit(const picojson::object& conn, const std::string& key)
+    template <class NetworkBuilder>
+    static int getConnBit(const picojson::object& conn, const std::string& key,
+                          NetworkBuilder& builder,
+                          std::unordered_map<int, int>& bit2id,
+                          int& constBitCounter)
     {
         using namespace picojson;
         const auto& bits = conn.at(key).get<array>();
         if (bits.size() != 1)
             error::die("Invalid JSON: wrong conn size: expected 1, got ",
                        bits.size());
-        if (!bits.at(0).is<double>())
-            error::die(
-                "Connection of cells to a constant driver is not implemented.");
-        return bits.at(0).get<double>();
+        if (bits.at(0).is<double>())
+            return bits.at(0).get<double>();
+        // Handle constant driver: "0" or "1"
+        std::string cnstStr = bits.at(0).get<std::string>();
+        bool cnst = cnstStr == "1";
+        if (!cnst && cnstStr != "0")
+            spdlog::warn("Constant bit of '{}' is regarded as '0'.", cnstStr);
+        int fakeBit = --constBitCounter;
+        int id = cnst ? builder.CONSTONE() : builder.CONSTZERO();
+        bit2id.emplace(fakeBit, id);
+        return fakeBit;
     }
 
 public:
@@ -2220,17 +2231,25 @@ public:
             {"$_SDFF_PP1_", CELL::SDFFPP1},
             {"$_MUX_", CELL::MUX},
         };
+        int constBitCounter = 0;
         std::vector<Cell> cellvec;
         for (auto&& [_key, valAny] : cells) {
             object& val = valAny.template get<object>();
             const std::string& type = val.at("type").get<std::string>();
+
+            // Skip metadata cells like $scopeinfo
+            auto mapIt = mapCell.find(type);
+            if (mapIt == mapCell.end())
+                continue;
+
             object& conn = val.at("connections").get<object>();
             auto get = [&](const char* key) -> int {
-                return getConnBit(conn, key);
+                return getConnBit(conn, key, builder, bit2id,
+                                  constBitCounter);
             };
 
             int bit = -1, id = -1;
-            switch (mapCell.at(type)) {
+            switch (mapIt->second) {
             case CELL::AND:
                 id = builder.AND();
                 cellvec.emplace_back(CELL::AND, id, get("A"), get("B"));
