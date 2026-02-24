@@ -36,6 +36,11 @@ if (IYOKAN_ENABLE_CUDA)
         set(CMAKE_CUDA20_STANDARD_COMPILE_OPTION "")
         set(CMAKE_CUDA20_EXTENSION_COMPILE_OPTION "")
     endif()
+    # Disable key-bundle bootstrapping: cuFHEpp's BootstrapTLWE2TRLWE (used for
+    # CMUX RAM gate bootstrapping) always uses __BlindRotate__ which expects
+    # regular BSK format, but USE_KEY_BUNDLE stores the BSK in key-bundle format,
+    # causing wrong RAM results. Disable key bundles to keep BSK in regular format.
+    set(USE_KEY_BUNDLE OFF CACHE BOOL "" FORCE)
     add_subdirectory(thirdparty/cuFHEpp)
 else()
     add_subdirectory(thirdparty/cuFHEpp/thirdparties/TFHEpp)
@@ -64,8 +69,7 @@ set(IYOKAN_INCLUDE_DIRS
 )
 if (IYOKAN_ENABLE_CUDA)
     list(APPEND IYOKAN_INCLUDE_DIRS ${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES})
-    # Match cuFHEpp's compile definitions so TFHEpp headers see the same types.
-    list(APPEND IYOKAN_COMPILE_DEFINITIONS USE_KEY_BUNDLE)
+    # Note: USE_KEY_BUNDLE intentionally not propagated here (disabled above).
 endif(IYOKAN_ENABLE_CUDA)
 set(IYOKAN_LIBS tfhe++ Threads::Threads OpenMP::OpenMP_CXX Backward::Backward stdc++fs)
 if (IYOKAN_80BIT_SECURITY)
