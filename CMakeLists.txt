@@ -1,6 +1,10 @@
 cmake_minimum_required(VERSION 3.18)
 
 option(IYOKAN_80BIT_SECURITY "Use 80-bit security parameter for TFHE and cuFHE" OFF)
+# IYOKAN_MARCH: -march target passed to TFHEpp and Iyokan itself.
+# Use "x86-64-v3" for a portable AVX2 build, "native" (default) for best
+# performance on the build host.
+set(IYOKAN_MARCH "native" CACHE STRING "Target -march flag for TFHEpp and Iyokan")
 
 set(CMAKE_MODULE_PATH
     ${CMAKE_SOURCE_DIR}
@@ -28,6 +32,9 @@ find_package(Sanitizers)
 if (IYOKAN_80BIT_SECURITY)
     set(USE_80BIT_SECURITY ON CACHE BOOL "")
 endif()
+# Forward IYOKAN_MARCH to TFHEpp as TFHEPP_MARCH (normal variable, inherited by
+# subdirectories including cuFHEpp/thirdparties/TFHEpp via add_subdirectory).
+set(TFHEPP_MARCH "${IYOKAN_MARCH}")
 if (IYOKAN_ENABLE_CUDA)
     enable_language(CUDA)
     set(CMAKE_CUDA_STANDARD 20)
@@ -55,7 +62,7 @@ add_subdirectory(thirdparty/spdlog)
 
 set(IYOKAN_CXXFLAGS -Wall -Wextra -Wno-sign-compare)
 set(IYOKAN_CXXFLAGS_DEBUG   ${IYOKAN_CXXFLAGS} -O0 -g3)
-set(IYOKAN_CXXFLAGS_RELEASE ${IYOKAN_CXXFLAGS} -O3 -march=native -DNDEBUG -g3)
+set(IYOKAN_CXXFLAGS_RELEASE ${IYOKAN_CXXFLAGS} -O3 -march=${IYOKAN_MARCH} -DNDEBUG -g3)
 set(IYOKAN_INCLUDE_DIRS
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/picojson>
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/ThreadPool>
