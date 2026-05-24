@@ -52,6 +52,12 @@ if (IYOKAN_ENABLE_CUDA)
 else()
     add_subdirectory(thirdparty/cuFHEpp/thirdparties/TFHEpp)
 endif(IYOKAN_ENABLE_CUDA)
+if(TARGET spqlios-intl)
+    # TFHEpp's bundled spqlios-intl includes params.hpp from the TFHEpp source
+    # tree. Add it here because TFHEpp is built as a nested subdirectory.
+    target_include_directories(spqlios-intl PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/cuFHEpp/thirdparties/TFHEpp/include)
+endif()
 
 # Workaround: GCC < 14 does not support std::make_signed<__int128>.
 # TFHEpp's lvl3param uses __uint128_t, causing compilation failure.
@@ -86,8 +92,9 @@ endif()
 # Propagate TFHEpp compile definitions to Iyokan targets so that header-only
 # template functions (CircuitBootstrapping, ExternalProduct, etc.) see the same
 # preprocessor state as the tfhe++ library, avoiding ODR violations.
-if(USE_BLAKE3)
-    list(APPEND IYOKAN_COMPILE_DEFINITIONS USE_BLAKE3)
+if(TFHEpp_DEFINITIONS)
+    list(APPEND IYOKAN_COMPILE_DEFINITIONS ${TFHEpp_DEFINITIONS})
+    list(REMOVE_DUPLICATES IYOKAN_COMPILE_DEFINITIONS)
 endif()
 
 set(CMAKE_C_FLAGS "")
