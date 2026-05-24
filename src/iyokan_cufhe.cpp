@@ -79,7 +79,8 @@ void makeTFHEppRAMNetworkForCUFHEImpl(
         std::shared_ptr<BridgeDepNode<TFHEppWorkerInfo, CUFHEWorkerInfo>>>&
         bridge1,
     size_t addressWidth, const std::string& ramPortName,
-    const std::vector<std::shared_ptr<TaskTFHEppCBWithInv>>& cbs, int indexBit)
+    const std::vector<std::shared_ptr<TaskTFHEppCBWithInv>>& cbs, int indexBit,
+    size_t wrenIndex)
 {
     /*
                    +------+
@@ -152,7 +153,7 @@ void makeTFHEppRAMNetworkForCUFHEImpl(
     auto taskInputWriteData =
         bt.getTask<TaskTFHEppGateWIRE>("input", "wdata", indexBit);
     auto taskInputWriteEnabled =
-        bt.getTask<TaskTFHEppGateWIRE>("input", "wren", 0);
+        bt.getTask<TaskTFHEppGateWIRE>("input", "wren", wrenIndex);
 
     // Create MUXWoSE and connect.
     auto taskMUXWoSE = std::make_shared<TaskTFHEppGateMUXWoSE>();
@@ -184,8 +185,12 @@ void makeTFHEppRAMNetworkForCUFHEImpl(
 }
 
 CUFHENetworkWithTFHEpp makeTFHEppRAMNetworkForCUFHE(
-    size_t addressWidth, size_t dataWidth, const std::string& ramPortName)
+    size_t addressWidth, size_t dataWidth, const std::string& ramPortName,
+    size_t wrenWidth = 1)
 {
+    assert(wrenWidth > 0);
+    assert(dataWidth % wrenWidth == 0);
+
     NetworkBuilderBase<TFHEppWorkerInfo> bt;
     NetworkBuilderBase<CUFHEWorkerInfo> bc;
     std::vector<std::shared_ptr<CUFHE2TFHEppBridge>> bridge0;
@@ -201,8 +206,9 @@ CUFHENetworkWithTFHEpp makeTFHEppRAMNetworkForCUFHE(
         cbs.push_back(taskCB);
     }
 
-    // Input for write-in flag.
-    bt.addINPUT<TaskTFHEppGateWIRE>("wren", 0, false);
+    // Inputs for write-in flags.
+    for (size_t i = 0; i < wrenWidth; i++)
+        bt.addINPUT<TaskTFHEppGateWIRE>("wren", i, false);
 
     for (int indexBit = 0; indexBit < dataWidth; indexBit++) {
         // Input for data to write into RAM.
@@ -210,8 +216,10 @@ CUFHENetworkWithTFHEpp makeTFHEppRAMNetworkForCUFHE(
         // Output for data to be read from RAM.
         bt.addOUTPUT<TaskTFHEppGateWIRE>("rdata", indexBit, true);
 
+        const size_t laneWidth = dataWidth / wrenWidth;
         makeTFHEppRAMNetworkForCUFHEImpl(bc, bt, bridge0, bridge1, addressWidth,
-                                         ramPortName, cbs, indexBit);
+                                         ramPortName, cbs, indexBit,
+                                         indexBit / laneWidth);
     }
 
     auto ret = CUFHENetworkWithTFHEpp{
@@ -569,7 +577,8 @@ public:
             switch (ram.type) {
             case RAM_TYPE::CMUX_MEMORY: {
                 auto net = makeTFHEppRAMNetworkForCUFHE(ram.inAddrWidth,
-                                                        ram.inWdataWidth, "");
+                                                        ram.inWdataWidth, "",
+                                                        ram.inWrenWidth);
                 name2cnet_.emplace(ram.name, net.cufheNet);
                 name2tnet_.emplace(ram.name, net.tfheppNet);
                 merge(bridges0_, net.bridges0);

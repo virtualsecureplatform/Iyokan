@@ -602,6 +602,100 @@ int getOutput(std::shared_ptr<TaskTFHEppGateMem> task)
                                    *TFHEppTestHelper::instance().sk())[0];
 }
 
+template <class NetworkBuilder, class Network>
+void setRAMInputs(Network& net, size_t addressWidth, size_t dataWidth,
+                  size_t wrenWidth, uint32_t addr, uint32_t wdata,
+                  uint32_t wren)
+{
+    for (size_t i = 0; i < addressWidth; i++)
+        setInput(get<NetworkBuilder>(net, "input", "addr", i),
+                 (addr >> i) & 1u);
+    for (size_t i = 0; i < dataWidth; i++)
+        setInput(get<NetworkBuilder>(net, "input", "wdata", i),
+                 (wdata >> i) & 1u);
+    for (size_t i = 0; i < wrenWidth; i++)
+        setInput(get<NetworkBuilder>(net, "input", "wren", i),
+                 (wren >> i) & 1u);
+}
+
+template <class NetworkBuilder, class Network>
+uint32_t getRAMOutput(Network& net, size_t dataWidth)
+{
+    uint32_t ret = 0;
+    for (size_t i = 0; i < dataWidth; i++) {
+        ret |= getOutput(get<NetworkBuilder>(net, "output", "rdata", i)) << i;
+    }
+    return ret;
+}
+
+template <class NetworkBuilder, class Network>
+uint32_t runRAMCycle(Network& net, size_t addressWidth, size_t dataWidth,
+                     size_t wrenWidth, uint32_t addr, uint32_t wdata,
+                     uint32_t wren)
+{
+    setRAMInputs<NetworkBuilder>(net, addressWidth, dataWidth, wrenWidth, addr,
+                                 wdata, wren);
+    processAllGates(net);
+    uint32_t ret = getRAMOutput<NetworkBuilder>(net, dataWidth);
+    net.tick();
+    return ret;
+}
+
+void testPlainMaskedRAM()
+{
+    constexpr size_t addressWidth = 1;
+    constexpr size_t dataWidth = 32;
+    constexpr size_t wrenWidth = 4;
+    PlainNetwork net =
+        makePlainRAMNetwork(addressWidth, dataWidth, "", wrenWidth);
+    assertNetValid(net);
+
+    runRAMCycle<PlainNetworkBuilder>(net, addressWidth, dataWidth, wrenWidth, 0,
+                                     0x11223344, 0xf);
+    assert(runRAMCycle<PlainNetworkBuilder>(net, addressWidth, dataWidth,
+                                            wrenWidth, 0, 0, 0) == 0x11223344);
+
+    runRAMCycle<PlainNetworkBuilder>(net, addressWidth, dataWidth, wrenWidth, 0,
+                                     0xaabbccdd, 0x1);
+    assert(runRAMCycle<PlainNetworkBuilder>(net, addressWidth, dataWidth,
+                                            wrenWidth, 0, 0, 0) == 0x112233dd);
+
+    runRAMCycle<PlainNetworkBuilder>(net, addressWidth, dataWidth, wrenWidth, 0,
+                                     0x55667788, 0x3);
+    assert(runRAMCycle<PlainNetworkBuilder>(net, addressWidth, dataWidth,
+                                            wrenWidth, 0, 0, 0) == 0x11227788);
+
+    runRAMCycle<PlainNetworkBuilder>(net, addressWidth, dataWidth, wrenWidth, 0,
+                                     0xdeadbeef, 0xf);
+    assert(runRAMCycle<PlainNetworkBuilder>(net, addressWidth, dataWidth,
+                                            wrenWidth, 0, 0, 0) == 0xdeadbeef);
+}
+
+void testTFHEppMaskedRAM()
+{
+    constexpr size_t addressWidth = 2;
+    constexpr size_t dataWidth = 8;
+    constexpr size_t wrenWidth = 2;
+    TFHEppNetwork net =
+        makeTFHEppRAMNetwork(addressWidth, dataWidth, "", wrenWidth);
+    assertNetValid(net);
+
+    runRAMCycle<TFHEppNetworkBuilder>(net, addressWidth, dataWidth, wrenWidth,
+                                      0, 0xa5, 0x3);
+    assert(runRAMCycle<TFHEppNetworkBuilder>(net, addressWidth, dataWidth,
+                                             wrenWidth, 0, 0, 0) == 0xa5);
+
+    runRAMCycle<TFHEppNetworkBuilder>(net, addressWidth, dataWidth, wrenWidth,
+                                      0, 0x3c, 0x1);
+    assert(runRAMCycle<TFHEppNetworkBuilder>(net, addressWidth, dataWidth,
+                                             wrenWidth, 0, 0, 0) == 0xac);
+
+    runRAMCycle<TFHEppNetworkBuilder>(net, addressWidth, dataWidth, wrenWidth,
+                                      0, 0x3c, 0x2);
+    assert(runRAMCycle<TFHEppNetworkBuilder>(net, addressWidth, dataWidth,
+                                             wrenWidth, 0, 0, 0) == 0x3c);
+}
+
 void testTFHEppSerialization()
 {
     auto& h = TFHEppTestHelper::instance();
@@ -922,9 +1016,11 @@ void testBlueprint()
         assert(rams[0].inAddrWidth == 8);
         assert(rams[0].inWdataWidth == 8);
         assert(rams[0].outRdataWidth == 8);
+        assert(rams[0].inWrenWidth == 1);
         assert(rams[1].inAddrWidth == 8);
         assert(rams[1].inWdataWidth == 8);
         assert(rams[1].outRdataWidth == 8);
+        assert(rams[1].inWrenWidth == 1);
     }
 
     {
@@ -996,6 +1092,7 @@ int main()
     testSequentialCircuit<PlainNetworkBuilder>();
     testFromJSONtest_counter_4bit<PlainNetworkBuilder>();
     testPrioritySetVisitor<PlainNetworkBuilder>();
+    testPlainMaskedRAM();
 
     testNOT<TFHEppNetworkBuilder>();
     testMUX<TFHEppNetworkBuilder>();
@@ -1010,6 +1107,7 @@ int main()
     testSequentialCircuit<TFHEppNetworkBuilder>();
     testFromJSONtest_counter_4bit<TFHEppNetworkBuilder>();
     testPrioritySetVisitor<TFHEppNetworkBuilder>();
+    testTFHEppMaskedRAM();
     testTFHEppSerialization();
     testTFHEppFileSerializedAdder();
 

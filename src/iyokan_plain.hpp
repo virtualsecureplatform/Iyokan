@@ -342,8 +342,12 @@ public:
 CEREAL_REGISTER_TYPE(TaskPlainRAMWriter);
 
 inline TaskNetwork<PlainWorkerInfo> makePlainRAMNetwork(
-    size_t addressWidth, size_t dataWidth, const std::string& ramPortName)
+    size_t addressWidth, size_t dataWidth, const std::string& ramPortName,
+    size_t wrenWidth = 1)
 {
+    assert(wrenWidth > 0);
+    assert(dataWidth % wrenWidth == 0);
+
     NetworkBuilderBase<PlainWorkerInfo> builder;
 
     // Create inputs
@@ -352,8 +356,11 @@ inline TaskNetwork<PlainWorkerInfo> makePlainRAMNetwork(
         auto taskINPUT = builder.addINPUT<TaskPlainGateWIRE>("addr", i, false);
         inputsAddr.push_back(taskINPUT);
     }
-    auto taskWriteEnabled =
-        builder.addINPUT<TaskPlainGateWIRE>("wren", 0, false);
+    std::vector<std::shared_ptr<TaskPlainGateWIRE>> inputsWren;
+    for (size_t i = 0; i < wrenWidth; i++) {
+        auto taskINPUT = builder.addINPUT<TaskPlainGateWIRE>("wren", i, false);
+        inputsWren.push_back(taskINPUT);
+    }
     for (size_t i = 0; i < dataWidth; i++) {
         auto taskINPUT = builder.addINPUT<TaskPlainGateWIRE>("wdata", i, false);
         inputsWdata.push_back(taskINPUT);
@@ -385,7 +392,8 @@ inline TaskNetwork<PlainWorkerInfo> makePlainRAMNetwork(
         // Connect RAMReader to rdata
         connectTasks(taskRAMReader, outputsRdata.at(i));
         // Connect wren, wdata and rdata to RAMWriter
-        connectTasks(taskWriteEnabled, taskRAMWriter);
+        const size_t laneWidth = dataWidth / wrenWidth;
+        connectTasks(inputsWren.at(i / laneWidth), taskRAMWriter);
         connectTasks(inputsWdata.at(i), taskRAMWriter);
         connectTasks(outputsRdata.at(i), taskRAMWriter);
     }

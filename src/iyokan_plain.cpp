@@ -319,7 +319,8 @@ public:
                         "Invalid RAM size; RAM that has different sizes of "
                         "wdata and rdata is not implemented.");
                 auto net = std::make_shared<PlainNetwork>(
-                    makePlainRAMNetwork(ram.inAddrWidth, ram.inWdataWidth, ""));
+                    makePlainRAMNetwork(ram.inAddrWidth, ram.inWdataWidth, "",
+                                        ram.inWrenWidth));
                 name2net_.emplace(ram.name, net);
                 break;
             }

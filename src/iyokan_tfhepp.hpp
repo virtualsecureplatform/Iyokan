@@ -675,7 +675,8 @@ CEREAL_REGISTER_TYPE(TaskTFHEppRAMGateBootstrapping);
 inline void makeTFHEppRAMNetworkImpl(
     NetworkBuilderBase<TFHEppWorkerInfo>& builder, size_t addressWidth,
     const std::string& ramPortName,
-    const std::vector<std::shared_ptr<TaskTFHEppCBWithInv>>& cbs, int indexBit)
+    const std::vector<std::shared_ptr<TaskTFHEppCBWithInv>>& cbs, int indexBit,
+    size_t wrenIndex)
 {
     /*
         // Address CB
@@ -753,7 +754,7 @@ inline void makeTFHEppRAMNetworkImpl(
     auto taskInputWriteData =
         builder.getTask<TaskTFHEppGateWIRE>("input", "wdata", indexBit);
     auto taskInputWriteEnabled =
-        builder.getTask<TaskTFHEppGateWIRE>("input", "wren", 0);
+        builder.getTask<TaskTFHEppGateWIRE>("input", "wren", wrenIndex);
 
     // Create MUXWoSE and connect.
     auto taskMUXWoSE = std::make_shared<TaskTFHEppGateMUXWoSE>();
@@ -787,8 +788,12 @@ inline void makeTFHEppRAMNetworkImpl(
 }
 
 inline TaskNetwork<TFHEppWorkerInfo> makeTFHEppRAMNetwork(
-    size_t addressWidth, size_t dataWidth, const std::string& ramPortName)
+    size_t addressWidth, size_t dataWidth, const std::string& ramPortName,
+    size_t wrenWidth = 1)
 {
+    assert(wrenWidth > 0);
+    assert(dataWidth % wrenWidth == 0);
+
     NetworkBuilderBase<TFHEppWorkerInfo> builder;
 
     // Inputs for address.
@@ -802,8 +807,9 @@ inline TaskNetwork<TFHEppWorkerInfo> makeTFHEppRAMNetwork(
         cbs.push_back(taskCB);
     }
 
-    // Input for write-in flag.
-    builder.addINPUT<TaskTFHEppGateWIRE>("wren", 0, false);
+    // Inputs for write-in flags.
+    for (size_t i = 0; i < wrenWidth; i++)
+        builder.addINPUT<TaskTFHEppGateWIRE>("wren", i, false);
 
     for (int indexBit = 0; indexBit < dataWidth; indexBit++) {
         // Input for data to write into RAM.
@@ -811,8 +817,9 @@ inline TaskNetwork<TFHEppWorkerInfo> makeTFHEppRAMNetwork(
         // Output for data to be read from RAM.
         builder.addOUTPUT<TaskTFHEppGateWIRE>("rdata", indexBit, true);
 
+        const size_t laneWidth = dataWidth / wrenWidth;
         makeTFHEppRAMNetworkImpl(builder, addressWidth, ramPortName, cbs,
-                                 indexBit);
+                                 indexBit, indexBit / laneWidth);
     }
 
     return TaskNetwork<TFHEppWorkerInfo>(std::move(builder));

@@ -333,7 +333,8 @@ public:
             switch (ram.type) {
             case RAM_TYPE::CMUX_MEMORY: {
                 auto net = std::make_shared<TFHEppNetwork>(makeTFHEppRAMNetwork(
-                    ram.inAddrWidth, ram.inWdataWidth, ""));
+                    ram.inAddrWidth, ram.inWdataWidth, "",
+                    ram.inWrenWidth));
                 name2net_.emplace(ram.name, net);
                 break;
             }

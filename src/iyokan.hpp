@@ -1643,12 +1643,12 @@ struct BuiltinRAM {
         MUX,
     } type;
     std::string name;
-    size_t inAddrWidth, inWdataWidth, outRdataWidth;
+    size_t inAddrWidth, inWdataWidth, outRdataWidth, inWrenWidth;
 
     template <class Archive>
     void serialize(Archive& ar)
     {
-        ar(type, name, inAddrWidth, inWdataWidth, outRdataWidth);
+        ar(type, name, inAddrWidth, inWdataWidth, outRdataWidth, inWrenWidth);
     }
 };
 struct Port {
@@ -1793,10 +1793,26 @@ public:
                         toml::find<size_t>(srcBuiltin, "in_wdata_width");
                     const auto outRdataWidth =
                         toml::find<size_t>(srcBuiltin, "out_rdata_width");
+                    const auto inWrenWidth =
+                        toml::find_or<size_t>(srcBuiltin, "in_wren_width", 1);
+
+                    if (inWrenWidth == 0)
+                        error::die("Invalid in_wren_width of RAM \"", name,
+                                   "\": must be positive.");
+                    if (inWdataWidth % inWrenWidth != 0)
+                        error::die("Invalid RAM \"", name,
+                                   "\": in_wdata_width must be divisible by "
+                                   "in_wren_width.");
+                    if (ramType == blueprint::BuiltinRAM::TYPE::MUX &&
+                        inWrenWidth != 1)
+                        error::die("Invalid RAM \"", name,
+                                   "\": in_wren_width != 1 is supported only "
+                                   "for type = \"ram\".");
 
                     builtinRAMs_.push_back(
                         blueprint::BuiltinRAM{ramType, name, inAddrWidth,
-                                              inWdataWidth, outRdataWidth});
+                                              inWdataWidth, outRdataWidth,
+                                              inWrenWidth});
                 }
             }
         }
