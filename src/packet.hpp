@@ -5,6 +5,7 @@
 #include <iomanip>
 #include <memory>
 #include <regex>
+#include <string>
 
 #include <cereal/archives/portable_binary.hpp>
 #include <cereal/cereal.hpp>
@@ -19,6 +20,68 @@
 
 #include "error.hpp"
 #include "utility.hpp"
+
+enum class FrontendSnapshotKind {
+    Untagged,
+    Plain,
+    TFHEpp,
+    CUFHE,
+    Invalid,
+};
+
+inline constexpr char frontendSnapshotMagic[] =
+    "IYOKAN-FRONTEND-SNAPSHOT-V1\n";
+inline constexpr size_t frontendSnapshotMagicSize =
+    sizeof(frontendSnapshotMagic) - 1;
+
+inline char frontendSnapshotKindToChar(FrontendSnapshotKind kind)
+{
+    switch (kind) {
+    case FrontendSnapshotKind::Plain:
+        return 'P';
+    case FrontendSnapshotKind::TFHEpp:
+        return 'T';
+    case FrontendSnapshotKind::CUFHE:
+        return 'C';
+    default:
+        return '?';
+    }
+}
+
+inline FrontendSnapshotKind frontendSnapshotKindFromChar(char kind)
+{
+    switch (kind) {
+    case 'P':
+        return FrontendSnapshotKind::Plain;
+    case 'T':
+        return FrontendSnapshotKind::TFHEpp;
+    case 'C':
+        return FrontendSnapshotKind::CUFHE;
+    default:
+        return FrontendSnapshotKind::Invalid;
+    }
+}
+
+inline FrontendSnapshotKind detectFrontendSnapshotKind(
+    const std::string& path)
+{
+    std::ifstream ifs{path, std::ios::binary};
+    if (!ifs)
+        return FrontendSnapshotKind::Invalid;
+
+    std::string magic(frontendSnapshotMagicSize, '\0');
+    ifs.read(magic.data(), magic.size());
+    if (ifs.gcount() != static_cast<std::streamsize>(magic.size()))
+        return FrontendSnapshotKind::Untagged;
+    if (magic != frontendSnapshotMagic)
+        return FrontendSnapshotKind::Untagged;
+
+    char kind = '?';
+    ifs.get(kind);
+    if (!ifs)
+        return FrontendSnapshotKind::Invalid;
+    return frontendSnapshotKindFromChar(kind);
+}
 
 enum class Bit : bool {};
 inline constexpr Bit operator~(Bit l) noexcept
@@ -338,6 +401,48 @@ void writeToArchive(const std::string& path, const T& src)
     try {
         std::ofstream ofs{path, std::ios::binary};
         assert(ofs && "Can't open the file to write in; maybe not allowed?");
+        return writeToArchive(ofs, src);
+    }
+    catch (std::exception& ex) {
+        spdlog::error(ex.what());
+        error::die("Unable to write into archive: ", path);
+    }
+}
+
+template <class T>
+void readFrontendSnapshot(T& res, const std::string& path,
+                          FrontendSnapshotKind expectedKind)
+{
+    const auto kind = detectFrontendSnapshotKind(path);
+    if (kind == FrontendSnapshotKind::Untagged) {
+        readFromArchive(res, path);
+        return;
+    }
+    if (kind != expectedKind)
+        error::die("Invalid snapshot kind: ", path);
+
+    try {
+        std::ifstream ifs{path, std::ios::binary};
+        if (!ifs)
+            spdlog::error(
+                "Can't open the file to read from; Maybe not found?: {}", path);
+        ifs.seekg(frontendSnapshotMagicSize + 1);
+        readFromArchive(res, ifs);
+    }
+    catch (std::exception& ex) {
+        error::die("Invalid archive: ", path);
+    }
+}
+
+template <class T>
+void writeFrontendSnapshot(const std::string& path, FrontendSnapshotKind kind,
+                           const T& src)
+{
+    try {
+        std::ofstream ofs{path, std::ios::binary};
+        assert(ofs && "Can't open the file to write in; maybe not allowed?");
+        ofs.write(frontendSnapshotMagic, frontendSnapshotMagicSize);
+        ofs.put(frontendSnapshotKindToChar(kind));
         return writeToArchive(ofs, src);
     }
     catch (std::exception& ex) {

@@ -595,7 +595,8 @@ void doPlain(const Options& opt)
     std::optional<PlainFrontend> frontend;
     if (opt.resumeFile) {
         frontend.emplace();
-        readFromArchive<PlainFrontend>(*frontend, *opt.resumeFile);
+        readFrontendSnapshot<PlainFrontend>(*frontend, *opt.resumeFile,
+                                            FrontendSnapshotKind::Plain);
         frontend->overwriteParams(opt);
     }
     else {
@@ -603,7 +604,8 @@ void doPlain(const Options& opt)
     }
     frontend->go(opt);
     if (opt.snapshotFile)
-        writeToArchive(*opt.snapshotFile, *frontend);
+        writeFrontendSnapshot(*opt.snapshotFile, FrontendSnapshotKind::Plain,
+                              *frontend);
 }
 
 bool isSerializedPlainFrontend(const std::string& filepath)

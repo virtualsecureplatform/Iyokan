@@ -240,20 +240,43 @@ int main(int argc, char** argv)
         spdlog::set_level(spdlog::level::debug);
 
     if (opt.resumeFile) {
+        const auto snapshotKind = detectFrontendSnapshotKind(*opt.resumeFile);
         switch (type) {
         case TYPE::PLAIN:
-            if (!isSerializedPlainFrontend(*opt.resumeFile))
+            if (snapshotKind == FrontendSnapshotKind::Plain)
+                break;
+            if (snapshotKind != FrontendSnapshotKind::Untagged ||
+                !isSerializedPlainFrontend(*opt.resumeFile))
                 error::die("Invalid resume file: ", *opt.resumeFile);
             break;
 
         case TYPE::TFHE:
-            if (!isSerializedTFHEppFrontend(*opt.resumeFile)) {
+            switch (snapshotKind) {
+            case FrontendSnapshotKind::TFHEpp:
+                break;
 #ifdef IYOKAN_CUDA_ENABLED
-                if (isSerializedCUFHEFrontend(*opt.resumeFile))
-                    enableGPU = true;
-                else
+            case FrontendSnapshotKind::CUFHE:
+                enableGPU = true;
+                break;
 #endif
-                    error::die("Invalid resume file: ", *opt.resumeFile);
+            case FrontendSnapshotKind::Untagged:
+#ifdef IYOKAN_CUDA_ENABLED
+                if (opt.numGPU) {
+                    enableGPU = true;
+                    break;
+                }
+#endif
+                if (!isSerializedTFHEppFrontend(*opt.resumeFile)) {
+#ifdef IYOKAN_CUDA_ENABLED
+                    if (isSerializedCUFHEFrontend(*opt.resumeFile))
+                        enableGPU = true;
+                    else
+#endif
+                        error::die("Invalid resume file: ", *opt.resumeFile);
+                }
+                break;
+            default:
+                error::die("Invalid resume file: ", *opt.resumeFile);
             }
             break;
         }

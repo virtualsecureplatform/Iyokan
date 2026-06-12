@@ -891,7 +891,8 @@ void doCUFHE(const Options& opt)
     std::optional<CUFHEFrontend> frontend;
     if (opt.resumeFile) {
         frontend.emplace();
-        readFromArchive<CUFHEFrontend>(*frontend, *opt.resumeFile);
+        readFrontendSnapshot<CUFHEFrontend>(*frontend, *opt.resumeFile,
+                                            FrontendSnapshotKind::CUFHE);
         frontend->overwriteParams(opt);
     }
     else {
@@ -899,7 +900,8 @@ void doCUFHE(const Options& opt)
     }
     frontend->go(opt);
     if (opt.snapshotFile)
-        writeToArchive(*opt.snapshotFile, *frontend);
+        writeFrontendSnapshot(*opt.snapshotFile, FrontendSnapshotKind::CUFHE,
+                              *frontend);
 }
 
 bool isSerializedCUFHEFrontend(const std::string& path)

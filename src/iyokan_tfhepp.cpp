@@ -606,7 +606,8 @@ void doTFHE(const Options& opt)
     std::optional<TFHEppFrontend> frontend;
     if (opt.resumeFile) {
         frontend.emplace();
-        readFromArchive<TFHEppFrontend>(*frontend, *opt.resumeFile);
+        readFrontendSnapshot<TFHEppFrontend>(*frontend, *opt.resumeFile,
+                                             FrontendSnapshotKind::TFHEpp);
         frontend->overwriteParams(opt);
     }
     else {
@@ -614,7 +615,8 @@ void doTFHE(const Options& opt)
     }
     frontend->go(opt);
     if (opt.snapshotFile)
-        writeToArchive(*opt.snapshotFile, *frontend);
+        writeFrontendSnapshot(*opt.snapshotFile, FrontendSnapshotKind::TFHEpp,
+                              *frontend);
 }
 
 bool isSerializedTFHEppFrontend(const std::string& filepath)
