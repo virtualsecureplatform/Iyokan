@@ -153,7 +153,11 @@ void doGenEvalKeyTFHEpp(const std::string& in, const std::string& out)
 {
     auto sk = readFromArchive<TFHEpp::SecretKey>(in);
     TFHEpp::EvalKey ek;
+#ifdef USE_SUBSET_KEY
+    ek.emplacesubiksk<TFHEpp::lvl10param>(sk);
+#else
     ek.emplaceiksk<TFHEpp::lvl10param>(sk);
+#endif
     ek.emplacebk<TFHEpp::lvl01param>(sk);
     ek.emplacebkfft<TFHEpp::lvl01param>(sk);
     ek.emplacebkfft<TFHEpp::lvl02param>(sk);

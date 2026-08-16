@@ -96,6 +96,16 @@ if(TFHEpp_DEFINITIONS)
     list(APPEND IYOKAN_COMPILE_DEFINITIONS ${TFHEpp_DEFINITIONS})
     list(REMOVE_DUPLICATES IYOKAN_COMPILE_DEFINITIONS)
 endif()
+# TFHEpp is nested below cuFHEpp in CUDA builds, so these cache options are
+# not always returned through TFHEpp_DEFINITIONS.  Mirror the active parameter
+# family and key-switching format in Iyokan's header-heavy frontend.
+foreach(iyokan_tfhepp_definition IN ITEMS USE_BLOCK_BINARY USE_SUBSET_KEY)
+    if(DEFINED ${iyokan_tfhepp_definition}
+            AND ${${iyokan_tfhepp_definition}})
+        list(APPEND IYOKAN_COMPILE_DEFINITIONS ${iyokan_tfhepp_definition})
+    endif()
+endforeach()
+list(REMOVE_DUPLICATES IYOKAN_COMPILE_DEFINITIONS)
 
 set(CMAKE_C_FLAGS "")
 set(CMAKE_C_FLAGS_DEBUG "")

@@ -35,6 +35,11 @@ CMake builds Iyokan with 128-bit security by default.
 If you want weaker (but faster and more memory efficient) security,
 use `-DIYOKAN_80BIT_SECURITY=On`.
 
+The default TFHE parameter family uses Block Binary keys and Subset Keys
+(`USE_BLOCK_BINARY=ON`, `USE_SUBSET_KEY=ON`). Existing secret/evaluation keys,
+encrypted packets, and snapshots made with the former defaults are not
+compatible: regenerate them after upgrading.
+
 ## Test
 
 Run Ruby script `test.rb` at Iyokan's root directory like this
