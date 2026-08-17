@@ -11,7 +11,54 @@ struct TFHEppWorkerInfo {
     std::shared_ptr<const EvalKey> ek;
 };
 
+#ifdef TANGOR_KVSP_STARPU_ASYNC
+class TaskTangorStarpuTFHEpp
+    : public Task<TLWELvl0, TLWELvl0, TFHEppWorkerInfo> {
+private:
+    std::shared_ptr<Tangor::IyokanStarpuTask> task_;
+
+    virtual void startSync(TFHEppWorkerInfo wi) = 0;
+
+    void startAsyncImpl(TFHEppWorkerInfo wi,
+                        ProgressGraphMaker* graph) override
+    {
+        if (graph)
+            graph->startNode(this->depnode()->label());
+        Tangor::beginIyokanStarpuCapture();
+        startSync(std::move(wi));
+        task_ = Tangor::endIyokanStarpuCapture();
+    }
+
+public:
+    TaskTangorStarpuTFHEpp() = default;
+
+    explicit TaskTangorStarpuTFHEpp(size_t expectedNumInputs)
+        : Task<TLWELvl0, TLWELvl0, TFHEppWorkerInfo>(expectedNumInputs)
+    {
+    }
+
+    bool hasFinished() const override
+    {
+        return !task_ || task_->isFinished();
+    }
+
+    void onBeforePropagate() override
+    {
+        if (task_)
+            task_->synchronizeOutput();
+    }
+
+    template <class Archive>
+    void serialize(Archive& ar)
+    {
+        ar(cereal::base_class<Task<TLWELvl0, TLWELvl0, TFHEppWorkerInfo>>(
+            this));
+    }
+};
+using TaskAsyncTFHEpp = TaskTangorStarpuTFHEpp;
+#else
 using TaskAsyncTFHEpp = TaskAsync<TLWELvl0, TLWELvl0, TFHEppWorkerInfo>;
+#endif
 using TaskTFHEppGate = Task<TLWELvl0, TLWELvl0, TFHEppWorkerInfo>;
 using TaskTFHEppGateMem = TaskMem<TLWELvl0, TLWELvl0, TFHEppWorkerInfo>;
 
