@@ -537,6 +537,9 @@ private:
         sk_ = std::make_shared<SecretKey>();
         ek_ = std::make_shared<EvalKey>();
         (*ek_).emplaceiksk<Lvl10>(*sk_);
+#ifdef USE_SUBSET_KEY
+        (*ek_).emplacesubiksk<Lvl10>(*sk_);
+#endif
         (*ek_).emplacebk<Lvl01>(*sk_);
         (*ek_).emplacebkfft<Lvl01>(*sk_);
         (*ek_).emplacebkfft<Lvl02>(*sk_);
@@ -679,21 +682,113 @@ void testTFHEppMaskedRAM()
     TFHEppNetwork net =
         makeTFHEppRAMNetwork(addressWidth, dataWidth, "", wrenWidth);
     assertNetValid(net);
+    const auto check = [](uint32_t actual, uint32_t expected) {
+        if (actual != expected)
+            throw std::runtime_error("masked TFHEpp RAM regression failed");
+    };
 
     runRAMCycle<TFHEppNetworkBuilder>(net, addressWidth, dataWidth, wrenWidth,
                                       0, 0xa5, 0x3);
-    assert(runRAMCycle<TFHEppNetworkBuilder>(net, addressWidth, dataWidth,
-                                             wrenWidth, 0, 0, 0) == 0xa5);
+    check(runRAMCycle<TFHEppNetworkBuilder>(net, addressWidth, dataWidth,
+                                            wrenWidth, 0, 0, 0),
+          0xa5);
 
     runRAMCycle<TFHEppNetworkBuilder>(net, addressWidth, dataWidth, wrenWidth,
                                       0, 0x3c, 0x1);
-    assert(runRAMCycle<TFHEppNetworkBuilder>(net, addressWidth, dataWidth,
-                                             wrenWidth, 0, 0, 0) == 0xac);
+    check(runRAMCycle<TFHEppNetworkBuilder>(net, addressWidth, dataWidth,
+                                            wrenWidth, 0, 0, 0),
+          0xac);
 
     runRAMCycle<TFHEppNetworkBuilder>(net, addressWidth, dataWidth, wrenWidth,
                                       0, 0x3c, 0x2);
-    assert(runRAMCycle<TFHEppNetworkBuilder>(net, addressWidth, dataWidth,
-                                             wrenWidth, 0, 0, 0) == 0x3c);
+    check(runRAMCycle<TFHEppNetworkBuilder>(net, addressWidth, dataWidth,
+                                            wrenWidth, 0, 0, 0),
+          0x3c);
+}
+
+void testTFHEppSingleAddressBitRAM()
+{
+    constexpr size_t addressWidth = 1;
+    constexpr size_t dataWidth = 1;
+    constexpr size_t wrenWidth = 1;
+    TFHEppNetwork net =
+        makeTFHEppRAMNetwork(addressWidth, dataWidth, "", wrenWidth);
+    assertNetValid(net);
+
+    const auto check = [](uint32_t actual, uint32_t expected) {
+        if (actual != expected)
+            throw std::runtime_error("single-address-bit TFHEpp RAM regression failed");
+    };
+    runRAMCycle<TFHEppNetworkBuilder>(net, addressWidth, dataWidth, wrenWidth,
+                                      0, 1, 1);
+    check(runRAMCycle<TFHEppNetworkBuilder>(net, addressWidth, dataWidth,
+                                            wrenWidth, 0, 0, 0),
+          1);
+    check(runRAMCycle<TFHEppNetworkBuilder>(net, addressWidth, dataWidth,
+                                            wrenWidth, 1, 0, 0),
+          0);
+}
+
+void testTFHEppSingleBlockROM()
+{
+    constexpr size_t addressWidth = 4;
+    constexpr size_t dataWidth = 8;
+    TFHEppNetwork net = makeTFHEppROMNetwork(addressWidth, 3);
+    assertNetValid(net);
+
+    SecretKey sk;
+    std::stringstream serialized_sk{std::ios::binary | std::ios::out |
+                                    std::ios::in};
+    writeToArchive(serialized_sk, sk);
+    readFromArchive(sk, serialized_sk);
+    EvalKey ek;
+    ek.emplaceiksk<Lvl10>(sk);
+#ifdef USE_SUBSET_KEY
+    ek.emplacesubiksk<Lvl10>(sk);
+#endif
+    ek.emplacebk<Lvl01>(sk);
+    ek.emplacebkfft<Lvl01>(sk);
+    ek.emplacebkfft<Lvl02>(sk);
+    ek.emplaceprivksk4cb<Lvl21>(sk);
+    std::stringstream serialized_ek{std::ios::binary | std::ios::out |
+                                    std::ios::in};
+    writeToArchive(serialized_ek, ek);
+    readFromArchive(ek, serialized_ek);
+    TFHEppWorkerInfo wi{std::make_shared<EvalKey>(std::move(ek))};
+
+    std::vector<Bit> plain(1 << (addressWidth + 3), 0_b);
+    for (size_t address = 0; address < (1 << addressWidth); address++)
+        for (size_t bit = 0; bit < dataWidth; bit++)
+            plain[address * dataWidth + bit] =
+                Bit((address >> bit) & 1u);
+
+    auto rom = net.get<TaskTFHEppROMUX>("rom", "all", 0);
+    const auto encrypted = encryptROM(sk, plain);
+    assert(encrypted.size() == 1);
+    TFHEPacket request;
+    request.rom.emplace("rom", encrypted);
+    std::stringstream serialized_packet{std::ios::binary | std::ios::out |
+                                        std::ios::in};
+    writeToArchive(serialized_packet, request);
+    readFromArchive(request, serialized_packet);
+    rom->set(0, request.rom.at("rom").front());
+
+    constexpr size_t address = 7;
+    for (size_t bit = 0; bit < addressWidth; bit++) {
+        TLWELvl0 input;
+        TFHEpp::tlweSymEncrypt<Lvl0>(
+            input, ((address >> bit) & 1u) ? Lvl0::μ : -Lvl0::μ,
+            sk.key.get<Lvl0>());
+        get<TFHEppNetworkBuilder>(net, "input", "addr", bit)->set(input);
+    }
+
+    processAllGates(net, std::thread::hardware_concurrency(), wi);
+    for (size_t bit = 0; bit < dataWidth; bit++) {
+        auto output = get<TFHEppNetworkBuilder>(net, "output", "rdata", bit);
+        const auto actual = TFHEpp::bootsSymDecrypt<Lvl0>({output->get()}, sk)[0];
+        if (actual != ((address >> bit) & 1u))
+            throw std::runtime_error("single-block TFHEpp ROM regression failed");
+    }
 }
 
 void testTFHEppSerialization()
@@ -1079,7 +1174,6 @@ void testBlueprint()
 int main()
 {
     AsyncThread::setNumThreads(std::thread::hardware_concurrency());
-
     testNOT<PlainNetworkBuilder>();
     testMUX<PlainNetworkBuilder>();
     testBinopGates<PlainNetworkBuilder>();
@@ -1108,6 +1202,8 @@ int main()
     testFromJSONtest_counter_4bit<TFHEppNetworkBuilder>();
     testPrioritySetVisitor<TFHEppNetworkBuilder>();
     testTFHEppMaskedRAM();
+    testTFHEppSingleAddressBitRAM();
+    testTFHEppSingleBlockROM();
     testTFHEppSerialization();
     testTFHEppFileSerializedAdder();
 

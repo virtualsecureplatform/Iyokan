@@ -152,7 +152,7 @@ inline std::vector<TRLWELvl1> encryptROM(const TFHEpp::SecretKey& key,
         PolyLvl1 pmu;
         for (size_t i = 0; i < P::n; i++){
             if (thread + i < src.size())
-                pmu[i] = (src[thread + i] == 1_b) ? P::μ : -P::μ;
+                pmu[i] = (src[thread + i] == 1_b) ? 2 * P::μ : -2 * P::μ;
             else
                 pmu[i] = 0;
         }

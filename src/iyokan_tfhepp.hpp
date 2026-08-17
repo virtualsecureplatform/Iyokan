@@ -416,6 +416,15 @@ private:
     void RAMUX()
     {
         const size_t addrWidth = getAddressWidth();
+        if (addrWidth == 0) {
+            output() = *data_.front();
+            return;
+        }
+        if (addrWidth == 1) {
+            TFHEpp::CMUXFFT<Lvl1>(output(), input(0).inverted, *data_[0],
+                                  *data_[1]);
+            return;
+        }
         const uint32_t num_trlwe = 1 << addrWidth;
         temp_.resize(num_trlwe / 2);
         auto addr = [this](size_t i) -> const TRGSWLvl1FFT& {
