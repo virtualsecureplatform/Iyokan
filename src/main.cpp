@@ -282,19 +282,46 @@ int main(int argc, char** argv)
         }
     }
 
+#ifdef TANGOR_KVSP_STARPU_ASYNC
+    unsigned tangorCudaDevices = 0;
+#ifdef IYOKAN_CUDA_ENABLED
+    if (type == TYPE::TFHE && enableGPU)
+        tangorCudaDevices = static_cast<unsigned>(opt.numGPU.value_or(1));
+#endif
+    Tangor::configureIyokanStarpu(
+        static_cast<unsigned>(opt.numCPUWorkers.value_or(
+            std::max(1u, std::thread::hardware_concurrency()))),
+        tangorCudaDevices);
+#endif
+
+#ifdef TANGOR_KVSP_STARPU_ASYNC
+    // StarPU owns compute parallelism; keep one lightweight frontend submitter
+    // instead of oversubscribing the CPU with a second worker pool.
+    AsyncThread::setNumThreads(1);
+#else
     AsyncThread::setNumThreads(std::thread::hardware_concurrency());
+#endif
 
     switch (type) {
     case TYPE::PLAIN:
         doPlain(opt);
         break;
     case TYPE::TFHE:
+#ifdef TANGOR_KVSP_STARPU_ASYNC
+        // Tangor always runs the TFHEpp circuit graph. When requested, StarPU
+        // places its individual codelets on both CPU and CUDA workers.
+        doTFHE(opt);
+#else
 #ifdef IYOKAN_CUDA_ENABLED
         if (enableGPU)
             doCUFHE(opt);
         else
 #endif
             doTFHE(opt);
+#endif
         break;
     }
+#ifdef TANGOR_KVSP_STARPU_ASYNC
+    Tangor::shutdownIyokanStarpu();
+#endif
 }
