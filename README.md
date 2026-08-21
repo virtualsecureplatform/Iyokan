@@ -38,7 +38,9 @@ use `-DIYOKAN_80BIT_SECURITY=On`.
 The default TFHE parameter family uses Block Binary keys and Subset Keys
 (`USE_BLOCK_BINARY=ON`, `USE_SUBSET_KEY=ON`). Existing secret/evaluation keys,
 encrypted packets, and snapshots made with the former defaults are not
-compatible: regenerate them after upgrading.
+compatible: regenerate them after upgrading. CPU and CUDA builds use the same
+split Fourier archive layout, so the regenerated artifacts can be shared
+between Iyokan, Tangor, and KVSP backends.
 
 ## Test
 

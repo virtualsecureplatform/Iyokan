@@ -35,6 +35,11 @@ endif()
 # Forward IYOKAN_MARCH to TFHEpp as TFHEPP_MARCH (normal variable, inherited by
 # subdirectories including cuFHEpp/thirdparties/TFHEpp via add_subdirectory).
 set(TFHEPP_MARCH "${IYOKAN_MARCH}")
+# Keep CPU and CUDA archives byte-compatible. cuFHEpp consumes TFHEpp's split
+# Fourier layout, so using the interleaved SPQLIOS backend only in CPU builds
+# makes evaluation keys and encrypted ROM/RAM packets backend-specific.
+set(USE_SPQLIOS_INTL OFF CACHE BOOL
+    "Use TFHEpp's split Fourier layout for CPU/CUDA archive compatibility" FORCE)
 if (IYOKAN_ENABLE_CUDA)
     enable_language(CUDA)
     set(CMAKE_CUDA_STANDARD 20)

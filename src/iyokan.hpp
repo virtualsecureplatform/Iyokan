@@ -26,6 +26,7 @@
 #include <regex>
 #include <set>
 #include <sstream>
+#include <type_traits>
 #include <unordered_map>
 #include <variant>
 #include <vector>
@@ -1359,6 +1360,10 @@ public:
     void set(const OutType& newval)
     {
         this->output() = newval;
+#ifdef TANGOR_KVSP_STARPU_ASYNC
+        if constexpr (std::is_same_v<OutType, Tangor::IyokanTLWE>)
+            Tangor::markIyokanTLWEHostWrite(this->output());
+#endif
     }
 
     const OutType& get() const
@@ -1398,7 +1403,15 @@ public:
 
         // We HAVE TO prefix 'this->' here. Thanks to:
         // https://stackoverflow.com/questions/4643074/why-do-i-have-to-access-template-base-class-members-through-the-this-pointer
+#ifdef TANGOR_KVSP_STARPU_ASYNC
+        if constexpr (std::is_same_v<InType, Tangor::IyokanTLWE>)
+            Tangor::synchronizeIyokanTLWE(this->input(0));
+#endif
         this->output() = this->input(0);
+#ifdef TANGOR_KVSP_STARPU_ASYNC
+        if constexpr (std::is_same_v<OutType, Tangor::IyokanTLWE>)
+            Tangor::markIyokanTLWEHostWrite(this->output());
+#endif
     }
 
     bool hasFinished() const override
@@ -1419,6 +1432,9 @@ template <class InType, class OutType, class WorkerInfo>
 class TaskAsync : public Task<InType, OutType, WorkerInfo> {
 private:
     AsyncThread thr_;
+#ifdef TANGOR_KVSP_STARPU_ASYNC
+    std::shared_ptr<Tangor::IyokanStarpuTask> tangorTask_;
+#endif
 
 private:
     virtual void startSync(WorkerInfo wi) = 0;
@@ -1428,7 +1444,27 @@ private:
         thr_ = [this, wi, graph] {
             if (graph)
                 graph->startNode(this->depnode()->label());
+#ifdef TANGOR_KVSP_STARPU_ASYNC
+            if constexpr (requires { wi.ek; }) {
+                if (wi.ek)
+                    Tangor::prepareIyokanStarpu(*wi.ek);
+            }
+            Tangor::beginIyokanStarpuCapture();
+#endif
             startSync(wi);
+#ifdef TANGOR_KVSP_STARPU_ASYNC
+            tangorTask_ = Tangor::endIyokanStarpuCapture();
+            if (!tangorTask_) {
+                if constexpr (std::is_same_v<OutType, Tangor::IyokanTLWE>)
+                    Tangor::markIyokanTLWEHostWrite(this->output());
+                else if constexpr (std::is_same_v<OutType,
+                                                  Tangor::IyokanTRLWE>)
+                    Tangor::markIyokanTRLWEHostWrite(this->output());
+                else if constexpr (std::is_same_v<OutType,
+                                                  Tangor::IyokanTRGSWFFT>)
+                    Tangor::markIyokanTRGSWFFTHostWrite(this->output());
+            }
+#endif
         };
     }
 
@@ -1444,8 +1480,21 @@ public:
 
     bool hasFinished() const override
     {
+#ifdef TANGOR_KVSP_STARPU_ASYNC
+        return thr_.hasFinished() &&
+               (!tangorTask_ || tangorTask_->isFinished());
+#else
         return thr_.hasFinished();
+#endif
     }
+
+#ifdef TANGOR_KVSP_STARPU_ASYNC
+    void onBeforePropagate() override
+    {
+        if (tangorTask_)
+            tangorTask_->synchronizeOutput();
+    }
+#endif
 
     template <class Archive>
     void serialize(Archive& ar)

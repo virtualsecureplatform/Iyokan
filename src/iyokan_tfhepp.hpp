@@ -12,50 +12,7 @@ struct TFHEppWorkerInfo {
 };
 
 #ifdef TANGOR_KVSP_STARPU_ASYNC
-class TaskTangorStarpuTFHEpp
-    : public Task<TLWELvl0, TLWELvl0, TFHEppWorkerInfo> {
-private:
-    std::shared_ptr<Tangor::IyokanStarpuTask> task_;
-
-    virtual void startSync(TFHEppWorkerInfo wi) = 0;
-
-    void startAsyncImpl(TFHEppWorkerInfo wi,
-                        ProgressGraphMaker* graph) override
-    {
-        if (graph)
-            graph->startNode(this->depnode()->label());
-        Tangor::beginIyokanStarpuCapture();
-        startSync(std::move(wi));
-        task_ = Tangor::endIyokanStarpuCapture();
-    }
-
-public:
-    TaskTangorStarpuTFHEpp() = default;
-
-    explicit TaskTangorStarpuTFHEpp(size_t expectedNumInputs)
-        : Task<TLWELvl0, TLWELvl0, TFHEppWorkerInfo>(expectedNumInputs)
-    {
-    }
-
-    bool hasFinished() const override
-    {
-        return !task_ || task_->isFinished();
-    }
-
-    void onBeforePropagate() override
-    {
-        if (task_)
-            task_->synchronizeOutput();
-    }
-
-    template <class Archive>
-    void serialize(Archive& ar)
-    {
-        ar(cereal::base_class<Task<TLWELvl0, TLWELvl0, TFHEppWorkerInfo>>(
-            this));
-    }
-};
-using TaskAsyncTFHEpp = TaskTangorStarpuTFHEpp;
+using TaskAsyncTFHEpp = TaskAsync<TLWELvl0, TLWELvl0, TFHEppWorkerInfo>;
 #else
 using TaskAsyncTFHEpp = TaskAsync<TLWELvl0, TLWELvl0, TFHEppWorkerInfo>;
 #endif
@@ -121,7 +78,13 @@ private:
             thr_ = [graph, this]() {
                 if (graph)
                     graph->startNode(this->depnode()->label());
+#ifdef TANGOR_KVSP_STARPU_ASYNC
+                Tangor::synchronizeIyokanTLWE(input(0));
+#endif
                 output() = input(0);
+#ifdef TANGOR_KVSP_STARPU_ASYNC
+                Tangor::markIyokanTLWEHostWrite(output());
+#endif
             };
         }
         else {
@@ -243,7 +206,13 @@ private:
     void startSync(TFHEppWorkerInfo wi) override
     {
         auto ek = wi.ek;
+#ifdef TANGOR_KVSP_STARPU_ASYNC
+        Tangor::synchronizeIyokanTLWE(input(0));
+#endif
         TFHEpp::CircuitBootstrapping<TFHEpp::lvl02param,TFHEpp::lvl21param>(output(), input(0), *ek);
+#ifdef TANGOR_KVSP_STARPU_ASYNC
+        Tangor::markIyokanTRGSWFFTHostWrite(output());
+#endif
     }
 
 public:
@@ -265,7 +234,13 @@ private:
     void startSync(TFHEppWorkerInfo wi) override
     {
         auto ek = wi.ek;
+#ifdef TANGOR_KVSP_STARPU_ASYNC
+        Tangor::synchronizeIyokanTLWE(input(0));
+#endif
         TFHEpp::CircuitBootstrappingInv<TFHEpp::lvl02param,TFHEpp::lvl21param>(output(), input(0), *ek);
+#ifdef TANGOR_KVSP_STARPU_ASYNC
+        Tangor::markIyokanTRGSWFFTHostWrite(output());
+#endif
     }
 
 public:
@@ -343,7 +318,16 @@ private:
     {
         TRLWELvl1 data;
         UROMUX(data);
+#ifdef TANGOR_KVSP_STARPU_ASYNC
+        // LROMUX immediately consumes UROMUX's host result with TFHEpp CPU
+        // primitives. Wait for that task only; independent StarPU work keeps
+        // running and no process-wide barrier is introduced.
+        Tangor::synchronizeIyokanStarpuCapture();
+#endif
         LROMUX(TFHEpp::lvl1param::n, data);
+#ifdef TANGOR_KVSP_STARPU_ASYNC
+        Tangor::markIyokanTRLWEHostWrite(output());
+#endif
     }
 
 public:
@@ -435,7 +419,14 @@ private:
     void startSync(TFHEppWorkerInfo wi) override
     {
         auto ek = wi.ek;
+#ifdef TANGOR_KVSP_STARPU_ASYNC
+        Tangor::synchronizeIyokanTLWE(input(0));
+#endif
         TFHEpp::CircuitBootstrappingWithInv<TFHEpp::lvl02param,TFHEpp::lvl21param>(output().normal,output().inverted, input(0), *ek);
+#ifdef TANGOR_KVSP_STARPU_ASYNC
+        Tangor::markIyokanTRGSWFFTHostWrite(output().normal);
+        Tangor::markIyokanTRGSWFFTHostWrite(output().inverted);
+#endif
     }
 
 public:
@@ -588,6 +579,9 @@ private:
     std::weak_ptr<const TRLWELvl1> mem_;
 
     AsyncThread thr_;
+#ifdef TANGOR_KVSP_STARPU_ASYNC
+    std::shared_ptr<Tangor::IyokanStarpuTask> tangorTask_;
+#endif
 
 public:
     TaskTFHEppRAMCMUXs()
@@ -647,8 +641,21 @@ public:
 
     bool hasFinished() const override
     {
+#ifdef TANGOR_KVSP_STARPU_ASYNC
+        return thr_.hasFinished() &&
+               (!tangorTask_ || tangorTask_->isFinished());
+#else
         return thr_.hasFinished();
+#endif
     }
+
+#ifdef TANGOR_KVSP_STARPU_ASYNC
+    void onBeforePropagate() override
+    {
+        if (tangorTask_)
+            tangorTask_->synchronizeOutput();
+    }
+#endif
 
     void addInputPtr(const std::shared_ptr<const TRGSWLvl1FFTPair>& input)
     {
@@ -675,13 +682,22 @@ public:
             if (graph)
                 graph->startNode(this->depnode()->label());
 
+#ifdef TANGOR_KVSP_STARPU_ASYNC
+            Tangor::beginIyokanStarpuCapture();
+#endif
             *output_ = *inputWritten_.lock();
+#ifdef TANGOR_KVSP_STARPU_ASYNC
+            Tangor::markIyokanTRLWEHostWrite(*output_);
+#endif
             for (size_t j = 0; j < getAddressWidth(); j++) {
                 const TRGSWLvl1FFT& in = (memIndex_ >> j) & 1u
                                              ? inputAddrs_[j].lock()->normal
                                              : inputAddrs_[j].lock()->inverted;
                 TFHEpp::CMUXFFT<Lvl1>(*output_, in, *output_, *mem_.lock());
             }
+#ifdef TANGOR_KVSP_STARPU_ASYNC
+            tangorTask_ = Tangor::endIyokanStarpuCapture();
+#endif
         };
     }
 
@@ -703,8 +719,13 @@ private:
 private:
     void startSync(TFHEppWorkerInfo wi) override
     {
+#ifdef TANGOR_KVSP_STARPU_ASYNC
+        Tangor::runIyokanStarpuRamGateBootstrap(*mem_.lock(), input(0),
+                                                *wi.ek);
+#else
         TFHEpp::BlindRotate<Lvl01>(*mem_.lock(), input(0),
                                                       (*wi.ek).getbkfft<TFHEpp::lvl01param>(),TFHEpp::μpolygen<Lvl1, Lvl1::μ>());
+#endif
     }
 
 public:
