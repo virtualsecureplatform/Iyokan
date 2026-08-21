@@ -1,4 +1,10 @@
 #include <chrono>
+#include <algorithm>
+#include <cctype>
+#include <filesystem>
+#include <fstream>
+#include <set>
+#include <thread>
 
 #include <CLI/CLI.hpp>
 
@@ -8,6 +14,45 @@
 #ifdef IYOKAN_CUDA_ENABLED
 #include "iyokan_cufhe.hpp"
 #endif
+
+namespace {
+
+unsigned defaultCPUWorkerCount()
+{
+    const unsigned logical =
+        std::max(1u, std::thread::hardware_concurrency());
+
+#ifdef __linux__
+    // `hardware_concurrency` includes SMT siblings.  StarPU binds one CPU
+    // worker per logical thread, which oversubscribes this workload on SMT
+    // machines.  Prefer one worker per physical core when topology is
+    // available; keep the portable logical-thread fallback for other hosts.
+    std::set<std::pair<int, int>> physicalCores;
+    std::error_code ec;
+    const std::filesystem::path cpuRoot{"/sys/devices/system/cpu"};
+    for (std::filesystem::directory_iterator it(cpuRoot, ec), end;
+         !ec && it != end; it.increment(ec)) {
+        const std::string name = it->path().filename().string();
+        if (name.rfind("cpu", 0) != 0 || name.size() == 3 ||
+            !std::all_of(name.begin() + 3, name.end(), [](unsigned char c) {
+                return std::isdigit(c) != 0;
+            }))
+            continue;
+
+        int package = 0, core = 0;
+        std::ifstream packageFile(it->path() / "topology/physical_package_id");
+        std::ifstream coreFile(it->path() / "topology/core_id");
+        if ((packageFile >> package) && (coreFile >> core))
+            physicalCores.emplace(package, core);
+    }
+    if (!physicalCores.empty())
+        return static_cast<unsigned>(physicalCores.size());
+#endif
+
+    return logical;
+}
+
+}  // namespace
 
 int main(int argc, char** argv)
 {
@@ -44,6 +89,7 @@ int main(int argc, char** argv)
 
     enum class TYPE { PLAIN, TFHE } type;
     Options opt;
+    const unsigned defaultCPUWorkers = defaultCPUWorkerCount();
 #ifdef IYOKAN_CUDA_ENABLED
     bool enableGPU = false;
 #endif
@@ -176,6 +222,23 @@ int main(int argc, char** argv)
 
     CLI11_PARSE(app, argc, argv);
 
+    // Materialize the automatic value so the frontend, StarPU configuration,
+    // and AsyncThread fallback pool agree.  CPU-only evaluation is best with
+    // one worker per physical core.  In Tangor GPU mode, however, the CPU
+    // workers mainly feed independent RAM/ROM preparation and CUDA launches;
+    // using the available SMT siblings removes that producer bottleneck on
+    // the measured A100 host.  An explicit --cpu always takes precedence.
+    unsigned automaticCPUWorkers = defaultCPUWorkers;
+#ifdef TANGOR_KVSP_STARPU_ASYNC
+#ifdef IYOKAN_CUDA_ENABLED
+    if (type == TYPE::TFHE && enableGPU)
+        automaticCPUWorkers =
+            std::max(1u, std::thread::hardware_concurrency());
+#endif
+#endif
+    if (!opt.numCPUWorkers)
+        opt.numCPUWorkers.emplace(static_cast<int>(automaticCPUWorkers));
+
     // Print what options are selected.
     spdlog::info("Options");
     if (opt.blueprint)
@@ -282,6 +345,16 @@ int main(int argc, char** argv)
         }
     }
 
+#ifdef IYOKAN_CUDA_ENABLED
+    // GPU worker/device counts alone must not silently leave a new run on the
+    // CPU backend.  A CUDA snapshot enables GPU execution on resume, but a
+    // fresh run must state that intent explicitly.
+    if (type == TYPE::TFHE && !opt.resumeFile &&
+        (opt.numGPUWorkers || opt.numGPU) && !enableGPU) {
+        error::die("--gpu, --gpu_num, and --num-gpu require --enable-gpu");
+    }
+#endif
+
 #ifdef TANGOR_KVSP_STARPU_ASYNC
     unsigned tangorCudaDevices = 0;
 #ifdef IYOKAN_CUDA_ENABLED
@@ -290,16 +363,28 @@ int main(int argc, char** argv)
 #endif
     Tangor::configureIyokanStarpu(
         static_cast<unsigned>(opt.numCPUWorkers.value_or(
-            std::max(1u, std::thread::hardware_concurrency()))),
-        tangorCudaDevices);
+            defaultCPUWorkers)),
+        tangorCudaDevices,
+        tangorCudaDevices == 0
+            ? static_cast<unsigned>(opt.numCPUWorkers.value_or(
+                  defaultCPUWorkers))
+            // Match Iyokan's established cuFHE default: these are logical
+            // CUDA launch slots, not CPU threads. `--gpu` remains the tuning
+            // override while Tangor keeps StarPU's physical CPU pool bounded.
+            : static_cast<unsigned>(opt.numGPUWorkers.value_or(800)));
 #endif
 
 #ifdef TANGOR_KVSP_STARPU_ASYNC
-    // StarPU owns compute parallelism; keep one lightweight frontend submitter
-    // instead of oversubscribing the CPU with a second worker pool.
-    AsyncThread::setNumThreads(1);
+    // Not every TFHEpp frontend operation has a StarPU codelet yet: circuit
+    // bootstrapping and the RAM MUX preparation path still execute through
+    // AsyncThread.  Serialising that fallback pool turns a KVSP cycle into a
+    // long CPU bottleneck even when StarPU has CUDA workers available. Keep
+    // the same physical-core budget for those independent operations while
+    // StarPU schedules the offloaded gate graph.
+    AsyncThread::setNumThreads(
+        opt.numCPUWorkers.value_or(defaultCPUWorkers));
 #else
-    AsyncThread::setNumThreads(std::thread::hardware_concurrency());
+    AsyncThread::setNumThreads(defaultCPUWorkers);
 #endif
 
     switch (type) {

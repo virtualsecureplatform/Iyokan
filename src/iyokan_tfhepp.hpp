@@ -78,6 +78,9 @@ private:
             thr_ = [graph, this]() {
                 if (graph)
                     graph->startNode(this->depnode()->label());
+#ifdef TANGOR_KVSP_STARPU_ASYNC
+                Tangor::synchronizeIyokanTLWE(input(0));
+#endif
                 output() = input(0);
 #ifdef TANGOR_KVSP_STARPU_ASYNC
                 Tangor::markIyokanTLWEHostWrite(output());
@@ -203,6 +206,9 @@ private:
     void startSync(TFHEppWorkerInfo wi) override
     {
         auto ek = wi.ek;
+#ifdef TANGOR_KVSP_STARPU_ASYNC
+        Tangor::synchronizeIyokanTLWE(input(0));
+#endif
         TFHEpp::CircuitBootstrapping<TFHEpp::lvl02param,TFHEpp::lvl21param>(output(), input(0), *ek);
 #ifdef TANGOR_KVSP_STARPU_ASYNC
         Tangor::markIyokanTRGSWFFTHostWrite(output());
@@ -228,6 +234,9 @@ private:
     void startSync(TFHEppWorkerInfo wi) override
     {
         auto ek = wi.ek;
+#ifdef TANGOR_KVSP_STARPU_ASYNC
+        Tangor::synchronizeIyokanTLWE(input(0));
+#endif
         TFHEpp::CircuitBootstrappingInv<TFHEpp::lvl02param,TFHEpp::lvl21param>(output(), input(0), *ek);
 #ifdef TANGOR_KVSP_STARPU_ASYNC
         Tangor::markIyokanTRGSWFFTHostWrite(output());
@@ -410,6 +419,9 @@ private:
     void startSync(TFHEppWorkerInfo wi) override
     {
         auto ek = wi.ek;
+#ifdef TANGOR_KVSP_STARPU_ASYNC
+        Tangor::synchronizeIyokanTLWE(input(0));
+#endif
         TFHEpp::CircuitBootstrappingWithInv<TFHEpp::lvl02param,TFHEpp::lvl21param>(output().normal,output().inverted, input(0), *ek);
 #ifdef TANGOR_KVSP_STARPU_ASYNC
         Tangor::markIyokanTRGSWFFTHostWrite(output().normal);
@@ -707,10 +719,12 @@ private:
 private:
     void startSync(TFHEppWorkerInfo wi) override
     {
+#ifdef TANGOR_KVSP_STARPU_ASYNC
+        Tangor::runIyokanStarpuRamGateBootstrap(*mem_.lock(), input(0),
+                                                *wi.ek);
+#else
         TFHEpp::BlindRotate<Lvl01>(*mem_.lock(), input(0),
                                                       (*wi.ek).getbkfft<TFHEpp::lvl01param>(),TFHEpp::μpolygen<Lvl1, Lvl1::μ>());
-#ifdef TANGOR_KVSP_STARPU_ASYNC
-        Tangor::markIyokanTRLWEHostWrite(*mem_.lock());
 #endif
     }
 

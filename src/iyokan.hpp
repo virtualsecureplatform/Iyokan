@@ -1403,6 +1403,10 @@ public:
 
         // We HAVE TO prefix 'this->' here. Thanks to:
         // https://stackoverflow.com/questions/4643074/why-do-i-have-to-access-template-base-class-members-through-the-this-pointer
+#ifdef TANGOR_KVSP_STARPU_ASYNC
+        if constexpr (std::is_same_v<InType, Tangor::IyokanTLWE>)
+            Tangor::synchronizeIyokanTLWE(this->input(0));
+#endif
         this->output() = this->input(0);
 #ifdef TANGOR_KVSP_STARPU_ASYNC
         if constexpr (std::is_same_v<OutType, Tangor::IyokanTLWE>)

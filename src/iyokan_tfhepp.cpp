@@ -72,6 +72,15 @@ struct TFHEppRunParameter {
         blueprint = opt.blueprint.value();
         numCPUWorkers =
             opt.numCPUWorkers.value_or(std::thread::hardware_concurrency());
+#ifdef TANGOR_KVSP_STARPU_ASYNC
+        // GPU gate tasks become ready independently and return immediately
+        // after their StarPU CUDA launch.  Keep enough logical workers to
+        // fill the asynchronous CUDA queue, while StarPU itself owns only
+        // the configured physical CPU-worker pool.
+        numCPUWorkers = std::max(
+            numCPUWorkers,
+            static_cast<int>(Tangor::iyokanStarpuFrontendWorkerCount()));
+#endif
         numCycles = opt.numCycles.value_or(-1);
         ekFile = opt.ekFile.value();
         inputFile = opt.inputFile.value();
