@@ -73,10 +73,9 @@ struct TFHEppRunParameter {
         numCPUWorkers =
             opt.numCPUWorkers.value_or(std::thread::hardware_concurrency());
 #ifdef TANGOR_KVSP_STARPU_ASYNC
-        // GPU gate tasks become ready independently and return immediately
-        // after their StarPU CUDA launch.  Keep enough logical workers to
-        // fill the asynchronous CUDA queue, while StarPU itself owns only
-        // the configured physical CPU-worker pool.
+        // This is the logical frontend queue, not StarPU's physical CPU pool.
+        // In GPU mode it must be deep enough to keep the asynchronous launch
+        // slots busy even when main.cpp materializes the automatic --cpu value.
         numCPUWorkers = std::max(
             numCPUWorkers,
             static_cast<int>(Tangor::iyokanStarpuFrontendWorkerCount()));
@@ -100,6 +99,15 @@ struct TFHEppRunParameter {
         OVERWRITE(inputFile);
         OVERWRITE(outputFile);
 #undef OVERWRITE
+#ifdef TANGOR_KVSP_STARPU_ASYNC
+        // GPU gate tasks become ready independently and return immediately
+        // after their StarPU CUDA launch.  Apply the logical queue depth after
+        // command-line and resume overrides: --cpu controls StarPU's physical
+        // CPU pool, while --gpu controls this independent frontend queue.
+        numCPUWorkers = std::max(
+            numCPUWorkers,
+            static_cast<int>(Tangor::iyokanStarpuFrontendWorkerCount()));
+#endif
     }
 
     void print() const
