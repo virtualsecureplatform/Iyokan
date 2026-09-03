@@ -209,7 +209,9 @@ private:
 #ifdef TANGOR_KVSP_STARPU_ASYNC
         Tangor::synchronizeIyokanTLWE(input(0));
 #endif
-        TFHEpp::CircuitBootstrapping<TFHEpp::lvl02param,TFHEpp::lvl21param>(output(), input(0), *ek);
+        TFHEpp::CircuitBootstrappingSubset<TFHEpp::lvl02param,
+                                           TFHEpp::lvl21param>(
+            output(), input(0), *ek);
 #ifdef TANGOR_KVSP_STARPU_ASYNC
         Tangor::markIyokanTRGSWFFTHostWrite(output());
 #endif
@@ -237,7 +239,9 @@ private:
 #ifdef TANGOR_KVSP_STARPU_ASYNC
         Tangor::synchronizeIyokanTLWE(input(0));
 #endif
-        TFHEpp::CircuitBootstrappingInv<TFHEpp::lvl02param,TFHEpp::lvl21param>(output(), input(0), *ek);
+        TFHEpp::CircuitBootstrappingSubsetInv<TFHEpp::lvl02param,
+                                              TFHEpp::lvl21param>(
+            output(), input(0), *ek);
 #ifdef TANGOR_KVSP_STARPU_ASYNC
         Tangor::markIyokanTRGSWFFTHostWrite(output());
 #endif
@@ -375,11 +379,9 @@ private:
 private:
     void startSync(TFHEppWorkerInfo wi) override
     {
-        const KeySwitchingKey& ksk = wi.ek->getiksk<TFHEpp::lvl10param>();
-
         TLWELvl1 reslvl1;
         TFHEpp::SampleExtractIndex<Lvl1>(reslvl1, input(0), index_);
-        TFHEpp::IdentityKeySwitch<Lvl10>(output(), reslvl1, ksk);
+        TFHEpp::EvalIdentityKeySwitch<Lvl10>(output(), reslvl1, *wi.ek);
     }
 
 public:
@@ -450,7 +452,9 @@ private:
 #ifdef TANGOR_KVSP_STARPU_ASYNC
         Tangor::synchronizeIyokanTLWE(input(0));
 #endif
-        TFHEpp::CircuitBootstrappingWithInv<TFHEpp::lvl02param,TFHEpp::lvl21param>(output().normal,output().inverted, input(0), *ek);
+        TFHEpp::CircuitBootstrappingSubsetWithInv<TFHEpp::lvl02param,
+                                                  TFHEpp::lvl21param>(
+            output().normal, output().inverted, input(0), *ek);
 #ifdef TANGOR_KVSP_STARPU_ASYNC
         Tangor::markIyokanTRGSWFFTHostWrite(output().normal);
         Tangor::markIyokanTRGSWFFTHostWrite(output().inverted);

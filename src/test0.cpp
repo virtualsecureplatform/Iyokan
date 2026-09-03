@@ -543,7 +543,8 @@ private:
         (*ek_).emplacebk<Lvl01>(*sk_);
         (*ek_).emplacebkfft<Lvl01>(*sk_);
         (*ek_).emplacebkfft<Lvl02>(*sk_);
-        (*ek_).emplaceprivksk4cb<Lvl21>(*sk_);
+        (*ek_).emplacesubiksk<Lvl21>(*sk_);
+        (*ek_).emplacesubprivksk4cb<Lvl21>(*sk_);
         {
             std::vector<TLWELvl0> tmp;
             TFHEpp::bootsSymEncrypt<Lvl0>(tmp, {0}, *sk_);
@@ -749,7 +750,8 @@ void testTFHEppSingleBlockROM()
     ek.emplacebk<Lvl01>(sk);
     ek.emplacebkfft<Lvl01>(sk);
     ek.emplacebkfft<Lvl02>(sk);
-    ek.emplaceprivksk4cb<Lvl21>(sk);
+    ek.emplacesubiksk<Lvl21>(sk);
+    ek.emplacesubprivksk4cb<Lvl21>(sk);
     std::stringstream serialized_ek{std::ios::binary | std::ios::out |
                                     std::ios::in};
     writeToArchive(serialized_ek, ek);
@@ -778,7 +780,7 @@ void testTFHEppSingleBlockROM()
         TLWELvl0 input;
         TFHEpp::tlweSymEncrypt<Lvl0>(
             input, ((address >> bit) & 1u) ? Lvl0::μ : -Lvl0::μ,
-            sk.key.get<Lvl0>());
+            sk.key.getSubset<Lvl0>());
         get<TFHEppNetworkBuilder>(net, "input", "addr", bit)->set(input);
     }
 
