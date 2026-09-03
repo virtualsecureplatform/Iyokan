@@ -402,6 +402,34 @@ public:
 };
 CEREAL_REGISTER_TYPE(TaskTFHEppSEI);
 
+class TaskTFHEppROMNormalize : public TaskAsyncTFHEpp {
+private:
+    void startSync(TFHEppWorkerInfo wi) override
+    {
+#ifdef TANGOR_KVSP_STARPU_ASYNC
+        Tangor::runIyokanStarpuBinaryGate(Tangor::IyokanBinaryGate::AND,
+                                          output(), input(0), input(1),
+                                          *wi.ek);
+#else
+        TFHEpp::HomAND<TFHEpp::lvl01param, TFHEpp::lvl1param::μ,
+                       TFHEpp::lvl10param>(output(), input(0), input(1),
+                                           *wi.ek);
+#endif
+    }
+
+public:
+    TaskTFHEppROMNormalize() : TaskAsyncTFHEpp(2)
+    {
+    }
+
+    template <class Archive>
+    void serialize(Archive& ar)
+    {
+        ar(cereal::base_class<TaskAsyncTFHEpp>(this));
+    }
+};
+CEREAL_REGISTER_TYPE(TaskTFHEppROMNormalize);
+
 struct TRGSWLvl1FFTPair {
     TRGSWLvl1FFT normal, inverted;
 
@@ -505,8 +533,13 @@ public:
               addressWidth),
           data_(1 << addressWidth)
     {
-        for (auto& p : data_)
+        for (auto& p : data_) {
             p = std::make_shared<TRLWELvl1>();
+            // A zero-filled TRLWE has phase zero, which is on the Boolean
+            // bootstrap boundary.  Empty RAM must instead contain a valid
+            // trivial encryption of false.
+            p->at(Lvl1::k).fill(-Lvl1::μ);
+        }
     }
 
     size_t getAddressWidth() const
@@ -958,15 +991,27 @@ inline TaskNetwork<TFHEppWorkerInfo> makeTFHEppROMNetwork(
         connectTasks(taskCBInv, taskROMUX);
     }
 
+    // AND(x, true) has x as its pre-bootstrap phase.  Sharing one canonical
+    // true ciphertext therefore converts each ROM bit from +/-2mu to the
+    // ordinary +/-mu gate representation without changing the ROM encoding.
+    auto taskCanonicalOne = builder.emplaceTask<TaskTFHEppGateCONSTONE>(
+        NodeLabel{"CONSTONE", "ROMNormalize"});
+
     // Create SEIs and outputs, and connect them properly
     for (int i = 0; i < outRdataWidth; i++) {
         auto taskSEI = std::make_shared<TaskTFHEppSEI>(i);
         builder.addTask(NodeLabel{"SEI", utility::fok("[", i, "]")}, taskSEI);
         connectTasks(taskROMUX, taskSEI);
 
+        auto taskNormalize = std::make_shared<TaskTFHEppROMNormalize>();
+        builder.addTask(NodeLabel{"ROMNormalize", utility::fok("[", i, "]")},
+                        taskNormalize);
+        connectTasks(taskSEI, taskNormalize);
+        connectTasks(taskCanonicalOne, taskNormalize);
+
         auto taskOUTPUT =
             builder.addOUTPUT<TaskTFHEppGateWIRE>("rdata", i, true);
-        connectTasks(taskSEI, taskOUTPUT);
+        connectTasks(taskNormalize, taskOUTPUT);
     }
 
     return TaskNetwork<TFHEppWorkerInfo>(std::move(builder));

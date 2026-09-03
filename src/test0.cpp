@@ -788,6 +788,17 @@ void testTFHEppSingleBlockROM()
         const auto actual = TFHEpp::bootsSymDecrypt<Lvl0>({output->get()}, sk)[0];
         if (actual != ((address >> bit) & 1u))
             throw std::runtime_error("single-block TFHEpp ROM regression failed");
+
+        // ROM outputs are ordinary Boolean ciphertexts and must remain valid
+        // inputs to the gate API.  A sign-only decryption check does not catch
+        // noncanonical message amplitudes such as +/-2μ, which break XOR.
+        TLWELvl0 xorOutput;
+        TFHEpp::HomXOR<TFHEpp::lvl01param, TFHEpp::lvl1param::μ,
+                       TFHEpp::lvl10param>(xorOutput, output->get(),
+                                           output->get(), *wi.ek);
+        if (TFHEpp::bootsSymDecrypt<Lvl0>({xorOutput}, sk)[0])
+            throw std::runtime_error(
+                "TFHEpp ROM output is not gate-composable");
     }
 }
 

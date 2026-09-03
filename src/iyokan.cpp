@@ -17,6 +17,7 @@ std::unordered_map<int, int> doRankuSort(
         {"CONSTZERO", 0},    {"CB", 100},     {"CBInv", 100},
         {"CBWithInv", 100},  {"MUXWoSE", 20}, {"CMUXs", 10},
         {"SEI", 0},          {"GB", 10},      {"ROMUX", 10},
+        {"ROMNormalize", 10},
         {"RAMUX", 10},       {"SEI&KS", 5},   {"cufhe2tfhepp", 0},
         {"tfhepp2cufhe", 0}, {"bridge", 0},   {"RAMWriter", 0},
         {"RAMReader", 0},    {"ROM", 0},      {"SDFF", 0},
