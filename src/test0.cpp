@@ -680,31 +680,38 @@ void testTFHEppMaskedRAM()
     constexpr size_t addressWidth = 2;
     constexpr size_t dataWidth = 8;
     constexpr size_t wrenWidth = 2;
-    TFHEppNetwork net =
-        makeTFHEppRAMNetwork(addressWidth, dataWidth, "", wrenWidth);
-    assertNetValid(net);
     const auto check = [](uint32_t actual, uint32_t expected) {
         if (actual != expected)
             throw std::runtime_error("masked TFHEpp RAM regression failed");
     };
 
-    runRAMCycle<TFHEppNetworkBuilder>(net, addressWidth, dataWidth, wrenWidth,
-                                      0, 0xa5, 0x3);
-    check(runRAMCycle<TFHEppNetworkBuilder>(net, addressWidth, dataWidth,
-                                            wrenWidth, 0, 0, 0),
-          0xa5);
+    // Exercise both the snapshot-compatible legacy graph and a chunk size
+    // that leaves a one-word tail chunk.
+    for (const char* chunkSize : {"0", "3"}) {
+        setenv("IYOKAN_RAM_CMUX_CHUNK_SIZE", chunkSize, 1);
+        TFHEppNetwork net =
+            makeTFHEppRAMNetwork(addressWidth, dataWidth, "", wrenWidth);
+        assertNetValid(net);
 
-    runRAMCycle<TFHEppNetworkBuilder>(net, addressWidth, dataWidth, wrenWidth,
-                                      0, 0x3c, 0x1);
-    check(runRAMCycle<TFHEppNetworkBuilder>(net, addressWidth, dataWidth,
-                                            wrenWidth, 0, 0, 0),
-          0xac);
+        runRAMCycle<TFHEppNetworkBuilder>(net, addressWidth, dataWidth,
+                                          wrenWidth, 0, 0xa5, 0x3);
+        check(runRAMCycle<TFHEppNetworkBuilder>(net, addressWidth, dataWidth,
+                                                wrenWidth, 0, 0, 0),
+              0xa5);
 
-    runRAMCycle<TFHEppNetworkBuilder>(net, addressWidth, dataWidth, wrenWidth,
-                                      0, 0x3c, 0x2);
-    check(runRAMCycle<TFHEppNetworkBuilder>(net, addressWidth, dataWidth,
-                                            wrenWidth, 0, 0, 0),
-          0x3c);
+        runRAMCycle<TFHEppNetworkBuilder>(net, addressWidth, dataWidth,
+                                          wrenWidth, 0, 0x3c, 0x1);
+        check(runRAMCycle<TFHEppNetworkBuilder>(net, addressWidth, dataWidth,
+                                                wrenWidth, 0, 0, 0),
+              0xac);
+
+        runRAMCycle<TFHEppNetworkBuilder>(net, addressWidth, dataWidth,
+                                          wrenWidth, 0, 0x3c, 0x2);
+        check(runRAMCycle<TFHEppNetworkBuilder>(net, addressWidth, dataWidth,
+                                                wrenWidth, 0, 0, 0),
+              0x3c);
+    }
+    unsetenv("IYOKAN_RAM_CMUX_CHUNK_SIZE");
 }
 
 void testTFHEppSingleAddressBitRAM()

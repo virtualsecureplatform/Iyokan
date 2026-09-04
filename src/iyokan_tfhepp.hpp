@@ -2,6 +2,10 @@
 #define VIRTUALSECUREPLATFORM_IYOKAN_TFHEPP_HPP
 
 #include <bitset>
+#include <cerrno>
+#include <chrono>
+#include <cstdlib>
+#include <limits>
 
 #include "iyokan.hpp"
 
@@ -379,9 +383,22 @@ private:
 private:
     void startSync(TFHEppWorkerInfo wi) override
     {
+#ifdef TANGOR_KVSP_STARPU_ASYNC
+        const bool profiling = Tangor::iyokanRuntimeProfileEnabled();
+        const auto startedAt = profiling ? std::chrono::steady_clock::now()
+                                         : std::chrono::steady_clock::time_point{};
+#endif
         TLWELvl1 reslvl1;
         TFHEpp::SampleExtractIndex<Lvl1>(reslvl1, input(0), index_);
         TFHEpp::EvalIdentityKeySwitch<Lvl10>(output(), reslvl1, *wi.ek);
+#ifdef TANGOR_KVSP_STARPU_ASYNC
+        if (profiling)
+            Tangor::recordIyokanRuntimeProfile(
+                Tangor::IyokanProfileKind::SampleExtractIdentityKeySwitch,
+                std::chrono::duration_cast<std::chrono::nanoseconds>(
+                    std::chrono::steady_clock::now() - startedAt)
+                    .count());
+#endif
     }
 
 public:
@@ -450,12 +467,21 @@ private:
     {
         auto ek = wi.ek;
 #ifdef TANGOR_KVSP_STARPU_ASYNC
+        const bool profiling = Tangor::iyokanRuntimeProfileEnabled();
+        const auto startedAt = profiling ? std::chrono::steady_clock::now()
+                                         : std::chrono::steady_clock::time_point{};
         Tangor::synchronizeIyokanTLWE(input(0));
 #endif
         TFHEpp::CircuitBootstrappingSubsetWithInv<TFHEpp::lvl02param,
                                                   TFHEpp::lvl21param>(
             output().normal, output().inverted, input(0), *ek);
 #ifdef TANGOR_KVSP_STARPU_ASYNC
+        if (profiling)
+            Tangor::recordIyokanRuntimeProfile(
+                Tangor::IyokanProfileKind::CircuitBootstrap,
+                std::chrono::duration_cast<std::chrono::nanoseconds>(
+                    std::chrono::steady_clock::now() - startedAt)
+                    .count());
         Tangor::markIyokanTRGSWFFTHostWrite(output().normal);
         Tangor::markIyokanTRGSWFFTHostWrite(output().inverted);
 #endif
@@ -786,11 +812,234 @@ public:
 };
 CEREAL_REGISTER_TYPE(TaskTFHEppRAMGateBootstrapping);
 
+class TaskTFHEppRAMWriteChunk : public TaskBase<TFHEppWorkerInfo> {
+private:
+    size_t numReadyInputs_, firstMemIndex_;
+    std::vector<std::weak_ptr<TRLWELvl1>> mem_;
+    std::vector<TRLWELvl1> accumulators_;
+    std::vector<std::weak_ptr<const TRGSWLvl1FFTPair>> inputAddrs_;
+    std::weak_ptr<const TRLWELvl1> inputWritten_;
+    AsyncThread thr_;
+#ifdef TANGOR_KVSP_STARPU_ASYNC
+    std::shared_ptr<Tangor::IyokanStarpuTask> tangorTask_;
+#endif
+
+public:
+    TaskTFHEppRAMWriteChunk()
+    {
+    }
+
+    TaskTFHEppRAMWriteChunk(
+        size_t addressWidth, size_t firstMemIndex,
+        const std::vector<std::shared_ptr<TRLWELvl1>>& mem)
+        : numReadyInputs_(0),
+          firstMemIndex_(firstMemIndex),
+          mem_(mem.begin(), mem.end()),
+          accumulators_(mem.size()),
+          inputAddrs_(addressWidth)
+    {
+        assert(!mem.empty());
+    }
+
+    size_t getAddressWidth() const
+    {
+        return inputAddrs_.size();
+    }
+
+    size_t getInputSize() const override
+    {
+        return getAddressWidth() + 1;
+    }
+
+    void checkValid(error::Stack& err) override
+    {
+        assert(this->depnode());
+        const NodeLabel& label = this->depnode()->label();
+        if (mem_.empty() ||
+            !std::all_of(mem_.begin(), mem_.end(),
+                         [](auto&& mem) { return mem.use_count() != 0; }) ||
+            !std::all_of(inputAddrs_.begin(), inputAddrs_.end(),
+                         [](auto&& in) { return in.use_count() != 0; }) ||
+            inputWritten_.use_count() == 0)
+            err.add("Not enough inputs: ", label.str());
+    }
+
+    void tick() override
+    {
+        numReadyInputs_ = 0;
+#ifdef TANGOR_KVSP_STARPU_ASYNC
+        tangorTask_.reset();
+#endif
+    }
+
+    void notifyOneInputReady() override
+    {
+        numReadyInputs_++;
+        assert(numReadyInputs_ <= getInputSize());
+    }
+
+    bool areInputsReady() const override
+    {
+        return numReadyInputs_ == getInputSize();
+    }
+
+    bool hasFinished() const override
+    {
+#ifdef TANGOR_KVSP_STARPU_ASYNC
+        return thr_.hasFinished() &&
+               (!tangorTask_ || tangorTask_->isFinished());
+#else
+        return thr_.hasFinished();
+#endif
+    }
+
+#ifdef TANGOR_KVSP_STARPU_ASYNC
+    void onBeforePropagate() override
+    {
+        if (tangorTask_)
+            tangorTask_->synchronizeOutput();
+    }
+#endif
+
+    void addInputPtr(const std::shared_ptr<const TRGSWLvl1FFTPair>& input)
+    {
+        auto it = std::find_if(inputAddrs_.begin(), inputAddrs_.end(),
+                               [](auto&& in) { return in.use_count() == 0; });
+        assert(it != inputAddrs_.end());
+        *it = input;
+    }
+
+    void addInputPtr(const std::shared_ptr<const TRLWELvl1>& input)
+    {
+        assert(inputWritten_.use_count() == 0);
+        inputWritten_ = input;
+    }
+
+    void startAsync(TFHEppWorkerInfo wi, ProgressGraphMaker* graph) override
+    {
+        thr_ = [this, wi = std::move(wi), graph] {
+            if (graph)
+                graph->startNode(this->depnode()->label());
+
+            const auto written = inputWritten_.lock();
+            assert(written);
+            for (auto& accumulator : accumulators_)
+                accumulator = *written;
+
+#ifdef TANGOR_KVSP_STARPU_ASYNC
+            const bool profiling = Tangor::iyokanRuntimeProfileEnabled();
+            const auto cmuxStartedAt =
+                profiling ? std::chrono::steady_clock::now()
+                          : std::chrono::steady_clock::time_point{};
+#endif
+            // Keep a small contiguous group of accumulators resident while
+            // reusing the same normal/inverted address selector across it.
+            for (size_t bit = 0; bit < getAddressWidth(); ++bit) {
+                for (size_t offset = 0; offset < mem_.size(); ++offset) {
+                    const size_t memIndex = firstMemIndex_ + offset;
+                    const TRGSWLvl1FFT& selector =
+                        (memIndex >> bit) & 1u
+                            ? inputAddrs_[bit].lock()->normal
+                            : inputAddrs_[bit].lock()->inverted;
+                    const auto memory = mem_[offset].lock();
+                    assert(memory);
+                    TFHEpp::CMUXFFT<Lvl1>(accumulators_[offset], selector,
+                                          accumulators_[offset], *memory);
+                }
+            }
+#ifdef TANGOR_KVSP_STARPU_ASYNC
+            if (profiling)
+                Tangor::recordIyokanRuntimeProfile(
+                    Tangor::IyokanProfileKind::CpuCmuxChain,
+                    std::chrono::duration_cast<std::chrono::nanoseconds>(
+                        std::chrono::steady_clock::now() - cmuxStartedAt)
+                        .count(),
+                    mem_.size() * getAddressWidth());
+            const auto seiStartedAt =
+                profiling ? std::chrono::steady_clock::now()
+                          : std::chrono::steady_clock::time_point{};
+#endif
+
+            std::vector<TLWELvl0> refreshInputs(mem_.size());
+            std::vector<std::shared_ptr<TRLWELvl1>> memory(mem_.size());
+            for (size_t offset = 0; offset < mem_.size(); ++offset) {
+                TLWELvl1 extracted;
+                TFHEpp::SampleExtractIndex<Lvl1>(extracted,
+                                                 accumulators_[offset], 0);
+                TFHEpp::EvalIdentityKeySwitch<Lvl10>(
+                    refreshInputs[offset], extracted, *wi.ek);
+                memory[offset] = mem_[offset].lock();
+                assert(memory[offset]);
+            }
+#ifdef TANGOR_KVSP_STARPU_ASYNC
+            if (profiling)
+                Tangor::recordIyokanRuntimeProfile(
+                    Tangor::IyokanProfileKind::SampleExtractIdentityKeySwitch,
+                    std::chrono::duration_cast<std::chrono::nanoseconds>(
+                        std::chrono::steady_clock::now() - seiStartedAt)
+                        .count(),
+                    mem_.size());
+#endif
+
+#ifdef TANGOR_KVSP_STARPU_ASYNC
+            if (Tangor::iyokanStarpuUsesCuda()) {
+                std::vector<Tangor::IyokanTRLWE*> outputs;
+                outputs.reserve(memory.size());
+                for (const auto& value : memory)
+                    outputs.push_back(value.get());
+                tangorTask_ = Tangor::runIyokanStarpuRamGateBootstrapBatch(
+                    outputs, refreshInputs, *wi.ek);
+                return;
+            }
+#endif
+            for (size_t offset = 0; offset < memory.size(); ++offset) {
+                TFHEpp::BlindRotate<Lvl01>(
+                    *memory[offset], refreshInputs[offset],
+                    wi.ek->getbkfft<TFHEpp::lvl01param>(),
+                    TFHEpp::μpolygen<Lvl1, Lvl1::μ>());
+#ifdef TANGOR_KVSP_STARPU_ASYNC
+                Tangor::markIyokanTRLWEHostWrite(*memory[offset]);
+#endif
+            }
+        };
+    }
+
+    template <class Archive>
+    void serialize(Archive& ar)
+    {
+        ar(cereal::base_class<TaskBase<TFHEppWorkerInfo>>(this),
+           numReadyInputs_, firstMemIndex_, mem_, inputAddrs_, inputWritten_);
+        if constexpr (Archive::is_loading::value)
+            accumulators_.resize(mem_.size());
+    }
+};
+CEREAL_REGISTER_TYPE(TaskTFHEppRAMWriteChunk);
+
+inline size_t getTFHEppRAMCMUXChunkSize(size_t numWords)
+{
+    // The legacy graph remains the default until a chunk size demonstrates a
+    // material end-to-end win on both supported CPU blueprints.
+    constexpr size_t defaultChunkSize = 0;
+    const char* const value = std::getenv("IYOKAN_RAM_CMUX_CHUNK_SIZE");
+    if (value == nullptr || value[0] == '\0')
+        return defaultChunkSize;
+
+    errno = 0;
+    char* end = nullptr;
+    const unsigned long long parsed = std::strtoull(value, &end, 10);
+    if (value[0] < '0' || value[0] > '9' || errno != 0 || end == value ||
+        *end != '\0' ||
+        parsed > std::numeric_limits<size_t>::max())
+        throw std::runtime_error(
+            "IYOKAN_RAM_CMUX_CHUNK_SIZE must be a non-negative integer");
+    return parsed == 0 ? 0 : std::min(static_cast<size_t>(parsed), numWords);
+}
+
 inline void makeTFHEppRAMNetworkImpl(
     NetworkBuilderBase<TFHEppWorkerInfo>& builder, size_t addressWidth,
     const std::string& ramPortName,
     const std::vector<std::shared_ptr<TaskTFHEppCBWithInv>>& cbs, int indexBit,
-    size_t wrenIndex)
+    size_t wrenIndex, size_t chunkSize)
 {
     /*
         // Address CB
@@ -877,7 +1126,30 @@ inline void makeTFHEppRAMNetworkImpl(
     connectTasks(taskInputWriteData, taskMUXWoSE);
     connectTasks(taskInputWriteEnabled, taskMUXWoSE);
 
-    // Create links of CMUXs -> SEI -> GateBootstrapping.
+    if (chunkSize != 0) {
+        const size_t numWords = size_t{1} << addressWidth;
+        for (size_t begin = 0; begin < numWords; begin += chunkSize) {
+            const size_t end = std::min(begin + chunkSize, numWords);
+            std::vector<std::shared_ptr<TRLWELvl1>> memory;
+            memory.reserve(end - begin);
+            for (size_t i = begin; i < end; ++i)
+                memory.push_back(taskRAMUX->get(i));
+
+            auto taskChunk = std::make_shared<TaskTFHEppRAMWriteChunk>(
+                addressWidth, begin, memory);
+            builder.addTask(
+                NodeLabel{"RAMWriteChunk",
+                          utility::fok("[", indexBit, "][", begin, ":", end,
+                                       ")")},
+                taskChunk);
+            connectTasks(taskMUXWoSE, taskChunk);
+            for (auto&& cb : cbs)
+                connectTasks(cb, taskChunk);
+        }
+        return;
+    }
+
+    // Legacy one-cell task graph, retained for snapshots and A/B benchmarks.
     for (int i = 0; i < (1 << addressWidth); i++) {
         // Create components...
         auto taskCMUXs = std::make_shared<TaskTFHEppRAMCMUXs>(
@@ -909,6 +1181,11 @@ inline TaskNetwork<TFHEppWorkerInfo> makeTFHEppRAMNetwork(
     assert(dataWidth % wrenWidth == 0);
 
     NetworkBuilderBase<TFHEppWorkerInfo> builder;
+    const size_t numWords = size_t{1} << addressWidth;
+    const size_t chunkSize = getTFHEppRAMCMUXChunkSize(numWords);
+    spdlog::info("RAM CMUX write chunk size: {}",
+                 chunkSize == 0 ? std::string("legacy")
+                                : std::to_string(chunkSize));
 
     // Inputs for address.
     std::vector<std::shared_ptr<TaskTFHEppCBWithInv>> cbs;
@@ -933,7 +1210,7 @@ inline TaskNetwork<TFHEppWorkerInfo> makeTFHEppRAMNetwork(
 
         const size_t laneWidth = dataWidth / wrenWidth;
         makeTFHEppRAMNetworkImpl(builder, addressWidth, ramPortName, cbs,
-                                 indexBit, indexBit / laneWidth);
+                                 indexBit, indexBit / laneWidth, chunkSize);
     }
 
     return TaskNetwork<TFHEppWorkerInfo>(std::move(builder));
