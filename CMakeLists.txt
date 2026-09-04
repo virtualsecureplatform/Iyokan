@@ -105,9 +105,10 @@ endif()
 # not always returned through TFHEpp_DEFINITIONS.  Mirror the active parameter
 # family and key-switching format in Iyokan's header-heavy frontend.
 foreach(iyokan_tfhepp_definition IN ITEMS USE_BLOCK_BINARY USE_SUBSET_KEY)
-    if(DEFINED ${iyokan_tfhepp_definition}
-            AND ${${iyokan_tfhepp_definition}})
-        list(APPEND IYOKAN_COMPILE_DEFINITIONS ${iyokan_tfhepp_definition})
+    if(DEFINED ${iyokan_tfhepp_definition})
+        if(${iyokan_tfhepp_definition})
+            list(APPEND IYOKAN_COMPILE_DEFINITIONS ${iyokan_tfhepp_definition})
+        endif()
     endif()
 endforeach()
 list(REMOVE_DUPLICATES IYOKAN_COMPILE_DEFINITIONS)

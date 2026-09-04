@@ -1338,6 +1338,13 @@ public:
         return task->depnode()->label().id;
     }
 
+    int WIRE()
+    {
+        auto task = std::make_shared<TaskTypeWIRE>(true);
+        this->addTask(NodeLabel{"WIRE", ""}, task);
+        return task->depnode()->label().id;
+    }
+
     int ROM(const std::string& portName, int portBit)
     {
         auto task = addNamedWIRE(false, "rom", portName, portBit);
@@ -2276,6 +2283,7 @@ private:
         XNOR,
         NOR,
         ORNOT,
+        BUF,
         DFFP,
         SDFFPP0,
         SDFFPP1,
@@ -2415,6 +2423,7 @@ public:
             {"$_XNOR_", CELL::XNOR},
             {"$_NOR_", CELL::NOR},
             {"$_ORNOT_", CELL::ORNOT},
+            {"$_BUF_", CELL::BUF},
             {"$_DFF_P_", CELL::DFFP},
             {"$_SDFF_PP0_", CELL::SDFFPP0},
             {"$_SDFF_PP1_", CELL::SDFFPP1},
@@ -2479,35 +2488,29 @@ public:
                 cellvec.emplace_back(CELL::ORNOT, id, get("A"), get("B"));
                 bit = get("Y");
                 break;
+            case CELL::BUF:
+                id = builder.WIRE();
+                cellvec.emplace_back(CELL::BUF, id, get("A"));
+                bit = get("Y");
+                break;
             case CELL::DFFP:
                 id = builder.DFF();
                 cellvec.emplace_back(CELL::DFFP, id, get("D"));
                 bit = get("Q");
                 break;
             case CELL::SDFFPP0:
-                error::die(
-                    "Currently $_SDFF_PP0_ and $_SDFF_PP1_ are not supported "
-                    "because Iyokan cannot handle their 'R' inputs correctly. "
-                    "A patch for this issue is welcome!"
-                    "Please use $_DFF_P_ instead."
-                    "dfflegalize -cell $_DFF_P_ 01" 
-                    "ensure that in Yosys.");
-                // id = builder.SDFF(Bit(false));
-                // cellvec.emplace_back(CELL::DFFP, id, get("D"));
-                // bit = get("Q");
-                // break;
+                // KVSP treats reset as initialization-only.  The reset value
+                // encoded in the cell type initializes the DFF, while the R
+                // input is deliberately omitted from the evaluation graph.
+                id = builder.SDFF(Bit(false));
+                cellvec.emplace_back(CELL::SDFFPP0, id, get("D"));
+                bit = get("Q");
+                break;
             case CELL::SDFFPP1:
-                error::die(
-                    "Currently $_SDFF_PP0_ and $_SDFF_PP1_ are not supported "
-                    "because Iyokan cannot handle their 'R' inputs correctly. "
-                    "A patch for this issue is welcome! "
-                    "Please use $_DFF_P_ instead. "
-                    "dfflegalize -cell $_DFF_P_ 01 " 
-                    "ensure that in Yosys.");
-                // id = builder.SDFF(Bit(true));
-                // cellvec.emplace_back(CELL::DFFP, id, get("D"));
-                // bit = get("Q");
-                // break;
+                id = builder.SDFF(Bit(true));
+                cellvec.emplace_back(CELL::SDFFPP1, id, get("D"));
+                bit = get("Q");
+                break;
             case CELL::NOT:
                 id = builder.NOT();
                 cellvec.emplace_back(CELL::NOT, id, get("A"));
@@ -2546,6 +2549,7 @@ public:
             case CELL::DFFP:
             case CELL::SDFFPP0:
             case CELL::SDFFPP1:
+            case CELL::BUF:
             case CELL::NOT:
                 builder.connect(bit2id.at(cell.bit0), cell.id);
                 break;
