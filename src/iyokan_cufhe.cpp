@@ -747,15 +747,23 @@ public:
 
         // Make runner
         auto graph = opt.dumpTimeCSVPrefix || opt.dumpGraphJSONPrefix ||
-                             opt.dumpGraphDOTPrefix
+                             opt.dumpGraphDOTPrefix || opt.criticalProfilePrefix
                          ? std::make_shared<ProgressGraphMaker>()
                          : nullptr;
         CUFHENetworkRunner runner{pr_.numGPUWorkers, pr_.numCPUWorkers,
                                   TFHEppWorkerInfo{std::make_shared<TFHEpp::EvalKey>(ek)}, graph};
-        for (auto&& p : name2cnet_)
+        for (auto&& p : name2cnet_) {
             runner.addNetwork(p.second);
-        for (auto&& p : name2tnet_)
+            if (graph)
+                p.second->registerProfileDomain(
+                    *graph, pr_.blueprint.profileDomain(p.first));
+        }
+        for (auto&& p : name2tnet_) {
             runner.addNetwork(p.second);
+            if (graph)
+                p.second->registerProfileDomain(
+                    *graph, pr_.blueprint.profileDomain(p.first));
+        }
         for (auto&& bridge0 : bridges0_)
             runner.addBridge(bridge0);
         for (auto&& bridge1 : bridges1_)
@@ -830,6 +838,13 @@ public:
                     "{}-{}.dot", *opt.dumpGraphDOTPrefix, currentCycle_);
                 graph->dumpDOT(*utility::openOfstream(filename));
             }
+            if (opt.criticalProfilePrefix) {
+                assert(graph);
+                const std::string filename = fmt::format(
+                    "{}-{}.json", *opt.criticalProfilePrefix, currentCycle_);
+                graph->dumpCriticalJSON(*utility::openOfstream(filename),
+                                        currentCycle_, pr_.numCPUWorkers);
+            }
 
             spdlog::info("\tdone. ({} us)", duration.count());
             if (opt.stdoutCSV)
@@ -866,7 +881,7 @@ void processAllGates(CUFHENetwork& net, int numWorkers,
                      std::shared_ptr<ProgressGraphMaker> graph)
 {
     ReadyQueue<CUFHEWorkerInfo> readyQueue;
-    net.pushReadyTasks(readyQueue);
+    net.pushReadyTasks(readyQueue, graph.get());
 
     // Create workers.
     size_t numFinishedTargets = 0;

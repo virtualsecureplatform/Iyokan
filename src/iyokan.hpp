@@ -17,6 +17,7 @@
 
 #include <algorithm>
 #include <cassert>
+#include <ctime>
 #include <filesystem>
 #include <future>
 #include <iostream>
@@ -128,31 +129,62 @@ private:
 
 class ProgressGraphMaker {
 private:
+    using CriticalClock = std::chrono::steady_clock;
+
     struct Node {
         NodeLabel label;
         int index;
         std::optional<std::chrono::system_clock::time_point> start =
                                                                  std::nullopt,
                                                              end = std::nullopt;
+        std::optional<CriticalClock::time_point> readyCritical = std::nullopt,
+                                                 startCritical = std::nullopt,
+                                                 endCritical = std::nullopt;
+        std::optional<int> releasedBy = std::nullopt;
+        std::uint64_t cpuNanoseconds = 0;
     };
 
     struct Edge {
         int from, to;
         int index;
+        CriticalClock::time_point notifiedCritical;
+        bool causal;
+        bool released;
     };
 
     std::unordered_map<int, Node> nodes_;
+    std::unordered_map<int, std::string> configuredDomains_;
     std::vector<Edge> edges_;
 
     int numStartedNodes_, numNotifiedEdges_;
 
-    std::mutex mtxWrite_;
+    CriticalClock::time_point cycleStartCritical_ = CriticalClock::now();
+    std::uint64_t processCPUStartNanoseconds_ = 0;
+
+    mutable std::mutex mtxWrite_;
 
 private:
     Node& node(const NodeLabel& label)
     {
         auto [it, emplaced] = nodes_.try_emplace(label.id, Node{label, -1});
         return it->second;
+    }
+
+    static std::uint64_t processCPUNanoseconds()
+    {
+        timespec value{};
+        if (clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &value) != 0)
+            return 0;
+        return static_cast<std::uint64_t>(value.tv_sec) * 1000000000ULL +
+               static_cast<std::uint64_t>(value.tv_nsec);
+    }
+
+    std::uint64_t relativeNanoseconds(CriticalClock::time_point value) const
+    {
+        return static_cast<std::uint64_t>(
+            std::chrono::duration_cast<std::chrono::nanoseconds>(
+                value - cycleStartCritical_)
+                .count());
     }
 
 public:
@@ -162,10 +194,51 @@ public:
 
     void reset()
     {
+        std::lock_guard<std::mutex> lock(mtxWrite_);
         nodes_.clear();
         edges_.clear();
         numStartedNodes_ = 0;
         numNotifiedEdges_ = 0;
+        cycleStartCritical_ = CriticalClock::now();
+        processCPUStartNanoseconds_ = processCPUNanoseconds();
+#ifdef TANGOR_KVSP_STARPU_ASYNC
+        Tangor::beginIyokanCriticalProfileCycle(
+            static_cast<std::uint64_t>(
+                std::chrono::duration_cast<std::chrono::nanoseconds>(
+                    cycleStartCritical_.time_since_epoch()).count()));
+#endif
+    }
+
+    void readyNode(const NodeLabel& label,
+                   std::optional<int> releasedBy = std::nullopt)
+    {
+        std::lock_guard<std::mutex> lock(mtxWrite_);
+        auto& n = node(label);
+        if (!n.readyCritical)
+            n.readyCritical = CriticalClock::now();
+        if (releasedBy)
+            n.releasedBy = releasedBy;
+    }
+
+    void registerDomain(const NodeLabel& label, const std::string& domain)
+    {
+        std::lock_guard<std::mutex> lock(mtxWrite_);
+        configuredDomains_[label.id] = domain;
+    }
+
+    static std::uint64_t threadCPUNanoseconds()
+    {
+        timespec value{};
+        if (clock_gettime(CLOCK_THREAD_CPUTIME_ID, &value) != 0)
+            return 0;
+        return static_cast<std::uint64_t>(value.tv_sec) * 1000000000ULL +
+               static_cast<std::uint64_t>(value.tv_nsec);
+    }
+
+    void recordNodeCPU(const NodeLabel& label, std::uint64_t nanoseconds)
+    {
+        std::lock_guard<std::mutex> lock(mtxWrite_);
+        node(label).cpuNanoseconds += nanoseconds;
     }
 
     void startNode(const NodeLabel& label)
@@ -176,6 +249,9 @@ public:
         n.index = numStartedNodes_++;
         assert(!n.start && !n.end);
         n.start = std::chrono::high_resolution_clock::now();
+        n.startCritical = CriticalClock::now();
+        if (!n.readyCritical)
+            n.readyCritical = n.startCritical;
     }
 
     void finishNode(const NodeLabel& label)
@@ -185,11 +261,27 @@ public:
         auto& n = node(label);
         assert(n.start && !n.end);
         n.end = std::chrono::high_resolution_clock::now();
+        n.endCritical = CriticalClock::now();
+    }
+
+    void notify(const NodeLabel& from, const NodeLabel& to, bool released)
+    {
+        std::lock_guard<std::mutex> lock(mtxWrite_);
+        auto& target = node(to);
+        const bool causal = !target.startCritical.has_value();
+        const int edgeIndex = numNotifiedEdges_++;
+        edges_.push_back(Edge{from.id, to.id, edgeIndex,
+                              CriticalClock::now(), causal, released});
+        if (causal && released) {
+            if (!target.readyCritical)
+                target.readyCritical = edges_.back().notifiedCritical;
+            target.releasedBy = from.id;
+        }
     }
 
     void notify(const NodeLabel& from, const NodeLabel& to)
     {
-        edges_.push_back(Edge{from.id, to.id, numNotifiedEdges_++});
+        notify(from, to, false);
     }
 
     void dumpTime(std::ostream& os) const
@@ -257,6 +349,9 @@ public:
         root.emplace("edges", edges);
         os << picojson::value(root);
     }
+
+    void dumpCriticalJSON(std::ostream& os, int cycle,
+                          unsigned cpuWorkers) const;
 
     void dumpDOT(std::ostream& os) const
     {
@@ -818,12 +913,14 @@ void DepNode<WorkerInfo>::propagate(ReadyQueue<WorkerInfo>& readyQueue,
                                     ProgressGraphMaker& graph)
 {
     graph.finishNode(label());
-
-    propagate(readyQueue);
-
     for (auto&& dep_weak : dependents_) {
         auto dep = dep_weak.lock();
-        graph.notify(label(), dep->label());
+        auto&& task = dep->task_;
+        task->notifyOneInputReady();
+        const bool released = !dep->hasQueued() && task->areInputsReady();
+        graph.notify(label(), dep->label(), released);
+        if (released)
+            readyQueue.push(dep);
     }
 }
 
@@ -944,11 +1041,22 @@ public:
         return id2node_.size();
     }
 
-    void pushReadyTasks(ReadyQueue<WorkerInfo>& queue) const
+    void registerProfileDomain(ProgressGraphMaker& graph,
+                               const std::string& domain) const
+    {
+        for (const auto& [_, node] : id2node_)
+            graph.registerDomain(node->label(), domain);
+    }
+
+    void pushReadyTasks(ReadyQueue<WorkerInfo>& queue,
+                        ProgressGraphMaker* graph = nullptr) const
     {
         for (auto&& [id, node] : id2node_)
-            if (node->task()->areInputsReady())
+            if (node->task()->areInputsReady()) {
+                if (graph)
+                    graph->readyNode(node->label());
                 queue.push(node);
+            }
     }
 
     std::shared_ptr<DepNode<WorkerInfo>>& node(int id)
@@ -1444,12 +1552,15 @@ private:
         thr_ = [this, wi, graph] {
             if (graph)
                 graph->startNode(this->depnode()->label());
+            const std::uint64_t cpuStarted =
+                graph ? ProgressGraphMaker::threadCPUNanoseconds() : 0;
 #ifdef TANGOR_KVSP_STARPU_ASYNC
             if constexpr (requires { wi.ek; }) {
                 if (wi.ek)
                     Tangor::prepareIyokanStarpu(*wi.ek);
             }
-            Tangor::beginIyokanStarpuCapture();
+            Tangor::beginIyokanStarpuCapture(this->depnode()->label().id,
+                                             this->depnode()->label().kind);
 #endif
             startSync(wi);
 #ifdef TANGOR_KVSP_STARPU_ASYNC
@@ -1465,6 +1576,10 @@ private:
                     Tangor::markIyokanTRGSWFFTHostWrite(this->output());
             }
 #endif
+            if (graph)
+                graph->recordNodeCPU(
+                    this->depnode()->label(),
+                    ProgressGraphMaker::threadCPUNanoseconds() - cpuStarted);
         };
     }
 
@@ -1990,6 +2105,15 @@ public:
         return builtinRAMs_;
     }
 
+    std::string profileDomain(const std::string& networkName) const
+    {
+        for (const auto& ram : builtinRAMs_)
+            if (ram.name == networkName) return "ram:" + networkName;
+        for (const auto& rom : builtinROMs_)
+            if (rom.name == networkName) return "rom:" + networkName;
+        return "core:" + networkName;
+    }
+
     const std::vector<std::pair<blueprint::Port, blueprint::Port>>& edges()
         const
     {
@@ -2029,7 +2153,7 @@ struct Options {
     std::optional<std::string> ekFile, inputFile, outputFile, secretKey,
         dumpPrefix, snapshotFile, resumeFile;
     std::optional<std::string> dumpTimeCSVPrefix, dumpGraphJSONPrefix,
-        dumpGraphDOTPrefix;
+        dumpGraphDOTPrefix, criticalProfilePrefix;
     SCHED sched = SCHED::UND;
     bool stdoutCSV = false, skipReset = false,
          showCombinationalProgress = false;
@@ -2071,14 +2195,14 @@ public:
                               std::forward<Args>(args)...);
     }
 
-    void prepareToRun()
+    void prepareToRun(ProgressGraphMaker* graph = nullptr)
     {
         assert(readyQueue_->empty());
         assert(nets_.empty() || workers_.size() > 0);
 
         numFinishedTargets_ = 0;
         for (auto&& net : nets_)
-            net->pushReadyTasks(*readyQueue_);
+            net->pushReadyTasks(*readyQueue_, graph);
     }
 
     size_t numNodes() const

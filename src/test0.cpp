@@ -521,6 +521,22 @@ void testProgressGraphMaker()
     assert(dot.find(fmt::sprintf("n%d -> n%d", id2, id3)) != std::string::npos);
     assert(dot.find(fmt::sprintf("n%d -> n%d", id0, id4)) != std::string::npos);
     assert(dot.find(fmt::sprintf("n%d -> n%d", id3, id4)) != std::string::npos);
+
+    std::stringstream criticalStream;
+    graph->dumpCriticalJSON(criticalStream, 0, 1);
+    picojson::value criticalValue;
+    const std::string parseError =
+        picojson::parse(criticalValue, criticalStream);
+    assert(parseError.empty());
+    const auto& critical = criticalValue.get<picojson::object>();
+    assert(critical.at("schema_version").get<double>() == 1.0);
+    assert(critical.at("completeness").get<picojson::object>()
+               .at("causal_graph_valid").get<bool>());
+    size_t noncausalEdges = 0;
+    for (const auto& edgeValue : critical.at("edges").get<picojson::array>())
+        if (!edgeValue.get<picojson::object>().at("causal").get<bool>())
+            ++noncausalEdges;
+    assert(noncausalEdges == 1);
 }
 
 #include "iyokan_tfhepp.hpp"

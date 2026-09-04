@@ -449,7 +449,11 @@ public:
 
     void startAsync(TFHEppWorkerInfo, ProgressGraphMaker* graph) override
     {
-        thr_ = [this] {
+        thr_ = [this, graph] {
+            if (graph)
+                graph->startNode(this->depnode()->label());
+            const std::uint64_t cpuStarted =
+                graph ? ProgressGraphMaker::threadCPUNanoseconds() : 0;
             output_->trlwehost = *inputWritten_.lock();
             for (size_t j = 0; j < getAddressWidth(); j++) {
                 const TRGSWLvl1FFT& in = (memIndex_ >> j) & 1u
@@ -460,6 +464,10 @@ public:
                                       output_->trlwehost,
                                       mem_.lock()->trlwehost);
             }
+            if (graph)
+                graph->recordNodeCPU(
+                    this->depnode()->label(),
+                    ProgressGraphMaker::threadCPUNanoseconds() - cpuStarted);
         };
     }
 
@@ -722,8 +730,8 @@ public:
     {
         if (graph_)
             graph_->reset();
-        cufhe_.prepareToRun();
-        tfhepp_.prepareToRun();
+        cufhe_.prepareToRun(graph_.get());
+        tfhepp_.prepareToRun(graph_.get());
 
         size_t numNodes = cufhe_.numNodes() + tfhepp_.numNodes() +
                           bridges0_.size() + bridges1_.size();

@@ -75,7 +75,6 @@ private:
         if (getInputSize() == 0) {
             if (graph)
                 graph->startNode(this->depnode()->label());
-
             // Nothing to do!
         }
         else if (getInputSize() == 1) {
@@ -744,9 +743,12 @@ public:
         thr_ = [this, graph] {
             if (graph)
                 graph->startNode(this->depnode()->label());
+            const std::uint64_t cpuStarted =
+                graph ? ProgressGraphMaker::threadCPUNanoseconds() : 0;
 
 #ifdef TANGOR_KVSP_STARPU_ASYNC
-            Tangor::beginIyokanStarpuCapture();
+            Tangor::beginIyokanStarpuCapture(this->depnode()->label().id,
+                                             this->depnode()->label().kind);
 #endif
             *output_ = *inputWritten_.lock();
 #ifdef TANGOR_KVSP_STARPU_ASYNC
@@ -761,6 +763,10 @@ public:
 #ifdef TANGOR_KVSP_STARPU_ASYNC
             tangorTask_ = Tangor::endIyokanStarpuCapture();
 #endif
+            if (graph)
+                graph->recordNodeCPU(
+                    this->depnode()->label(),
+                    ProgressGraphMaker::threadCPUNanoseconds() - cpuStarted);
         };
     }
 
@@ -920,6 +926,15 @@ public:
         thr_ = [this, wi = std::move(wi), graph] {
             if (graph)
                 graph->startNode(this->depnode()->label());
+            const std::uint64_t criticalCPUStarted =
+                graph ? ProgressGraphMaker::threadCPUNanoseconds() : 0;
+            const auto recordCriticalCPU = [&] {
+                if (graph)
+                    graph->recordNodeCPU(
+                        this->depnode()->label(),
+                        ProgressGraphMaker::threadCPUNanoseconds() -
+                            criticalCPUStarted);
+            };
 
             const auto written = inputWritten_.lock();
             assert(written);
@@ -987,8 +1002,13 @@ public:
                 outputs.reserve(memory.size());
                 for (const auto& value : memory)
                     outputs.push_back(value.get());
-                tangorTask_ = Tangor::runIyokanStarpuRamGateBootstrapBatch(
+                Tangor::beginIyokanStarpuCapture(
+                    this->depnode()->label().id,
+                    this->depnode()->label().kind);
+                Tangor::runIyokanStarpuRamGateBootstrapBatch(
                     outputs, refreshInputs, *wi.ek);
+                tangorTask_ = Tangor::endIyokanStarpuCapture();
+                recordCriticalCPU();
                 return;
             }
 #endif
@@ -1001,6 +1021,7 @@ public:
                 Tangor::markIyokanTRLWEHostWrite(*memory[offset]);
 #endif
             }
+            recordCriticalCPU();
         };
     }
 

@@ -118,6 +118,8 @@ int main(int argc, char** argv)
                           "");
         plain->add_option("--dump-graph-dot-prefix", opt.dumpGraphDOTPrefix,
                           "");
+        plain->add_option("--critical-profile-prefix",
+                          opt.criticalProfilePrefix, "");
         plain->add_option("--sched", opt.sched, "")
             ->transform(CLI::CheckedTransformer(mapSched, CLI::ignore_case));
         plain->add_flag("--skip-reset", opt.skipReset, "");
@@ -166,6 +168,8 @@ int main(int argc, char** argv)
         tfhe->add_option("--dump-graph-json-prefix", opt.dumpGraphJSONPrefix,
                          "");
         tfhe->add_option("--dump-graph-dot-prefix", opt.dumpGraphDOTPrefix, "");
+        tfhe->add_option("--critical-profile-prefix",
+                         opt.criticalProfilePrefix, "");
         tfhe->add_option("--sched", opt.sched, "")
             ->transform(CLI::CheckedTransformer(mapSched, CLI::ignore_case));
 
@@ -276,6 +280,9 @@ int main(int argc, char** argv)
                      *opt.dumpGraphJSONPrefix);
     if (opt.dumpGraphDOTPrefix)
         spdlog::info("\t--dump-graph-dot-prefix: {}", *opt.dumpGraphDOTPrefix);
+    if (opt.criticalProfilePrefix)
+        spdlog::info("\t--critical-profile-prefix: {}",
+                     *opt.criticalProfilePrefix);
     if (opt.sched != SCHED::UND) {
         std::string str;
         switch (opt.sched) {
@@ -372,6 +379,8 @@ int main(int argc, char** argv)
             // CUDA launch slots, not CPU threads. `--gpu` remains the tuning
             // override while Tangor keeps StarPU's physical CPU pool bounded.
             : static_cast<unsigned>(opt.numGPUWorkers.value_or(800)));
+    Tangor::setIyokanCriticalProfileEnabled(
+        opt.criticalProfilePrefix.has_value());
 #endif
 
 #ifdef TANGOR_KVSP_STARPU_ASYNC
